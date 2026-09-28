@@ -3,7 +3,18 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-const DB_PATH = path.join(__dirname, '..', 'data', 'db.json');
+const SEED_DB_PATH = path.join(__dirname, '..', 'data', 'db.json');
+const DB_PATH = process.env.DATA_DIR
+  ? path.join(process.env.DATA_DIR, 'db.json')
+  : SEED_DB_PATH;
+if (DB_PATH !== SEED_DB_PATH && !fs.existsSync(DB_PATH)) {
+  fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+  const initialDB = JSON.parse(fs.readFileSync(SEED_DB_PATH, 'utf8'));
+  // A fresh persistent volume should use the configured ADMIN_PASSWORD, not
+  // carry the development admin account from the bundled seed database.
+  initialDB.users = [];
+  fs.writeFileSync(DB_PATH, JSON.stringify(initialDB, null, 2));
+}
 let db = JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
 
 function saveDB() {

@@ -29,6 +29,19 @@ CMS backend and renderer are written on the Node standard library only.
 > *Users & Roles* (create a new super-admin, then remove the default account).
 > Sessions expire after 10 hours; login is rate-limited; every admin POST is CSRF-protected.
 
+## 1.1 Deploy to Render
+
+This repository includes a Render Blueprint in `render.yaml`. The application uses only Node.js built-ins, so no `npm install` is needed. The Blueprint attaches a persistent disk at `/var/data` for the CMS database. Render persistent disks require a paid web-service plan; do not remove the disk unless you have another persistent database/storage plan, or CMS edits can be lost on redeploy.
+
+1. Push this project to a GitHub or GitLab repository.
+2. In Render, choose **New → Blueprint**, connect the repository, and select its branch. Render reads `render.yaml` and creates the web service and persistent disk.
+3. When prompted for `ADMIN_PASSWORD`, enter a unique, strong password and keep it private. On the disk's first initialization, the site copies the content database without its development admin account, then creates the `admin` user using this password.
+4. After deployment, open the service URL and sign in at `/admin` with username `admin` and the password you supplied.
+5. Set `BASE_URL` in the Render service environment to the deployed Render URL, or to your custom HTTPS domain after connecting it. Redeploy for canonical URLs and the sitemap to reflect the selected domain.
+6. Add the custom domain in Render if needed and follow Render's DNS instructions. Render provides HTTPS for connected domains.
+
+The service listens on Render's assigned `PORT`. The CMS database persists on the attached disk at `/var/data/db.json`; keep regular backups of that file. `ADMIN_PASSWORD` is only used to create the initial admin on a fresh disk. Changing the environment variable later does not reset an existing CMS password.
+
 ---
 
 ## 2. What was built

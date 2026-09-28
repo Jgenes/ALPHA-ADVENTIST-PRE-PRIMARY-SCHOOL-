@@ -155,8 +155,16 @@ function header(ctx) {
 </header>
 <div class="quickbar" role="navigation" aria-label="Quick contact actions">
   <a href="${esc(wa)}" target="_blank" rel="noopener">${icon('whatsapp')}<span>WhatsApp</span></a>
-  <a href="tel:${esc(s.phones[0].href)}">${icon('phone')}<span>Call</span></a>
+  <a href="tel:${esc(s.phones[0].href)}">${icon('phone')}<span>${esc(s.phones[0].number)}</span></a>
   <a href="/admissions#apply">${icon('pencil')}<span>Apply</span></a>
+</div>
+<div class="floating-contact" aria-label="Contact Alpha Adventist School">
+  <a class="floating-contact__link floating-contact__link--whatsapp" href="${esc(wa)}" target="_blank" rel="noopener" aria-label="Chat with the school on WhatsApp" title="Chat with us on WhatsApp">
+    ${icon('whatsapp')}<span>Chat on WhatsApp</span>
+  </a>
+  <a class="floating-contact__link floating-contact__link--phone" href="tel:${esc(s.phones[0].href)}" aria-label="Call the school office at ${esc(s.phones[0].number)}" title="Call ${esc(s.phones[0].number)}">
+    ${icon('phone')}<span>${esc(s.phones[0].number)}</span>
+  </a>
 </div>`;
 }
 
@@ -227,7 +235,7 @@ function page(ctx, body, meta = {}) {
 <link rel="manifest" href="/site.webmanifest">
 <link rel="preload" as="image" href="/img/${(ctx.db.hero[0] && ctx.db.hero[0].image) || 'choir-green'}-1600.webp" type="image/webp">
 <link rel="stylesheet" href="/fonts/fonts.css">
-<link rel="stylesheet" href="/css/main.css?v=2">
+<link rel="stylesheet" href="/css/main.css?v=3">
 ${jsonld}</head>
 <body class="${meta.bodyClass || ''}">
 ${header(ctx)}

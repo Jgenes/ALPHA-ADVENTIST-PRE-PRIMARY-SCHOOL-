@@ -124,11 +124,21 @@ section{position:relative}
 .mobilenav__ctas{display:grid;gap:10px;padding:14px clamp(16px,4vw,32px) 26px}
 /* ---------- quickbar (mobile) ---------- */
 .quickbar{display:none}
+.floating-contact{position:fixed;right:22px;bottom:24px;z-index:96;display:grid;gap:12px}
+.floating-contact__link{position:relative;width:56px;height:56px;display:grid;place-items:center;border-radius:50%;color:#fff;text-decoration:none;box-shadow:0 8px 24px rgba(5,14,44,.25);transition:transform .18s,box-shadow .18s}
+.floating-contact__link:hover{transform:translateY(-3px);box-shadow:0 12px 28px rgba(5,14,44,.32)}
+.floating-contact__link .icon{width:25px;height:25px}
+.floating-contact__link--whatsapp{background:#168b50}
+.floating-contact__link--phone{background:var(--navy)}
+.floating-contact__link span{position:absolute;right:calc(100% + 10px);top:50%;transform:translate(6px,-50%);max-width:0;overflow:hidden;white-space:nowrap;padding:0;border-radius:999px;background:#fff;color:var(--navy-900);font-size:.8rem;font-weight:700;box-shadow:var(--shadow-1);opacity:0;transition:max-width .2s,opacity .2s,transform .2s,padding .2s}
+.floating-contact__link:hover span,.floating-contact__link:focus-visible span{max-width:240px;padding:9px 14px;opacity:1;transform:translate(0,-50%)}
 @media (max-width:820px){
   .quickbar{display:grid;grid-template-columns:1fr 1fr 1fr;position:fixed;left:0;right:0;bottom:0;z-index:95;background:var(--navy-900);box-shadow:0 -6px 24px rgba(5,14,44,.35);padding-bottom:env(safe-area-inset-bottom)}
   .quickbar a{display:flex;flex-direction:column;align-items:center;gap:3px;padding:10px 4px 12px;color:#dfe6f5;text-decoration:none;font-size:.72rem;font-weight:700;letter-spacing:.04em}
   .quickbar a .icon{width:21px;height:21px;color:var(--gold)}
   .quickbar a:active{background:rgba(255,255,255,.08)}
+  .quickbar a:nth-child(2) span{font-size:.62rem;letter-spacing:0}
+  .floating-contact{display:none}
   body{padding-bottom:62px}
   .footer{padding-bottom:0}
 }
@@ -633,4 +643,5 @@ pre,code{white-space:pre-wrap;overflow-wrap:anywhere}
   .hero__nav-in{gap:8px}
   .game__stats{gap:10px;flex-wrap:wrap}
   .quickbar a{font-size:.68rem}
+  .quickbar a:nth-child(2) span{font-size:.56rem}
 }
