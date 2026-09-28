@@ -9,34 +9,42 @@ module.exports = {
   render(ctx) {
     const db = ctx.db, s = db.settings;
     const wa = `https://wa.me/${s.whatsapp.href}?text=${encodeURIComponent('Hello Alpha Adventist Pre & Primary School, I am a parent/guardian and would like information.')}`;
+    const announcementContent = db.announcements.length
+      ? `<div class="parent-modal__notices">${db.announcements.map(a => `<article class="announce"><div class="news-meta"><span class="news-cat">${esc(a.tag)}</span><span>${esc(a.dateLabel)}</span></div><h3>${esc(a.title)}</h3><p>${esc(a.body)}</p></article>`).join('')}</div>`
+      : '<p class="muted">There are no current announcements. Official notices will appear here when published by the school.</p>';
+    const proposedCourses = db.courses.filter(course => course.status === 'proposed');
+    const parentItems = [
+      { icon: 'calendar', title: 'School Calendar', teaser: 'Term dates and approved school events', status: 'Sample preview · dates awaiting approval', content: '<p>This preview shows how the approved school calendar will be presented. Official dates will replace these placeholders when published.</p><dl class="parent-modal__facts"><div><dt>Term opening</dt><dd>To be announced</dd></div><div><dt>Term closing</dt><dd>To be announced</dd></div><div><dt>Approved school events</dt><dd>To be announced</dd></div><div><dt>Parent meeting dates</dt><dd>To be announced</dd></div></dl>' },
+      { icon: 'mega', title: 'Announcements', teaser: 'Important official notices', status: 'Current school notices', content: announcementContent },
+      { icon: 'clipboard', title: 'Examination Information', teaser: 'Approved assessment and examination schedules', status: 'Schedule preview · official dates pending', content: '<p>Approved assessment and examination information will be displayed here when released by the school.</p><div class="parent-modal__sample"><strong>Schedule preview</strong><dl class="parent-modal__facts"><div><dt>Class / level</dt><dd>Published in the approved notice</dd></div><div><dt>Examination dates</dt><dd>To be announced</dd></div><div><dt>Subjects and sessions</dt><dd>To be announced</dd></div></dl></div><p class="parent-modal__privacy">Individual pupil results and reports are private and are never displayed on this public page.</p>' },
+      { icon: 'book', title: 'Academic Information', teaser: 'Homework and learning guidance when approved', status: 'Example · not a current assignment', content: '<div class="parent-modal__sample"><strong>Example learning note</strong><p>Read together for a few minutes, talk about the story, and encourage your child to explain one new idea in their own words.</p><small>This is an illustrative example, not an assigned homework task. Class-specific guidance will be posted when approved.</small></div><p>Explore the published <a href="/academics">academic programme</a> for information about learning levels and subjects.</p>' },
+      { icon: 'users', title: 'Parent Meetings', teaser: 'Dates, notices and relevant information', status: 'Meeting notice preview · date pending', content: '<p>Approved parent meeting notices will appear here. This sample shows the information families can expect to see:</p><dl class="parent-modal__facts"><div><dt>Date and time</dt><dd>To be announced</dd></div><div><dt>Venue</dt><dd>To be announced</dd></div><div><dt>Meeting information</dt><dd>To be announced</dd></div></dl>' },
+      { icon: 'shield', title: 'School Rules & Joining Information', teaser: 'Approved parent and pupil guidance', status: 'Guidance preview · official document pending', content: '<p>Approved school rules and joining guidance will be published or linked here when authorised. Information may include:</p><ul class="parent-modal__list"><li>Daily routines and attendance</li><li>School expectations and respectful conduct</li><li>Joining requirements for day and boarding pupils</li><li>Family communication and pupil wellbeing guidance</li></ul><p>For current admissions steps, see <a href="/admissions">Admissions</a>.</p>' },
+      { icon: 'badge', title: 'Fee Information', teaser: 'Current, management-approved fee schedules only', status: 'Fee schedule preview · official amounts not published', content: '<p>Only a current fee schedule approved by school management will be published here. No sample amounts are shown.</p><dl class="parent-modal__facts"><div><dt>Pre-Primary / Primary fees</dt><dd>See approved schedule when published</dd></div><div><dt>Day / boarding charges</dt><dd>See approved schedule when published</dd></div><div><dt>Payment instructions</dt><dd>Published with the approved schedule</dd></div></dl><p class="parent-modal__privacy">Individual pupil balances, account details and payment records are confidential and will never appear on this public page.</p>' },
+      { icon: 'download', title: 'Policies & Downloads', teaser: 'Documents approved for public distribution', status: 'Download area preview', content: '<p>Only documents approved by school management for public distribution will be listed here. No downloadable policy documents are currently published.</p><div class="parent-modal__sample"><strong>Public documents area</strong><ul class="parent-modal__list"><li>Approved school policies</li><li>Approved parent and pupil guidance</li><li>Public forms and information sheets</li></ul><small>Documents will appear here after approval and upload.</small></div>' },
+      { icon: 'laptop', title: 'Computer Training Notices', teaser: 'Registration notices after programme approval', status: 'Proposed · not yet operational', content: `<p>Community computer training is proposed and is not yet operational. The following course ideas are under consideration:</p><ul class="parent-modal__list">${proposedCourses.map(course => `<li>${esc(course.title)}</li>`).join('')}</ul><p>Registration information will be posted after formal approval and launch. See <a href="/computer-learning#community">Computer Learning</a> for programme updates.</p>` },
+      { icon: 'phone', title: 'Contact the School', teaser: 'Official phone, WhatsApp and email channels', status: 'Official contact channels', content: `<p>The school office responds during working hours on school days.</p><div class="parent-modal__contact"><a href="tel:${esc(s.phones[0].href)}">${icon('phone')}<span><strong>Call the school office</strong><small>${esc(s.phones[0].number)}</small></span></a><a href="${esc(wa)}" target="_blank" rel="noopener">${icon('whatsapp')}<span><strong>WhatsApp</strong><small>${esc(s.whatsapp.number)}</small></span></a><a href="mailto:${esc(s.email)}">${icon('mail')}<span><strong>Email</strong><small>${esc(s.email)}</small></span></a></div>` }
+    ];
     const body = `
 ${phero(ctx, 'Parent Corner', 'Parent Corner', 'Keeping Alpha families informed and connected — calendars, announcements, examinations, boarding information and direct lines to the school office.', 'graduation-group')}
 
 <section class="sec">
   <div class="container">
-    ${sectionHead('Information for Families', 'Everything in One Place', 'The Parent Corner gathers the information families ask for most. Documents approved for public distribution are published here; everything else is available directly from the school office.')}
+    ${sectionHead('Information for Families', 'Everything in One Place', 'Select a card to open details. Documents approved for public distribution are published here; private pupil and family records are kept confidential.')}
     <div class="parent-grid">
-      <div class="card rv"><div class="card__ico">${icon('calendar')}</div><h3>School Calendar</h3><p>Term dates, approved school events, parent meetings and the daily routine are formal governance items of the School Board. The current calendar is available from the school office and published here once approved for public distribution.</p><span class="badge-soon">Published by office</span></div>
-      <div class="card rv"><div class="card__ico">${icon('clipboard')}</div><h3>Examinations</h3><p>Approved assessment and examination schedules, and guidance on how pupils are monitored and reported on, are provided to families by the school office.</p><span class="badge-soon">Published by office</span></div>
-      <div class="card rv"><div class="card__ico">${icon('shield')}</div><h3>School Rules &amp; Joining Information</h3><p>Approved parent and pupil guidance — cleanliness, order, supervision, child welfare, positive relationships and appropriate use of technology — is shared with families during admissions.</p><span class="badge-soon">Provided on admission</span></div>
-      <div class="card rv"><div class="card__ico">${icon('bed')}</div><h3>Boarding Information</h3><p>Boarding routines, supervision, evening study and current availability per class are confirmed by the school office during the admissions process.</p><a class="link-more" href="/admissions">Admissions information ${icon('arrow')}</a></div>
-      <div class="card rv"><div class="card__ico">${icon('mega')}</div><h3>Important Notices</h3><p>Official announcements from the school office appear below and on the homepage.</p><a class="link-more" href="#announcements">Read notices ${icon('arrow')}</a></div>
-      <div class="card rv"><div class="card__ico">${icon('phone')}</div><h3>Contact the School</h3><p>Call, WhatsApp or email the school office — the fastest way to reach your child's teachers and the administration.</p><a class="link-more" href="/contact">All contact channels ${icon('arrow')}</a></div>
+      ${parentItems.map((item, i) => `
+      <button class="parent-card rv" type="button" data-parent-modal="parent-modal-${i}" aria-haspopup="dialog" aria-controls="parent-modal-${i}">
+        <span class="parent-card__summary"><span class="parent-card__icon">${icon(item.icon)}</span><span class="parent-card__heading"><strong>${esc(item.title)}</strong><small>${esc(item.teaser)}</small></span></span>
+        <span class="parent-card__open">View details ${icon('arrow')}</span>
+      </button>`).join('')}
     </div>
-  </div>
-</section>
-
-<section class="sec sec--sand" id="announcements">
-  <div class="container">
-    ${sectionHead('Announcements', 'Official Notices from the School Office', '', { align: 'center' })}
-    <div class="grid" style="grid-template-columns:1fr;max-width:860px;margin-inline:auto">
-      ${db.announcements.map(a => `
-      <div class="announce rv">
-        <div class="news-meta"><span class="news-cat">${esc(a.tag)}</span><span>${esc(a.dateLabel)}</span></div>
-        <h4>${esc(a.title)}</h4>
-        <p>${esc(a.body)}</p>
-      </div>`).join('') || '<p class="muted text-center">No current announcements. New notices from the school office will appear here.</p>'}
-    </div>
+    ${parentItems.map((item, i) => `
+    <dialog class="parent-modal" id="parent-modal-${i}" aria-labelledby="parent-modal-title-${i}">
+      <div class="parent-modal__panel">
+        <header class="parent-modal__header"><div><span class="kicker">Parent Corner</span><h2 id="parent-modal-title-${i}">${esc(item.title)}</h2><span class="parent-modal__status">${esc(item.status)}</span></div><button class="parent-modal__close" type="button" data-modal-close aria-label="Close ${esc(item.title)}">${icon('close')}</button></header>
+        <div class="parent-modal__body">${item.content}</div>
+      </div>
+    </dialog>`).join('')}
   </div>
 </section>
 
@@ -69,23 +77,7 @@ ${phero(ctx, 'Parent Corner', 'Parent Corner', 'Keeping Alpha families informed 
   </div>
 </section>
 
-<section class="sec sec--sand">
-  <div class="container">
-    ${sectionHead('News for Families', 'Latest from Alpha', '', { align: 'center' })}
-    <div class="grid grid--3">
-      ${db.news.slice(0, 3).map(n => `
-      <article class="news-card rv">
-        <div class="news-card__media">${pic(n.image, n.alt || n.title, { widths: [480, 800], sizes: '(max-width: 900px) 92vw, 30vw' })}</div>
-        <div class="news-card__in">
-          <div class="news-meta"><span class="news-cat">${esc(n.category)}</span><span>${esc(n.dateLabel)}</span></div>
-          <h3><a href="/news/${esc(n.slug)}">${esc(n.title)}</a></h3>
-          <p>${esc(n.excerpt)}</p>
-        </div>
-      </article>`).join('')}
-    </div>
-    <p class="text-center" style="margin-top:24px">${btn('/news', 'All News & Events', 'ghost', 'arrow')}</p>
-  </div>
-</section>`;
+`;
     return {
       body,
       meta: {

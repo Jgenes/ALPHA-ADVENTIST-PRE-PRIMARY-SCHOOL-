@@ -133,10 +133,13 @@ function serveStatic(req, res, urlPath, publicDir) {
   if (!st.isFile()) return false;
   const ext = path.extname(file).toLowerCase();
   const isAsset = ['/img/', '/fonts/', '/css/', '/js/'].some(p => urlPath.startsWith(p));
+  const cacheControl = ext === '.css' || ext === '.js'
+    ? 'no-cache'
+    : isAsset ? 'public, max-age=2592000' : 'public, max-age=3600';
   res.writeHead(200, {
     'Content-Type': MIME[ext] || 'application/octet-stream',
     'Content-Length': st.size,
-    'Cache-Control': isAsset ? 'public, max-age=2592000' : 'public, max-age=3600',
+    'Cache-Control': cacheControl,
     'X-Content-Type-Options': 'nosniff'
   });
   fs.createReadStream(file).pipe(res);

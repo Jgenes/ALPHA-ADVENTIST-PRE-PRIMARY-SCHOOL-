@@ -1,6 +1,7 @@
 /* Alpha Adventist Pre & Primary School — front-end behaviours */
 (function () {
   'use strict';
+  document.documentElement.classList.add('js');
   var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   /* ---------- sticky header shadow ---------- */
@@ -27,6 +28,28 @@
       if (e.target.closest('a')) { toggle.click(); }
     });
   }
+
+  /* ---------- Parent Corner detail dialogs ---------- */
+  document.querySelectorAll('[data-parent-modal]').forEach(function (trigger) {
+    var dialog = document.getElementById(trigger.getAttribute('data-parent-modal'));
+    if (!dialog || typeof dialog.showModal !== 'function') return;
+    trigger.addEventListener('click', function () { dialog.showModal(); });
+    var close = dialog.querySelector('[data-modal-close]');
+    if (close) close.addEventListener('click', function () { dialog.close(); });
+    dialog.addEventListener('cancel', function (e) {
+      e.preventDefault();
+      dialog.close();
+    });
+    dialog.addEventListener('click', function (e) {
+      if (e.target === dialog) dialog.close();
+    });
+    dialog.addEventListener('close', function () { trigger.focus(); });
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    var openDialog = document.querySelector('.parent-modal[open]');
+    if (openDialog) openDialog.close();
+  });
 
   /* ---------- hero slider ---------- */
   var hero = document.querySelector('[data-hero]');

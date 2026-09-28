@@ -47,14 +47,16 @@ module.exports = {
     const body = `
 ${heroSection(ctx)}
 
-<!-- 4 · Quick trust cards -->
-<section class="trust" aria-label="Why families trust Alpha">
+<!-- 4 · Quick features from the official website content brief -->
+<section class="trust" aria-label="Why choose Alpha">
   <div class="container">
     <div class="trust__grid">
-      <div class="trust__card rv"><div class="trust__ico" aria-hidden="true">${icon('cross')}</div><div><h3>Seventh-day Adventist Institution</h3><p>Operating within the Western Tanzania Conference – Kigoma, with Christian values at the heart of school life.</p></div></div>
-      <div class="trust__card rv"><div class="trust__ico" aria-hidden="true">${icon('book')}</div><div><h3>Holistic Education</h3><p>Physical, mental, social and spiritual development — the school's stated educational philosophy in practice.</p></div></div>
-      <div class="trust__card rv"><div class="trust__ico" aria-hidden="true">${icon('users')}</div><div><h3>KG I – Standard VII</h3><p>Pre-Primary and Primary levels with day and boarding life, within a supervised daily routine.</p></div></div>
-      <div class="trust__card rv"><div class="trust__ico" aria-hidden="true">${icon('laptop')}</div><div><h3>Computer Learning</h3><p>Practical ICT lessons, smartboard-supported teaching and Computer Lab activities for every level.</p></div></div>
+      <a class="trust__card rv" href="/academics"><div class="trust__ico" aria-hidden="true">${icon('book')}</div><div><h3>Quality Education</h3><p>Structured learning that develops strong academic foundations, confidence, curiosity and lifelong learning skills.</p></div></a>
+      <a class="trust__card rv" href="/faith"><div class="trust__ico" aria-hidden="true">${icon('flame')}</div><div><h3>Christian Values</h3><p>Christian education that promotes faith, integrity, respect, discipline, responsibility and service.</p></div></a>
+      <a class="trust__card rv" href="/computer-learning"><div class="trust__ico" aria-hidden="true">${icon('chip')}</div><div><h3>Computer &amp; Digital Learning</h3><p>Practical digital learning that prepares pupils to use technology confidently, creatively, responsibly and safely.</p></div></a>
+      <a class="trust__card rv" href="/school-life#talent"><div class="trust__ico" aria-hidden="true">${icon('star')}</div><div><h3>Talent Development</h3><p>Opportunities to discover and develop abilities through creativity, music, communication and technology.</p></div></a>
+      <a class="trust__card rv" href="/privacy"><div class="trust__ico" aria-hidden="true">${icon('shield')}</div><div><h3>Supportive Learning Environment</h3><p>A disciplined, supportive and child-friendly environment that encourages learning, responsibility and positive relationships.</p></div></a>
+      <a class="trust__card rv" href="/about#head-of-school"><div class="trust__ico" aria-hidden="true">${icon('users')}</div><div><h3>Dedicated Teachers</h3><p>Teachers committed to guiding learners through quality instruction, encouragement, care and professional responsibility.</p></div></a>
     </div>
   </div>
 </section>
@@ -174,9 +176,15 @@ ${heroSection(ctx)}
       <div class="techcard rv">
         <h3>${icon('laptop')} Pupil Computer Learning <span class="badge-now">In school</span></h3>
         <p>Age-appropriate ICT lessons built on Alpha's “clear • simple • practical” approach, with smartboard support and Computer Lab activities.</p>
-        <ul class="skillchips">
-          <li>Computer fundamentals</li><li>Keyboard &amp; mouse</li><li>Typing</li><li>Files &amp; folders</li><li>Word processing</li><li>Digital creativity</li><li>Internet awareness</li><li>Digital safety</li><li>Introductory coding</li>
-        </ul>
+        <div class="skill-list">
+          <ul class="skillchips"><li>Computer fundamentals</li></ul>
+          <details class="skillchips-more">
+            <summary><span class="skill-more-label">View more</span><span class="skill-less-label">View less</span></summary>
+            <ul class="skillchips">
+              <li>Keyboard &amp; mouse</li><li>Typing</li><li>Files &amp; folders</li><li>Word processing</li><li>Digital creativity</li><li>Internet awareness</li><li>Digital safety</li><li>Introductory coding</li>
+            </ul>
+          </details>
+        </div>
       </div>
       <div class="techcard rv">
         <h3>${icon('users')} Teacher &amp; Staff ICT <span class="badge-now">Ongoing</span></h3>

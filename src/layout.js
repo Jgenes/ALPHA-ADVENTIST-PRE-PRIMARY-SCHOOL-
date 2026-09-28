@@ -227,7 +227,7 @@ function page(ctx, body, meta = {}) {
 <link rel="manifest" href="/site.webmanifest">
 <link rel="preload" as="image" href="/img/${(ctx.db.hero[0] && ctx.db.hero[0].image) || 'choir-green'}-1600.webp" type="image/webp">
 <link rel="stylesheet" href="/fonts/fonts.css">
-<link rel="stylesheet" href="/css/main.css">
+<link rel="stylesheet" href="/css/main.css?v=2">
 ${jsonld}</head>
 <body class="${meta.bodyClass || ''}">
 ${header(ctx)}

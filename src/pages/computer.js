@@ -13,10 +13,10 @@ module.exports = {
     const body = `
 ${phero(ctx, 'Computer Learning', 'Preparing Learners for the Digital Future', 'Practical computer learning, digital creativity and responsible technology use — for pupils today, for staff, and for the wider community tomorrow.', 'exhibit-teacher')}
 
-<section class="sec techband" id="pupils">
+<section class="sec sec--sand pupil-learning" id="pupils">
   <div class="container">
     ${sectionHead('Pupil Computer Learning', 'Clear • Simple • Practical', 'Alpha\'s pupil ICT lessons are built on hands-on practice, smartboard-supported teaching and Computer Lab activities — progressing with age from first touch of a keyboard to responsible internet use.')}
-    <div class="techgrid">
+    <div class="techgrid techgrid--levels">
       <div class="techcard rv">
         <h3>${icon('sun')} Foundation — KG I &amp; II</h3>
         <ul>
@@ -42,11 +42,15 @@ ${phero(ctx, 'Computer Learning', 'Preparing Learners for the Digital Future', '
         </ul>
       </div>
     </div>
-    <div style="margin-top:26px">
+    <div class="skills-panel">
       <h3 style="margin-bottom:12px">Skills Alpha pupils practise</h3>
-      <ul class="skillchips">
-        <li>Computer fundamentals</li><li>Computer parts</li><li>Keyboard &amp; mouse</li><li>Typing</li><li>Files &amp; folders</li><li>Word processing</li><li>Presentations</li><li>Spreadsheet fundamentals</li><li>Digital creativity</li><li>Internet awareness</li><li>Online research</li><li>Digital safety</li><li>Responsible use</li><li>Introductory coding</li>
-      </ul>
+      <ul class="skillchips"><li>Computer fundamentals</li><li>Computer parts</li><li>Keyboard &amp; mouse</li><li>Typing</li><li>Files &amp; folders</li></ul>
+      <details class="skillchips-more">
+        <summary><span class="skill-more-label">View all 14 ICT skills</span><span class="skill-less-label">Show fewer skills</span></summary>
+        <ul class="skillchips">
+          <li>Word processing</li><li>Presentations</li><li>Spreadsheet fundamentals</li><li>Digital creativity</li><li>Internet awareness</li><li>Online research</li><li>Digital safety</li><li>Responsible use</li><li>Introductory coding</li>
+        </ul>
+      </details>
     </div>
     <p style="margin-top:30px">${btn('#join', 'Join Computer Class', 'gold', 'keyboard')}</p>
   </div>
