@@ -249,16 +249,6 @@ const ROLE_PAGES = {
   '/admin/password': ['super', 'admin', 'editor', 'contributor'],
   '/admin/mfa': ['super', 'admin']
 };
-const ADMISSION_TRANSITIONS = {
-  SUBMITTED: ['DOCUMENTS_REQUIRED', 'UNDER_REVIEW'],
-  DOCUMENTS_REQUIRED: ['UNDER_REVIEW', 'DECLINED'],
-  UNDER_REVIEW: ['DOCUMENTS_REQUIRED', 'ASSESSMENT', 'ACCEPTED', 'WAITLISTED', 'DECLINED'],
-  ASSESSMENT: ['ACCEPTED', 'WAITLISTED', 'DECLINED'],
-  ACCEPTED: ['ENROLLED', 'DECLINED'],
-  WAITLISTED: ['ACCEPTED', 'DECLINED'],
-  DECLINED: [],
-  ENROLLED: []
-};
 function can(role, route) {
   const base = '/' + route.split('/').slice(1, 3).join('/');
   const roles = ROLE_PAGES[base];
@@ -389,7 +379,7 @@ async function handleAdmin(req, res, url) {
     if (route === '/admin/leadership') return send(res, 200, A.leadershipPage(ctx, msg));
     if (route === '/admin/settings') return send(res, 200, A.settingsPage(ctx, msg));
     if (route === '/admin/submissions') return send(res, 200, A.submissionsPage(ctx));
-    if (route === '/admin/admissions') return send(res, 200, A.admissionsPage(ctx, msg, ADMISSION_TRANSITIONS));
+    if (route === '/admin/admissions') return send(res, 200, A.admissionsPage(ctx, msg, L.ADMISSION_TRANSITIONS));
     if (route === '/admin/users') return send(res, 200, A.usersPage(ctx, msg));
     return redirect(res, '/admin');
   }
@@ -407,7 +397,7 @@ async function handleAdmin(req, res, url) {
       const reference = clean(body.applicationReference);
       const application = db.admissionApplications.find(item => item.applicationReference === reference);
       const nextStatus = clean(body.status);
-      if (!application || !ADMISSION_TRANSITIONS[application.status] || !ADMISSION_TRANSITIONS[application.status].includes(nextStatus)) {
+      if (!application || !L.ADMISSION_TRANSITIONS[application.status] || !L.ADMISSION_TRANSITIONS[application.status].includes(nextStatus)) {
         return redirect(res, '/admin/admissions?msg=' + encodeURIComponent('Invalid or unavailable status transition'));
       }
       const updated = await L.updateAdmissionStatus(reference, [application.status], nextStatus);

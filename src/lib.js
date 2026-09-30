@@ -25,6 +25,16 @@ let saveQueue = Promise.resolve();
 const MIGRATION_ID = 'legacy-platform-state-to-collections-v1';
 const STATE_ARRAYS = ['hero', 'pillars', 'courses', 'news', 'events', 'announcements', 'gallery', 'faqs', 'submissions', 'admissionApplications', 'users', 'auditLogs'];
 const STATE_OBJECTS = ['settings', 'statements', 'leadership', 'academics'];
+const ADMISSION_TRANSITIONS = {
+  SUBMITTED: ['DOCUMENTS_REQUIRED', 'UNDER_REVIEW'],
+  DOCUMENTS_REQUIRED: ['UNDER_REVIEW', 'DECLINED'],
+  UNDER_REVIEW: ['DOCUMENTS_REQUIRED', 'ASSESSMENT', 'ACCEPTED', 'WAITLISTED', 'DECLINED'],
+  ASSESSMENT: ['ACCEPTED', 'WAITLISTED', 'DECLINED'],
+  ACCEPTED: ['ENROLLED', 'DECLINED'],
+  WAITLISTED: ['ACCEPTED', 'DECLINED'],
+  DECLINED: [],
+  ENROLLED: []
+};
 const COLLECTION_VALIDATORS = {
   users: { $jsonSchema: { bsonType: 'object', required: ['username', 'name', 'role', 'salt', 'hash'], properties: { username: { bsonType: 'string', minLength: 1 }, name: { bsonType: 'string', minLength: 1 }, role: { enum: ['super', 'admin', 'editor', 'contributor'] }, salt: { bsonType: 'string' }, hash: { bsonType: 'string' } } } },
   news: { $jsonSchema: { bsonType: 'object', required: ['slug', 'title'], properties: { slug: { bsonType: 'string', minLength: 1 }, title: { bsonType: 'string', minLength: 1 } } } },
@@ -237,16 +247,18 @@ async function saveAdmissionApplication(application) {
   await saveDB('admissionApplications');
 }
 async function updateAdmissionStatus(reference, currentStatuses, nextStatus) {
+  const validSources = currentStatuses.filter(status => (ADMISSION_TRANSITIONS[status] || []).includes(nextStatus));
+  if (!validSources.length) return false;
   const now = new Date();
   if (mongoDatabase) {
     const result = await mongoDatabase.collection('admissionApplications').updateOne(
-      { applicationReference: reference, status: { $in: currentStatuses } },
+      { applicationReference: reference, status: { $in: validSources } },
       { $set: { status: nextStatus, updatedAt: now } }
     );
     if (!result.matchedCount) return false;
   }
   const application = db.admissionApplications.find(item => item.applicationReference === reference);
-  if (!application || !currentStatuses.includes(application.status)) return false;
+  if (!application || !validSources.includes(application.status)) return false;
   application.status = nextStatus;
   application.updatedAt = now;
   if (!mongoDatabase) await saveDB('admissionApplications');
@@ -480,7 +492,7 @@ function serveStatic(req, res, urlPath, publicDir) {
 }
 
 module.exports = {
-  db: getDB, initDB, saveDB, writeAuditEvent, nextAdmissionReference, saveAdmissionApplication, updateAdmissionStatus, closeDB, get data() { return db; },
+  db: getDB, initDB, saveDB, writeAuditEvent, nextAdmissionReference, saveAdmissionApplication, updateAdmissionStatus, ADMISSION_TRANSITIONS, closeDB, get data() { return db; },
   esc, paragraphs, parseCookies, cookieHeader,
   createSession, getSession, destroySession,
   newUser, verifyUser, isStrongPassword, validateMfaEncryptionKey, createTotpSecret, totp, verifyTotp, encryptMfaSecret, decryptMfaSecret,
