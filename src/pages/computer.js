@@ -100,11 +100,7 @@ ${phero(ctx, 'Computer Learning', 'Preparing Learners for the Digital Future', '
     <div class="sec-head">
       <span class="kicker">Community Computer Training</span>
       <h2>Alpha Computer &amp; Digital Learning Centre</h2>
-      <p class="sec-head__text">Alpha proposes to open computer training for the wider Kigoma community — practical digital skills for learning, work and everyday life. <strong style="color:var(--gold)">The programme is not yet operational;</strong> full details will be announced following formal approval and launch.</p>
-    </div>
-    <div class="grid grid--4">
-      ${proposed.map(c => `
-      <div class="techcard rv"><h3 style="font-size:1.02rem">${icon('chip')} ${esc(c.title)}</h3><p style="font-size:.86rem">${esc(c.blurb)}</p><span class="badge-soon">Coming soon</span></div>`).join('')}
+      <p class="sec-head__text">Alpha proposes to open computer training for the wider Kigoma community — practical digital skills for learning, work and everyday life. <strong style="color:var(--gold)">The programme is not yet operational;</strong> contact the office to register interest in an initial computer-fundamentals course. Dates, fees and payment instructions will be shared only after approval.</p>
     </div>
     <form class="card form" data-endpoint="/api/computer-interest" style="margin-top:30px;background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.18)" novalidate>
       <h3 style="color:#fff">Register Interest — Waiting List</h3>

@@ -58,12 +58,15 @@
     var dots = Array.prototype.slice.call(hero.querySelectorAll('.hero__dots button'));
     var prevB = hero.querySelector('[data-hero-prev]');
     var nextB = hero.querySelector('[data-hero-next]');
+    var pauseB = hero.querySelector('[data-hero-pause]');
+    var paused = reduced;
     var idx = 0, timer = null;
     var show = function (i) {
       idx = (i + slides.length) % slides.length;
       slides.forEach(function (s, n) {
         s.classList.toggle('is-active', n === idx);
         s.setAttribute('aria-hidden', String(n !== idx));
+        s.inert = n !== idx;
         var img = s.querySelector('img');
         if (img && n === idx) img.loading = 'eager';
       });
@@ -71,13 +74,23 @@
     };
     var stop = function () { if (timer) { clearInterval(timer); timer = null; } };
     var play = function () {
-      if (reduced || slides.length < 2) return;
+      if (reduced || paused || slides.length < 2) return;
       stop();
       timer = setInterval(function () { show(idx + 1); }, 7000);
     };
     dots.forEach(function (d, n) { d.addEventListener('click', function () { show(n); play(); }); });
     if (prevB) prevB.addEventListener('click', function () { show(idx - 1); play(); });
     if (nextB) nextB.addEventListener('click', function () { show(idx + 1); play(); });
+    if (pauseB) {
+      pauseB.setAttribute('aria-pressed', String(paused));
+      pauseB.setAttribute('aria-label', document.documentElement.lang === 'sw' ? (paused ? 'Endeleza slaidi' : 'Sitisha slaidi') : (paused ? 'Play slideshow' : 'Pause slideshow'));
+      pauseB.addEventListener('click', function () {
+        paused = !paused;
+        pauseB.setAttribute('aria-pressed', String(paused));
+        pauseB.setAttribute('aria-label', document.documentElement.lang === 'sw' ? (paused ? 'Endeleza slaidi' : 'Sitisha slaidi') : (paused ? 'Play slideshow' : 'Pause slideshow'));
+        if (paused) stop(); else play();
+      });
+    }
     hero.addEventListener('mouseenter', stop);
     hero.addEventListener('mouseleave', play);
     hero.addEventListener('focusin', stop);
@@ -191,11 +204,15 @@
   document.querySelectorAll('form[data-endpoint]').forEach(function (form) {
     form.addEventListener('submit', function (e) {
       e.preventDefault();
+      if (!form.reportValidity()) return;
       var status = form.querySelector('.form__status');
       var hp = form.querySelector('[name="website_url"]');
       if (hp && hp.value) { return; } /* honeypot: silently drop bots */
       var data = {};
       new FormData(form).forEach(function (v, k) { data[k] = v; });
+      if (!form.dataset.submissionKey) form.dataset.submissionKey = window.crypto && crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(36).slice(2);
+      data.submissionKey = form.dataset.submissionKey;
+      data.language = document.documentElement.lang;
       var btn = form.querySelector('button[type="submit"]');
       if (btn) btn.disabled = true;
       fetch(form.getAttribute('data-endpoint'), {
@@ -207,7 +224,7 @@
           status.className = 'form__status ' + (res.ok ? 'ok' : 'err');
           status.textContent = (res.message || (res.ok ? 'Thank you — your message has been received.' : 'Something went wrong. Please try again.')) + (res.reference ? ' Reference: ' + res.reference : '');
         }
-        if (res.ok) form.reset();
+        if (res.ok) { form.reset(); delete form.dataset.submissionKey; }
       }).catch(function () {
         if (status) { status.className = 'form__status err'; status.textContent = 'Network error — please try again or call the school office.'; }
       }).finally(function () { if (btn) btn.disabled = false; });
@@ -317,3 +334,8 @@
     });
   });
 })();
+
+// Installable public shell only; private routes are excluded by the worker.
+if ('serviceWorker' in navigator && window.isSecureContext) {
+  navigator.serviceWorker.register('/service-worker.js').catch(function () { /* Offline support is optional. */ });
+}

@@ -1,0 +1,165 @@
+'use strict';
+// Synthetic accounts and records only; the database is created in an OS temp
+// directory, never in a configured production/staging environment.
+const assert = require('node:assert/strict');
+const fs = require('node:fs/promises');
+const path = require('node:path');
+const AxeBuilder = require('@axe-core/playwright').default;
+const { chromium, expect } = require('@playwright/test');
+const { fixture, nextMonday, addDays, approve } = require('../test/helpers');
+async function main() {
+  const f = await fixture();
+  let browser;
+  try {
+    const teacher = f.users.teacher, hod = f.users.hod;
+    for (const user of [teacher, hod]) await f.agents.hr.ok('PUT', '/api/staff/' + user.id, { staffId: 'SYN-UI-' + user.username, position: 'Synthetic teacher', departmentId: 'primary', employmentType: 'Permanent', employmentDate: '2026-01-01', supervisorId: user.id === teacher.id ? hod.id : f.users.head.id });
+    const date = nextMonday();
+    await f.agents.hr.ok('POST', '/api/leave/balances', { userId: teacher.id, year: Number(date.slice(0, 4)), typeId: 'annual', entitledDays: 18 });
+    let notice = await f.agents.hr.ok('POST', '/api/notices', { title: 'Synthetic staff welcome', message: 'This is an automated test notice, not a school announcement.', category: 'HR', priority: 'Information', acknowledgementRequired: true, audience: { type: 'ALL_STAFF' } });
+    await f.agents.head.ok('POST', '/api/notices/' + notice.id + '/publish', { revision: notice.revision });
+    browser = await chromium.launch({ headless: true, ...(process.env.CHROMIUM_EXECUTABLE ? { executablePath: process.env.CHROMIUM_EXECUTABLE } : {}), args: ['--no-sandbox', '--disable-dev-shm-usage'] });
+    const desktop = await browser.newContext({ viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce' });
+    const page = await desktop.newPage();
+    const problems = [];
+    page.on('pageerror', error => problems.push(error.message));
+    page.on('console', message => { if (message.type() === 'error') problems.push(message.text()); });
+    page.on('response', response => { if (response.status() >= 400) problems.push(response.status() + ' ' + new URL(response.url()).pathname); });
+    const output = path.resolve('.runtime/ui-test');
+    await fs.mkdir(output, { recursive: true });
+    async function view(route, label, screenshot = false) {
+      await page.goto(f.base + route, { waitUntil: 'networkidle' });
+      await page.evaluate(() => document.fonts.ready);
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'No horizontal overflow: ' + label);
+      assert.deepEqual(await page.locator('img').evaluateAll(async images => { await Promise.all(images.map(image => { image.loading = 'eager'; return image.decode().catch(() => {}); })); return images.filter(image => image.naturalWidth === 0).map(image => image.getAttribute('src')); }), [], 'Images load: ' + label);
+      if (['/', '/contact', '/sw/admissions', '/portal'].includes(route)) { const audit = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze(); assert.deepEqual(audit.violations.map(item => ({ id: item.id, elements: item.nodes.map(node => ({ target: node.target, reason: node.failureSummary })) })), [], 'Accessibility: ' + label); }
+      if (screenshot) await page.screenshot({ path: path.join(output, label + '.png'), fullPage: true });
+    }
+    await view('/', 'home-desktop', true);
+    await expect(page.locator('.mainnav').getByRole('link', { name: 'Portal Login' })).toBeVisible();
+    await expect(page.locator('.mainnav').getByRole('link', { name: 'Downloads', exact: true })).toBeVisible();
+    await expect(page.locator('[data-hero]')).toBeVisible();
+    await expect(page.locator('.trust__card')).toHaveCount(6);
+    await expect(page.locator('.pillars .pillar')).toHaveCount(6);
+    await page.getByRole('button', { name: 'Next slide', exact: true }).click();
+    await expect(page.locator('.hero__slide.is-active .hero__title')).toHaveText('Strong Academic Foundations for Every Learner');
+    await page.getByRole('button', { name: 'Previous slide', exact: true }).click();
+    await expect(page.locator('.hero__slide.is-active h1')).toContainText('Welcome to Alpha');
+    if (await page.locator('[data-hero-pause]').getAttribute('aria-pressed') !== 'true') await page.locator('[data-hero-pause]').click();
+    await expect(page.locator('[data-hero-pause]')).toHaveAttribute('aria-pressed', 'true');
+    await page.getByRole('link', { name: 'SW', exact: true }).click();
+    await expect(page.locator('html')).toHaveAttribute('lang', 'sw');
+    await view('/sw/admissions', 'admissions-swahili', true);
+    await view('/contact', 'contact-desktop', true);
+    const form = page.locator('form[data-endpoint]').first();
+    await form.locator('[name="name"]').fill('Synthetic browser parent');
+    await form.locator('[name="phone"]').fill('+255700000000');
+    await form.locator('[name="email"]').fill('browser@example.test');
+    await form.locator('[name="message"]').fill('Synthetic browser test. No real personal information.');
+    await form.locator('[name="privacy_consent"]').check();
+    await form.locator('button[type="submit"]').click();
+    await expect(form.locator('.form__status')).toContainText('ALPHA-');
+    await view('/parents', 'parent-corner');
+    await page.getByRole('button', { name: /Contact the School.*View details/ }).click();
+    await expect(page.locator('.parent-modal[open]')).toContainText('School contact channels');
+    await page.getByRole('button', { name: 'Close Contact the School' }).click();
+    await view('/students', 'kids-zone');
+    assert.equal(await page.locator('a[href^="http"],a[href^="mailto:"],a[href^="tel:"]').count(), 0);
+    await page.locator('#typing-input').fill(await page.locator('[data-typing] [data-word]').innerText());
+    await expect(page.locator('[data-typing] [data-score]')).toHaveText('1');
+    await view('/portal', 'portal-login-desktop', true);
+    await expect(page.locator('[name="mfa_code"]')).toHaveCount(0);
+    await page.locator('[name="username"]').fill(teacher.username);
+    await page.locator('[name="password"]').fill(f.password);
+    await page.getByRole('button', { name: 'Sign in to workspace' }).click();
+    await expect(page.locator('#workspace h1')).toHaveText('Overview');
+    await expect(page.locator('#page-content')).toContainText('Welcome, Synthetic.');
+    await page.screenshot({ path: path.join(output, 'portal-teacher-desktop.png'), fullPage: true });
+    await view('/portal/leave', 'leave-desktop');
+    await page.getByRole('button', { name: /Apply for leave/ }).click();
+    const dialog = page.locator('dialog[open]');
+    await dialog.locator('[name="typeId"]').selectOption('annual');
+    await dialog.locator('[name="startDate"]').fill(date);
+    await dialog.locator('[name="returnDate"]').fill(addDays(date, 2));
+    await dialog.locator('[name="reason"]').fill('Synthetic browser leave request');
+    await dialog.locator('[name="handover"]').fill('Synthetic colleague');
+    await dialog.locator('[name="emergencyContact"]').fill('+255700000001');
+    await dialog.getByRole('button', { name: /Save|Submit/ }).click();
+    await expect(page.locator('#page-content')).toContainText('Submitted');
+    await view('/portal/notices', 'notices-desktop');
+    await page.locator('[data-notice] summary').first().click();
+    await page.getByRole('button', { name: 'I have read and understood' }).click();
+    await expect(page.locator('#page-content')).toContainText('Acknowledged');
+    for (const route of ['profile', 'contracts', 'documents', 'calendar', 'requests', 'notifications', 'help']) await view('/portal/' + route, 'teacher-' + route);
+    await view('/portal/documents', 'document-create');
+    await page.getByRole('button', { name: '+ New document', exact: true }).click();
+    await dialog.locator('[name="title"]').fill('Synthetic browser guide');
+    await dialog.locator('[name="documentNumber"]').fill('SYN-BROWSER-GUIDE-001');
+    await dialog.locator('[name="classification"]').selectOption('PUBLIC');
+    await dialog.locator('[name="category"]').selectOption('Parents');
+    await dialog.locator('[name="changeSummary"]').fill('Synthetic initial edition');
+    await dialog.locator('[name="file"]').setInputFiles({ name: 'guide.txt', mimeType: 'text/plain', buffer: Buffer.from('SYNTHETIC BROWSER CONTROLLED GUIDE') });
+    await dialog.getByRole('button', { name: /Save/ }).click();
+    await expect(page.getByRole('button', { name: 'Submit for review' })).toBeVisible();
+    await page.getByRole('button', { name: 'Submit for review' }).click();
+    await expect(page.locator('#page-content')).toContainText('Under Review');
+    const controlled = (await f.agents.teacher.ok('GET', '/api/documents')).find(item => item.documentNumber === 'SYN-BROWSER-GUIDE-001');
+    await approve(f.agents.office, controlled.draft.workflowId);
+    await approve(f.agents.head, controlled.draft.workflowId);
+    await view('/portal/cms', 'school-contact-editor');
+    await page.getByRole('button', { name: 'School contact details', exact: true }).click();
+    await expect(dialog.locator('[name="officePhone"]')).not.toBeEmpty();
+    await dialog.locator('[name="detailsVerified"]').check();
+    await dialog.getByRole('button', { name: /Save/ }).click();
+    await expect(page.locator('#page-content')).toContainText('School contact details');
+    await expect(page.locator('dialog[open]')).toHaveCount(0);
+    const cacheKeys = await page.evaluate(async () => { const output = []; for (const name of await caches.keys()) for (const request of await (await caches.open(name)).keys()) output.push(new URL(request.url).pathname); return output; });
+    assert.ok(cacheKeys.includes('/offline'), 'Service worker has installed');
+    assert.ok(cacheKeys.every(value => !/^\/(api|portal|media|admin|downloads\/)/.test(value)), 'No private cache entries');
+    assert.equal(await page.evaluate(() => localStorage.length + sessionStorage.length), 0, 'No private browser persistence');
+    await page.setViewportSize({ width: 390, height: 844 });
+    for (const [route, label] of [['/', 'home-mobile'], ['/sw', 'home-swahili-mobile'], ['/sw/contact', 'contact-swahili-mobile'], ['/admissions', 'admissions-mobile'], ['/portal', 'portal-teacher-mobile'], ['/portal/leave', 'leave-mobile'], ['/portal/notices', 'notices-mobile']]) await view(route, label, true);
+    await view('/', 'public-mobile-menu');
+    await page.getByRole('button', { name: 'Open menu', exact: true }).click();
+    await expect(page.locator('#mobileNav').getByRole('link', { name: 'Portal Login' })).toBeVisible();
+    await expect(page.locator('#mobileNav').getByRole('link', { name: 'Downloads', exact: true })).toBeVisible();
+    for (const width of [320, 360, 640, 768, 1024, 1280, 1366]) {
+      await page.setViewportSize({ width, height: 900 });
+      for (const route of ['/', '/sw', '/portal']) {
+        await page.goto(f.base + route, { waitUntil: 'networkidle' });
+        assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'Responsive width: ' + width + ' ' + route);
+      }
+    }
+    await page.setViewportSize({ width: 390, height: 844 });
+    await view('/portal', 'portal-mobile-menu');
+    await expect(page.locator('.admin-side')).toBeVisible();
+    await page.locator('.admin-side').getByRole('link', { name: 'My profile', exact: true }).scrollIntoViewIfNeeded();
+    await page.locator('.admin-side').getByRole('link', { name: 'My profile', exact: true }).click();
+    await expect(page.locator('#workspace h1')).toHaveText('My profile');
+    await view('/', 'offline-check');
+    await page.evaluate(async () => { await navigator.serviceWorker.ready; });
+    await desktop.setOffline(true);
+    await page.goto(f.base + '/about');
+    await expect(page.locator('body')).toContainText('offline');
+    await desktop.setOffline(false);
+    const manager = await browser.newContext({ viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce' });
+    const [name, value] = f.agents.head.cookie.split('=');
+    await manager.addCookies([{ name, value, url: f.base, httpOnly: true, sameSite: 'Lax' }]);
+    const managePage = await manager.newPage();
+    managePage.on('pageerror', error => problems.push(error.message));
+    managePage.on('console', message => { if (message.type() === 'error') problems.push(message.text()); });
+    for (const section of ['', 'approvals', 'staff', 'contracts', 'documents', 'notices', 'calendar', 'cms', 'media', 'admissions', 'enquiries', 'privacy', 'reports', 'workflows', 'users', 'audit']) {
+      await managePage.goto(f.base + '/portal/' + section, { waitUntil: 'networkidle' });
+      assert.equal(await managePage.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'Manager overflow: ' + section);
+      assert.ok(!await managePage.locator('#page-content .p-error').count(), 'Manager view: ' + section);
+    }
+    await managePage.goto(f.base + '/portal/documents', { waitUntil: 'networkidle' });
+    await managePage.getByRole('button', { name: 'Issue approved version' }).click();
+    await expect(managePage.locator('#page-content')).toContainText('Issued');
+    assert.equal((await f.anonymous.request('GET', '/downloads/' + controlled.id)).text, 'SYNTHETIC BROWSER CONTROLLED GUIDE');
+    await managePage.goto(f.base + '/portal', { waitUntil: 'networkidle' });
+    await managePage.screenshot({ path: path.join(output, 'portal-management-desktop.png'), fullPage: true });
+    assert.deepEqual(problems, [], 'No JS, CSP or failed-resource errors');
+    console.log('UI smoke passed: public forms, EN/SW, desktop/mobile, real login, leave/notices, approved-document issuance, school-settings drafts, role views, representative accessibility, offline fallback, and no private caching. Synthetic screenshots: .runtime/ui-test/');
+  } finally { if (browser) await browser.close(); await f.close(); }
+}
+main().catch(error => { console.error(error); process.exitCode = 1; });

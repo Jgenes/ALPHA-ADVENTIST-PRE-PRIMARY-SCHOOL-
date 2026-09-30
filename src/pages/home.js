@@ -1,13 +1,23 @@
 'use strict';
 const X = require('../layout');
 const L = require('../lib');
-const { esc, } = L;
+const { esc } = L;
+// Original GitHub homepage layout (82757d3), connected to governed public data.
+const originalSlides = require('../content/home-slides.json');
 const { icon, pic, btn, sectionHead } = X;
 
 function heroSection(ctx) {
-  const slides = ctx.db.hero.filter(h => h.enabled);
+  const sw = ctx.lang === 'sw';
+  const banners = (ctx.content || []).filter(item => item.kind === 'banner' && item.language === (sw ? 'sw' : 'en'));
+  const fallback = ctx.homeSlides || originalSlides;
+  const slides = banners.length ? banners.map(item => ({
+    kicker: sw ? 'Habari za Shule' : 'School announcement', title: item.title,
+    text: item.excerpt, image: item.mediaId ? '/media/' + item.mediaId : '', alt: item.title,
+    cta: { href: X.localPath(ctx, '/admissions') + '#apply', label: sw ? 'Omba Nafasi' : 'Apply for Admission' },
+    cta2: { href: X.localPath(ctx, '/contact'), label: sw ? 'Wasiliana na Shule' : 'Contact the School' }
+  })) : fallback;
   const slideHtml = slides.map((s, i) => `
-    <div class="hero__slide${i === 0 ? ' is-active' : ''}" role="group" aria-roledescription="slide" aria-label="Slide ${i + 1} of ${slides.length}: ${esc(s.kicker)}" aria-hidden="${i === 0 ? 'false' : 'true'}">
+    <div class="hero__slide${i === 0 ? ' is-active' : ''}" role="group" aria-roledescription="slide" aria-label="${sw ? 'Picha' : 'Slide'} ${i + 1} / ${slides.length}: ${esc(s.kicker)}" aria-hidden="${i === 0 ? 'false' : 'true'}" ${i ? 'inert' : ''}>
       <div class="hero__media">${pic(s.image, s.alt, { widths: [800, 1200, 1600], eager: i === 0, sizes: '100vw', w: 1600, h: 1066 })}</div>
       <div class="container hero__in">
         <p class="hero__kicker">${esc(s.kicker)}</p>
@@ -20,7 +30,7 @@ function heroSection(ctx) {
         </div>
       </div>
     </div>`).join('');
-  const dots = slides.map((s, i) => `<button type="button" aria-current="${i === 0}" aria-label="Go to slide ${i + 1}: ${esc(s.kicker)}"></button>`).join('');
+  const dots = slides.map((s, i) => `<button type="button" aria-current="${i === 0}" aria-label="${sw ? 'Chagua ukurasa' : 'Go to slide'} ${i + 1}: ${esc(s.kicker)}"></button>`).join('');
   return `
   <section class="hero" data-hero aria-roledescription="carousel" aria-label="Welcome to Alpha Adventist Pre & Primary School">
     ${slideHtml}
@@ -28,20 +38,23 @@ function heroSection(ctx) {
       <div class="container hero__nav-in">
         <div class="hero__dots" role="group" aria-label="Choose slide">${dots}</div>
         <div class="hero__arrows">
-          <button type="button" data-hero-prev aria-label="Previous slide">${icon('arrow', 'flip')}</button>
-          <button type="button" data-hero-next aria-label="Next slide">${icon('arrow')}</button>
+          <button type="button" data-hero-prev aria-label="${sw ? 'Ukurasa uliotangulia' : 'Previous slide'}">${icon('arrow', 'flip')}</button>
+          <button type="button" data-hero-next aria-label="${sw ? 'Ukurasa unaofuata' : 'Next slide'}">${icon('arrow')}</button>
+          <button type="button" data-hero-pause aria-pressed="false" aria-label="${sw ? 'Sitisha slaidi' : 'Pause slideshow'}">${icon('pause')}</button>
         </div>
       </div>
     </div>
-    <p class="hero__tag">Real photographs from Alpha school programmes — Kigoma, Tanzania</p>
+    <p class="hero__tag">${slides.some(slide => slide.image) ? (sw ? 'Picha zilizoidhinishwa na shule · Kigoma, Tanzania' : 'School-approved media · Kigoma, Tanzania') : (sw ? 'Picha za shule zitaonekana baada ya uthibitisho wa ridhaa na uchapishaji.' : 'School photographs appear after consent and publication approval.')}</p>
   </section>`;
 }
 
 module.exports = {
   render(ctx) {
+    if (ctx.lang === 'sw') return require('./home-sw').render(ctx, heroSection);
     const db = ctx.db, s = db.settings;
-    const featured = db.news.find(n => n.featured) || db.news[0];
-    const others = db.news.filter(n => n !== featured).slice(0, 2);
+    const news = db.news.filter(n => (n.language || 'en') === 'en');
+    const featured = news.find(n => n.featured) || news[0];
+    const others = news.filter(n => n !== featured).slice(0, 2);
     const wa = `https://wa.me/${s.whatsapp.href}?text=${encodeURIComponent('Hello Alpha Adventist Pre & Primary School, I would like to enquire about admission.')}`;
 
     const body = `
@@ -192,9 +205,9 @@ ${heroSection(ctx)}
         <p style="margin-top:10px">${btn('/computer-learning#staff', 'Staff ICT Development', 'outline-light')}</p>
       </div>
       <div class="techcard rv">
-        <h3>${icon('globe')} Community Training <span class="badge-soon">Coming soon</span></h3>
-        <p>A proposed Computer Training Centre for the wider Kigoma community — computer fundamentals, Microsoft Office, internet &amp; email, digital office skills, cyber safety and coding fundamentals.</p>
-        <p style="margin-top:10px">${btn('/computer-learning#community', 'Register Interest', 'gold')}</p>
+        <h3>${icon('lock')} Staff Portal <span class="badge-now">Available</span></h3>
+        <p>A secure workspace for authorised staff — leave requests, approved documents, notices and school workflows.</p>
+        <p style="margin-top:10px">${btn('/portal', 'Portal Login', 'gold')}</p>
       </div>
     </div>
     <p style="margin-top:30px">${btn('/computer-learning', 'Explore Computer Learning', 'light', 'arrow')}</p>
@@ -276,7 +289,7 @@ ${heroSection(ctx)}
   </div>
 </section>
 
-<!-- 15 · News & events -->
+${news.length ? `<!-- 15 · News & events -->
 <section class="sec" id="news">
   <div class="container">
     ${sectionHead('News & Events', 'What Is Happening at Alpha', 'Official school news, celebrations and announcements from the school office.')}
@@ -303,7 +316,9 @@ ${heroSection(ctx)}
   </div>
 </section>
 
-<!-- 16 · Gallery strip -->
+` : ''}
+
+${db.gallery.length ? `<!-- 16 · Gallery strip -->
 <section class="sec sec--sand" id="gallery">
   <div class="container">
     ${sectionHead('Gallery', 'Real Alpha Moments', 'Approved photographs from school programmes, ceremonies and daily life at Alpha.', { align: 'center' })}
@@ -318,17 +333,18 @@ ${heroSection(ctx)}
   </div>
 </section>
 
+` : ''}
+
 <!-- 17 · Parent corner -->
 <section class="sec" id="parents">
   <div class="container">
     ${sectionHead('Parent Corner', 'Keeping Alpha Families Informed and Connected', 'Everything parents and guardians need from the school office — in one place.')}
     <div class="parent-grid">
       <div class="card rv"><div class="card__ico">${icon('calendar')}</div><h3>School Calendar</h3><p>Term dates, approved events and the daily routine are available from the school office and published here once approved for public distribution.</p></div>
-      <div class="card rv"><div class="card__ico">${icon('mega')}</div><h3>Announcements</h3><p>Official notices from the school office, including examination information and parent meeting dates.</p><a class="link-more" href="/parents#announcements">Read announcements ${icon('arrow')}</a></div>
+      <div class="card rv"><div class="card__ico">${icon('mega')}</div><h3>Announcements</h3><p>Official notices from the school office, including examination information and parent meeting dates.</p><a class="link-more" href="/parents">Read announcements ${icon('arrow')}</a></div>
       <div class="card rv"><div class="card__ico">${icon('clipboard')}</div><h3>Examinations &amp; Rules</h3><p>Assessment schedules, school rules and joining information are provided to families by the school office.</p></div>
       <div class="card rv"><div class="card__ico">${icon('bed')}</div><h3>Boarding Information</h3><p>Boarding routines, supervision and current availability per class are confirmed during admissions.</p></div>
       <div class="card rv"><div class="card__ico">${icon('phone')}</div><h3>Contact the School</h3><p>Reach the office by phone, WhatsApp or email — the school responds during working hours on school days.</p><a class="link-more" href="/contact">Contact details ${icon('arrow')}</a></div>
-      <div class="card rv"><div class="card__ico">${icon('lock')}</div><h3>Future Parent Portal</h3><p>A secure portal for results, attendance, fee statements and teacher communication is planned for a later phase — protected by secure authentication when launched.</p><span class="badge-soon">Future phase</span></div>
     </div>
   </div>
 </section>
@@ -354,7 +370,7 @@ ${heroSection(ctx)}
       <a class="contact-card rv" href="tel:${esc(s.phones[0].href)}">${icon('phone')}<strong>Call</strong><span>${esc(s.phones[0].number)}</span></a>
       <a class="contact-card rv" href="${esc(wa)}" target="_blank" rel="noopener">${icon('whatsapp')}<strong>WhatsApp</strong><span>${esc(s.whatsapp.number)}</span></a>
       <a class="contact-card rv" href="mailto:${esc(s.email)}">${icon('mail')}<strong>Email</strong><span>${esc(s.email)}</span></a>
-      <a class="contact-card rv" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.mapQuery)}" target="_blank" rel="noopener">${icon('pin')}<strong>Get Directions</strong><span>${esc(s.locationText)}</span></a>
+      <a class="contact-card rv" href="${esc(s.mapUrl || 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(s.mapQuery))}" target="_blank" rel="noopener">${icon('pin')}<strong>Get Directions</strong><span>${esc(s.locationText)}</span></a>
     </div>
     <p class="text-center" style="margin-top:26px">${btn('/contact', 'Send an Enquiry', 'primary', 'send')}</p>
   </div>

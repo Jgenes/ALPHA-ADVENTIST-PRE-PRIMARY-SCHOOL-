@@ -1,14 +1,29 @@
 {
   "engines": {
-    "node": ">=20.19.0"
+    "node": ">=22.13.0 <23"
   },
   "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test test/*.test.js",
+    "check": "node scripts/check.js",
+    "bootstrap": "node scripts/bootstrap.js",
     "backup:mongodb": "node scripts/backup-mongodb.js",
     "migrate:mongodb": "node scripts/migrate-mongodb.js",
-    "restore:mongodb": "node scripts/restore-mongodb.js"
+    "restore:mongodb": "node scripts/restore-mongodb.js",
+    "test:ui": "node scripts/ui-smoke.js && node scripts/auth-ui-smoke.js"
   },
   "dependencies": {
     "dotenv": "^16.4.7",
-    "mongodb": "^7.7.0"
+    "mongodb": "^7.7.0",
+    "sharp": "^0.35.5"
+  },
+  "name": "alpha-adventist-digital-school-platform",
+  "version": "1.0.0",
+  "private": true,
+  "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "^1.63.0",
+    "yaml": "^2.9.1"
   }
 }

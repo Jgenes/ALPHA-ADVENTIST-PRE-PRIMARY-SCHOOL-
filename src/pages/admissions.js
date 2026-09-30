@@ -15,7 +15,7 @@ ${phero(ctx, 'Admissions', 'Admissions at Alpha', 'A simple, guided journey from
 <section class="sec">
   <div class="container">
     ${sectionHead('The Admission Process', 'Five Clear Steps', 'Families typically begin by contacting the school to enquire about admission, available levels, boarding and joining information. The school office guides you through each step.')}
-    <ol class="steps">
+    <ol class="adsp-steps">
       <li><strong>Discover Alpha</strong><br>Explore this website, call or WhatsApp the school office.</li>
       <li><strong>Book a School Visit</strong><br>Meet the team and see the campus, classrooms and Computer Lab.</li>
       <li><strong>Submit Application</strong><br>Complete the application with the school office.</li>

@@ -1,37 +1,53 @@
+# Deployment template, not proof of production readiness. Complete the release
+# gates in docs/operations-template.md and rehearse with isolated staging first.
+# This single-instance design requires both MongoDB AND persistent file storage.
 services:
   - type: web
     name: alpha-adventist-school
     runtime: node
     plan: starter
-    buildCommand: npm install --omit=dev && node --check server.js && node --check src/lib.js
-    startCommand: node server.js
-    healthCheckPath: /
-    autoDeploy: true
+    buildCommand: npm ci --omit=dev && node --check server.js
+    startCommand: npm start
+    healthCheckPath: /readyz
+    autoDeploy: false
     envVars:
-      - key: DATA_DIR
-        value: /var/data
+      - key: NODE_VERSION
+        value: "22.22.3"
       - key: NODE_ENV
         value: production
+      - key: DATA_DIR
+        value: /var/data
       - key: BASE_URL
-        value: https://alpha-adventist-pre-primary-school.onrender.com
-      - key: ADMIN_PASSWORD
-      - key: OFFICE_ALERT_WEBHOOK_URL
         sync: false
-      - key: FORM_RETENTION_DAYS
-        sync: false
-      - key: ADMIN_USERNAME
-        sync: false
+      - key: TRUST_PROXY_HOPS
+        value: "1"
       - key: MONGODB_URI
         sync: false
       - key: MONGODB_DB_NAME
         sync: false
       - key: MFA_ENCRYPTION_KEY
         sync: false
-      - key: TRUST_PROXY
-        value: "true"
+      - key: STORAGE_ENCRYPTION_KEY
+        sync: false
+      - key: AUDIT_HMAC_KEY
+        sync: false
       - key: OFFICE_ALERT_WEBHOOK_URL
         sync: false
+      - key: OFFICE_ALERT_WEBHOOK_SECRET
+        sync: false
+      - key: FORM_RETENTION_DAYS
+        sync: false
+      - key: ADMISSION_RETENTION_DAYS
+        sync: false
+      - key: RETENTION_POLICY_APPROVED
+        sync: false
+      - key: SAFEGUARDING_NAME
+        sync: false
+      - key: SAFEGUARDING_PHONE
+        sync: false
+      - key: UPLOAD_SCAN_COMMAND
+        sync: false
     disk:
-      name: alpha-school-data
+      name: alpha-school-private-files
       mountPath: /var/data
-      sizeGB: 1
+      sizeGB: 5

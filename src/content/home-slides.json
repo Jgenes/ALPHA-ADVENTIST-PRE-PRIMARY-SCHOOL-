@@ -1,0 +1,53 @@
+[
+  {
+    "id": "welcome",
+    "kicker": "Welcome to Alpha",
+    "title": "Welcome to Alpha Adventist Pre & Primary School",
+    "text": "A Seventh-day Adventist educational institution within the Western Tanzania Conference – Kigoma, committed to developing knowledgeable, disciplined, creative, responsible and spiritually grounded learners.",
+    "strap": "Education • Faith • Technology • Talent • Character • Future",
+    "cta": {
+      "label": "Apply for Admission",
+      "href": "/admissions#apply"
+    },
+    "cta2": {
+      "label": "Book a School Visit",
+      "href": "/admissions#visit"
+    }
+  },
+  {
+    "id": "academics",
+    "kicker": "Academics",
+    "title": "Strong Academic Foundations for Every Learner",
+    "text": "Learning that develops knowledge, confidence, discipline and curiosity.",
+    "strap": "",
+    "cta": {
+      "label": "Explore Academics",
+      "href": "/academics"
+    },
+    "cta2": null
+  },
+  {
+    "id": "technology",
+    "kicker": "Technology",
+    "title": "Preparing Children for the Digital Future",
+    "text": "Practical computer learning, digital creativity and responsible technology use.",
+    "strap": "",
+    "cta": {
+      "label": "Explore Computer Learning",
+      "href": "/computer-learning"
+    },
+    "cta2": null
+  },
+  {
+    "id": "life",
+    "kicker": "Faith, Talent & School Life",
+    "title": "Developing the Whole Child",
+    "text": "Faith, character, talent, creativity, teamwork and leadership are part of the Alpha experience.",
+    "strap": "",
+    "cta": {
+      "label": "Discover School Life",
+      "href": "/school-life"
+    },
+    "cta2": null
+  }
+]

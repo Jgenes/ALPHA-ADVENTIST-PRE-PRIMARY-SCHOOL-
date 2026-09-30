@@ -1,0 +1,15 @@
+.git
+.env
+.env.*
+.runtime
+private
+backups
+work
+uploads
+node_modules
+coverage
+data/*
+!data/seed.json
+*.sqlite*
+*.ejson.enc
+*.log

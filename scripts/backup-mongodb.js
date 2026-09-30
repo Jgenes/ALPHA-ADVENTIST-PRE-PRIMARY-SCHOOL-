@@ -1,79 +1,40 @@
 'use strict';
 require('dotenv').config();
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
-const crypto = require('crypto');
+const path = require('node:path');
 const { MongoClient } = require('mongodb');
-const { EJSON } = require('bson');
-
-function required(name, value) {
-  if (!value) throw new Error(`${name} is required.`);
-  return value;
-}
-
+const B = require('./backup-lib');
+const defined = object => Object.fromEntries(Object.entries(object).filter(([, value]) => value !== undefined));
 async function main() {
-  const uri = required('MONGODB_URI', process.env.MONGODB_URI || process.env.MONGO_URI);
-  const dbName = required('MONGODB_DB_NAME', process.env.MONGODB_DB_NAME || process.env.MONGO_DB_NAME);
-  const keyHex = required('MONGO_BACKUP_ENCRYPTION_KEY or MONGO_BACKUP_ENCRYPTION_KEY_FILE', process.env.MONGO_BACKUP_ENCRYPTION_KEY || (process.env.MONGO_BACKUP_ENCRYPTION_KEY_FILE && fs.readFileSync(process.env.MONGO_BACKUP_ENCRYPTION_KEY_FILE, 'utf8').trim()));
-  if (!/^[a-f0-9]{64}$/i.test(keyHex)) throw new Error('MONGO_BACKUP_ENCRYPTION_KEY must be 64 hexadecimal characters.');
-
-  const outputDir = path.resolve(process.env.MONGO_BACKUP_DIR || path.join(os.homedir(), '.local', 'share', 'alpha-adventist', 'backups'));
-  fs.mkdirSync(outputDir, { recursive: true, mode: 0o700 });
-  fs.chmodSync(outputDir, 0o700);
-  const dirMode = fs.statSync(outputDir).mode & 0o777;
-  if (dirMode !== 0o700) throw new Error('Backup directory must have permissions 700.');
-
-  const client = new MongoClient(uri, { serverSelectionTimeoutMS: 10000, appName: 'AlphaAdventistBackup' });
+  const { MONGODB_URI: uri, MONGODB_DB_NAME: database, DATA_DIR: dataDir } = process.env;
+  if (!uri || !database || !dataDir) throw new Error('Explicit MongoDB URI, database and persistent DATA_DIR are required.');
+  if (process.env.BACKUP_WRITES_PAUSED !== 'true') throw new Error('Stop all writers/jobs for the consistent database-and-file backup window, then explicitly confirm BACKUP_WRITES_PAUSED=true.');
+  const key = await B.backupKey();
+  const client = new MongoClient(uri, { serverSelectionTimeoutMS: 10000, appName: 'AlphaGovernedBackup' });
   try {
     await client.connect();
-    const database = client.db(dbName);
-    const definitions = await database.listCollections({}, { nameOnly: false }).toArray();
+    const db = client.db(database), hello = await db.command({ hello: 1 });
+    if (!hello.setName && hello.msg !== 'isdbgrid') throw new Error('A transaction-capable replica set is required.');
+    const definitions = (await db.listCollections({}, { nameOnly: false }).toArray()).filter(item => !item.name.startsWith('system.') && item.type === 'collection');
     const collections = [];
-    for (const definition of definitions.filter(item => !item.name.startsWith('system.'))) {
-      let indexes = [];
-      try {
-        indexes = (await database.collection(definition.name).listIndexes().toArray())
-          .filter(index => index.name !== '_id_')
-          .map(({ key, name, unique, sparse, expireAfterSeconds, partialFilterExpression, collation }) => ({ key, name, unique, sparse, expireAfterSeconds, partialFilterExpression, collation }));
-      } catch (error) {
-        if (definition.type !== 'view') throw error;
-      }
-      collections.push({
-        name: definition.name,
-        indexes,
-        options: {
-          validator: definition.options.validator,
-          validationLevel: definition.options.validationLevel,
-          validationAction: definition.options.validationAction
-        },
-        documents: await database.collection(definition.name).find({}).toArray()
-      });
+    for (const entry of definitions) {
+      const indexes = (await db.collection(entry.name).listIndexes().toArray()).filter(item => item.name !== '_id_').map(({ key, name, unique, sparse, expireAfterSeconds, partialFilterExpression, collation }) => defined({ key, name, unique, sparse, expireAfterSeconds, partialFilterExpression, collation }));
+      const { validator, validationLevel, validationAction, collation } = entry.options || {};
+      collections.push({ name: entry.name, indexes, options: defined({ validator, validationLevel, validationAction, collation }) });
     }
-
-    const payload = Buffer.from(EJSON.stringify({ database: dbName, exportedAt: new Date(), collections }, { relaxed: false }));
-    const iv = crypto.randomBytes(12);
-    const cipher = crypto.createCipheriv('aes-256-gcm', Buffer.from(keyHex, 'hex'), iv);
-    const encrypted = Buffer.concat([cipher.update(payload), cipher.final()]);
-    const archive = Buffer.concat([Buffer.from('ALPHAMDB'), iv, cipher.getAuthTag(), encrypted]);
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const filePath = path.join(outputDir, `${dbName}-${stamp}.ejson.enc`);
-    const fd = fs.openSync(filePath, 'wx', 0o600);
+    const session = client.startSession();
+    let snapshot;
     try {
-      fs.writeFileSync(fd, archive);
-      fs.fsyncSync(fd);
-    } finally {
-      fs.closeSync(fd);
-    }
-    fs.chmodSync(filePath, 0o600);
-    const count = collections.reduce((total, collection) => total + collection.documents.length, 0);
-    console.log(`Encrypted MongoDB backup created: ${filePath} (${collections.length} collections, ${count} documents)`);
-  } finally {
-    await client.close();
-  }
+      await session.withTransaction(async () => {
+        for (const collection of collections) collection.documents = await db.collection(collection.name).find({}, { session }).toArray();
+        const files = await B.captureFiles(path.resolve(dataDir), collections);
+        snapshot = { version: 2, database, exportedAt: new Date(), collections, files, publicCopiesRequireReview: true };
+      }, { readConcern: { level: 'snapshot' }, writeConcern: { w: 'majority' } });
+    } finally { await session.endSession(); }
+    const directory = path.resolve(process.env.MONGO_BACKUP_DIR || path.join(dataDir, 'backups'));
+    const file = path.join(directory, `${database.replace(/[^a-zA-Z0-9_-]/g, '_')}-${new Date().toISOString().replace(/[:.]/g, '-')}.ejson.enc`);
+    const result = await B.writeBackup(file, snapshot, key);
+    console.log(`Encrypted backup: ${file}\nCollections: ${collections.length}; referenced private files: ${snapshot.files.length}; bytes: ${result.bytes}\nSHA-256: ${result.sha256}\nTransfer off-site, verify upload and retention, and resume the service. Keys are not in this archive.`);
+  } finally { await client.close(); }
 }
-
-main().catch(error => {
-  console.error('[backup] failed; verify configuration, directory permissions, and MongoDB access.', error.name, error.code || '');
-  process.exitCode = 1;
-});
+if (require.main === module) main().catch(error => { console.error('[backup] Failed. Check the approved backup window, keys, storage and database access.', error.name, error.code || ''); process.exitCode = 1; });
+module.exports = { main };
