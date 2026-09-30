@@ -31,6 +31,7 @@ function adminLayout(ctx, inner, active, title) {
 <div class="admin-wrap">
   <nav class="admin-side" aria-label="CMS sections">
     ${link('/admin', 'grid', 'Dashboard', 'dash')}
+    ${link('/admin/password', 'lock', 'Change password', 'pw')}
     ${link('/admin/news', 'mega', 'News & Events', 'news')}
     ${link('/admin/announcements', 'mega', 'Announcements', 'ann')}
     ${link('/admin/gallery', 'camera', 'Gallery', 'gal')}
@@ -40,6 +41,7 @@ function adminLayout(ctx, inner, active, title) {
     ${link('/admin/leadership', 'badge', 'Leadership', 'lead')}
     ${link('/admin/settings', 'pin', 'Contact & Settings', 'set')}
     ${link('/admin/submissions', 'mail', 'Form Submissions', 'sub')}
+    ${link('/admin/admissions', 'clipboard', 'Admissions', 'admissions')}
     ${u && u.role === 'super' ? link('/admin/users', 'lock', 'Users & Roles', 'users') : ''}
   </nav>
   <main class="admin-main">${inner}</main>
@@ -64,11 +66,45 @@ function loginPage(ctx, error) {
     ${error ? `<p class="form__status err" style="display:block">${esc(error)}</p>` : ''}
     <div class="field"><label for="u">Username</label><input id="u" name="username" required autocomplete="username"></div>
     <div class="field"><label for="p">Password</label><input id="p" name="password" type="password" required autocomplete="current-password"></div>
+    <div class="field"><label for="mfa">Authenticator code (if enabled)</label><input id="mfa" name="mfa_code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6"></div>
     <input type="hidden" name="_csrf" value="${esc(ctx.publicCsrf || '')}">
     <button class="btn btn--primary btn--block" type="submit">${icon('lock')} Sign in</button>
-    <p class="muted" style="font-size:.76rem;text-align:center;margin:10px 0 0">Sessions expire after 10 hours. All administrative actions are recorded.</p>
+    <p class="muted" style="font-size:.76rem;text-align:center;margin:10px 0 0">Sessions expire after 10 hours. Login attempts are rate-limited and security events are logged.</p>
   </form>
 </main></body></html>`;
+}
+
+function passwordPage(ctx, message) {
+  const inner = `
+  <h1>Change password</h1>
+  <p class="muted">Choose a unique password with at least 12 characters, including uppercase and lowercase letters, a number, and a symbol.</p>
+  ${message ? `<p class="form__status err" style="display:block">${esc(message)}</p>` : ''}
+  <div class="admin-card" style="max-width:620px"><form class="form" method="post" action="/admin/password">
+    ${csrfInput(ctx)}
+    <div class="field"><label for="current_password">Current password</label><input id="current_password" name="current_password" type="password" autocomplete="current-password" required></div>
+    <div class="field"><label for="new_password">New password</label><input id="new_password" name="new_password" type="password" autocomplete="new-password" minlength="12" required></div>
+    <div class="field"><label for="confirm_password">Confirm new password</label><input id="confirm_password" name="confirm_password" type="password" autocomplete="new-password" minlength="12" required></div>
+    <button class="btn btn--primary" type="submit">Update password</button>
+  </form></div>`;
+  return adminLayout(ctx, inner, 'pw', 'Change password');
+}
+
+function mfaSetupPage(ctx, secret, message) {
+  const inner = `
+  <h1>Secure your administrator account</h1>
+  <p class="muted">Add this time-based one-time password secret to an authenticator app. Alpha will require a six-digit code when you sign in.</p>
+  ${message ? `<p class="form__status err" style="display:block">${esc(message)}</p>` : ''}
+  <div class="admin-card" style="max-width:620px">
+    <h2 style="font-size:1.15rem">Authenticator secret</h2>
+    <p><code style="overflow-wrap:anywhere;user-select:all">${esc(secret)}</code></p>
+    <p class="muted">Set the app to TOTP, SHA-1, six digits, and a 30-second interval. Keep this secret private.</p>
+    <form class="form" method="post" action="/admin/mfa">
+      ${csrfInput(ctx)}
+      <div class="field"><label for="mfa_code">Current authenticator code</label><input id="mfa_code" name="mfa_code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6" maxlength="6" required></div>
+      <button class="btn btn--primary" type="submit">Verify and enable MFA</button>
+    </form>
+  </div>`;
+  return adminLayout(ctx, inner, 'mfa', 'Set up MFA');
 }
 
 const f = {
@@ -87,6 +123,7 @@ function dashboard(ctx) {
     ['Gallery photos', db.gallery.length, '/admin/gallery'],
     ['Computer courses', db.courses.length, '/admin/courses'],
     ['Form submissions', db.submissions.length, '/admin/submissions'],
+    ['Admission applications', db.admissionApplications.length, '/admin/admissions'],
     ['Hero slides', db.hero.filter(h => h.enabled).length, '/admin/hero']
   ];
   const inner = `
@@ -97,8 +134,8 @@ function dashboard(ctx) {
   </div>
   <div class="admin-card" style="margin-top:22px">
     <h3>Latest submissions</h3>
-    ${db.submissions.length ? `<table class="admin-table"><thead><tr><th>Type</th><th>Name</th><th>Contact</th><th>When</th></tr></thead><tbody>
-      ${db.submissions.slice(-6).reverse().map(s => `<tr><td><span class="pill pill--gold">${esc(s.type)}</span></td><td>${esc(s.data.name || s.data.child_name || '—')}</td><td>${esc(s.data.phone || '—')}</td><td>${esc(new Date(s.at).toLocaleString())}</td></tr>`).join('')}
+    ${db.submissions.length ? `<table class="admin-table"><thead><tr><th>Reference</th><th>Type</th><th>Name</th><th>Contact</th><th>When</th></tr></thead><tbody>
+      ${db.submissions.slice(-6).reverse().map(s => `<tr><td><strong>${esc(s.reference || '—')}</strong></td><td><span class="pill pill--gold">${esc(s.type)}</span></td><td>${esc(s.data.name || s.data.child_name || '—')}</td><td>${esc(s.data.phone || '—')}</td><td>${esc(new Date(s.at).toLocaleString())}</td></tr>`).join('')}
     </tbody></table>` : '<p class="muted">No submissions yet.</p>'}
   </div>
   <div class="admin-card">
@@ -305,16 +342,40 @@ function submissionsPage(ctx) {
   <h1>Form Submissions</h1>
   <p class="muted" style="font-size:.88rem">Private — for the school office only. Never publish or share this information.</p>
   <div class="admin-card">
-    ${rows.length ? `<table class="admin-table"><thead><tr><th>When</th><th>Type</th><th>Details</th><th></th></tr></thead><tbody>
+    ${rows.length ? `<table class="admin-table"><thead><tr><th>Reference</th><th>When</th><th>Type</th><th>Details</th><th></th></tr></thead><tbody>
     ${rows.map((s, ri) => {
       const i = db.submissions.length - 1 - ri;
       const d = s.data;
       const detail = Object.keys(d).filter(k => k !== 'website_url' && d[k]).map(k => `<strong>${esc(k)}:</strong> ${esc(d[k])}`).join('<br>');
-      return `<tr><td>${esc(new Date(s.at).toLocaleString())}</td><td><span class="pill pill--gold">${esc(s.type)}</span></td><td>${detail}</td><td><form method="post" action="/admin/submissions/delete">${csrfInput(ctx)}<input type="hidden" name="index" value="${i}"><button class="btn btn--primary btn--sm" type="submit">Delete</button></form></td></tr>`;
+      return `<tr><td><strong>${esc(s.reference || '—')}</strong></td><td>${esc(new Date(s.at).toLocaleString())}</td><td><span class="pill pill--gold">${esc(s.type)}</span></td><td>${detail}</td><td><form method="post" action="/admin/submissions/delete">${csrfInput(ctx)}<input type="hidden" name="index" value="${i}"><button class="btn btn--primary btn--sm" type="submit">Delete</button></form></td></tr>`;
     }).join('')}
     </tbody></table>` : '<p class="muted">No submissions yet. Public form entries will appear here.</p>'}
   </div>`;
   return adminLayout(ctx, inner, 'sub', 'Submissions');
+}
+
+function admissionsPage(ctx, msg, transitions) {
+  const applications = ctx.db.admissionApplications.slice().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  const rows = applications.map(application => {
+    const guardian = application.guardians[0] || {};
+    const nextStates = transitions[application.status] || [];
+    return `<tr>
+      <td><strong>${esc(application.applicationReference)}</strong><br><small class="muted">${esc(new Date(application.submittedAt || application.createdAt).toLocaleString())}</small></td>
+      <td>${esc(application.applicant.fullName)}</td>
+      <td>${esc(application.classApplyingFor)}<br><small>${esc(application.boardingStatus)}</small></td>
+      <td>${esc(guardian.fullName || '—')}<br><a href="tel:${esc(guardian.phone || '')}">${esc(guardian.phone || '—')}</a>${guardian.email ? `<br><a href="mailto:${esc(guardian.email)}">${esc(guardian.email)}</a>` : ''}</td>
+      <td><span class="pill pill--gold">${esc(application.status.replaceAll('_', ' '))}</span></td>
+      <td>${nextStates.length ? `<form method="post" action="/admin/admissions/status" class="admin-actions">${csrfInput(ctx)}<input type="hidden" name="applicationReference" value="${esc(application.applicationReference)}"><select name="status" required><option value="">Next status</option>${nextStates.map(status => `<option value="${esc(status)}">${esc(status.replaceAll('_', ' '))}</option>`).join('')}</select><button class="btn btn--primary btn--sm" type="submit">Update</button></form>` : '<span class="muted">Final</span>'}</td>
+    </tr>`;
+  }).join('');
+  const inner = `
+  <h1>Admissions</h1>
+  <p class="muted">Private applications for authorised school administrators only.</p>
+  ${msg ? `<p class="form__status ok" style="display:block">${esc(msg)}</p>` : ''}
+  <div class="admin-card">
+    ${rows ? `<table class="admin-table"><thead><tr><th>Reference / submitted</th><th>Applicant</th><th>Class / arrangement</th><th>Primary guardian</th><th>Status</th><th>Review</th></tr></thead><tbody>${rows}</tbody></table>` : '<p class="muted">No admission applications have been received.</p>'}
+  </div>`;
+  return adminLayout(ctx, inner, 'admissions', 'Admissions');
 }
 
 function usersPage(ctx, msg) {
@@ -331,11 +392,12 @@ function usersPage(ctx, msg) {
   <div class="admin-card"><h3>Add user</h3>
     <form class="form" method="post" action="/admin/users/save">${csrfInput(ctx)}
       <div class="form__row">${f.text('username', 'Username *', '')}${f.text('name', 'Full name *', '')}</div>
-      <div class="form__row">${f.select('role', 'Role', ['super', 'admin', 'editor', 'contributor'], 'editor')}${f.text('password', 'Temporary password *', '', 'autocomplete="new-password"')}</div>
+      <div class="form__row">${f.select('role', 'Role', ['super', 'admin', 'editor', 'contributor'], 'editor')}${f.text('password', 'Temporary password *', '', 'type="password" autocomplete="new-password" minlength="12" required')}</div>
       <button class="btn btn--primary" type="submit">${icon('check')} Create user</button>
     </form>
   </div>`;
   return adminLayout(ctx, inner, 'users', 'Users');
 }
 
-module.exports = { adminLayout, loginPage, dashboard, newsPage, announcementsPage, galleryPage, coursesPage, heroPage, statementsPage, leadershipPage, settingsPage, submissionsPage, usersPage, IMG_POOL, GAL_CATS, NEWS_CATS };
+module.exports = { adminLayout, loginPage, passwordPage, mfaSetupPage, dashboard, newsPage, announcementsPage, galleryPage, coursesPage, heroPage, statementsPage, leadershipPage, settingsPage, submissionsPage, usersPage, IMG_POOL, GAL_CATS, NEWS_CATS };
+module.exports = { adminLayout, loginPage, passwordPage, mfaSetupPage, dashboard, newsPage, announcementsPage, galleryPage, coursesPage, heroPage, statementsPage, leadershipPage, settingsPage, submissionsPage, admissionsPage, usersPage, IMG_POOL, GAL_CATS, NEWS_CATS };

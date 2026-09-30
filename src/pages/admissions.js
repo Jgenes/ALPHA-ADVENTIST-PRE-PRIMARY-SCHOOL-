@@ -77,6 +77,7 @@ ${phero(ctx, 'Admissions', 'Admissions at Alpha', 'A simple, guided journey from
       </div>
       <div class="field"><label for="v-msg">Questions for the School Office</label><textarea id="v-msg" name="message"></textarea></div>
       <div class="hp-field" aria-hidden="true"><label>Leave this field empty</label><input type="text" name="website_url" tabindex="-1" autocomplete="off"></div>
+      <div class="field"><label style="display:flex;gap:10px;align-items:flex-start"><input type="checkbox" name="privacy_consent" value="yes" required style="width:auto;margin-top:4px"><span>I have read the <a href="/privacy">privacy notice</a> and authorize the school to use these details to respond to my request.</span></label></div>
       <p class="form__note">${icon('lock')}<span>Your details are used only by the school office to arrange your visit. They are never published on the website.</span></p>
       <div class="form__status" role="status"></div>
       <button class="btn btn--primary btn--block" type="submit">${icon('calendar')} Request a Visit</button>
@@ -87,7 +88,7 @@ ${phero(ctx, 'Admissions', 'Admissions at Alpha', 'A simple, guided journey from
 <section class="sec sec--sand" id="apply">
   <div class="container split split--rev">
     <form class="card form" data-endpoint="/api/apply" novalidate>
-      <h3>Admission Enquiry &amp; Application Request</h3>
+      <h3>Admission Application</h3>
       <p class="muted" style="font-size:.88rem">This form sends your application request directly to the school office, who will contact you with the next steps. Full online admissions will be introduced in a later phase of this website.</p>
       <div class="form__row">
         <div class="field"><label for="a-child">Child's Full Name <span class="req">*</span></label><input id="a-child" name="child_name" required></div>
@@ -103,6 +104,7 @@ ${phero(ctx, 'Admissions', 'Admissions at Alpha', 'A simple, guided journey from
       </div>
       <div class="field"><label for="a-msg">Message (optional)</label><textarea id="a-msg" name="message" placeholder="Previous school, transfer needs, questions…"></textarea></div>
       <div class="hp-field" aria-hidden="true"><label>Leave this field empty</label><input type="text" name="website_url" tabindex="-1" autocomplete="off"></div>
+      <div class="field"><label style="display:flex;gap:10px;align-items:flex-start"><input type="checkbox" name="privacy_consent" value="yes" required style="width:auto;margin-top:4px"><span>I am the parent or guardian, have read the <a href="/privacy">privacy notice</a>, and authorize the school to use these details to respond about this application request.</span></label></div>
       <p class="form__note">${icon('lock')}<span>Child privacy: application details are stored securely for the school office only and are never displayed publicly.</span></p>
       <div class="form__status" role="status"></div>
       <button class="btn btn--gold btn--block" type="submit">${icon('send')} Submit Application Request</button>

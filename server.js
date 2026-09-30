@@ -1,6 +1,7 @@
 'use strict';
 /* Alpha Adventist Pre & Primary School — official website platform
-   Zero-dependency Node.js server: SSR public site + JSON-file CMS + role-based admin. */
+  Node.js server: SSR public site + persistent CMS + role-based admin. */
+require('dotenv').config();
 const http = require('http');
 const path = require('path');
 const crypto = require('crypto');
@@ -12,15 +13,29 @@ const PUBLIC_DIR = path.join(__dirname, 'public');
 const PORT = process.env.PORT || 3000;
 const BASE_URL = process.env.BASE_URL || 'https://alphaadventist.ac.tz';
 
-/* seed a default super-admin on first run (change after first sign-in) */
-(function seedUsers() {
+/* seed a default super-admin after the configured database is ready */
+async function seedUsers() {
   const db = L.data;
   if (!db.users.length) {
-    db.users.push(L.newUser('admin', 'School Administrator', 'super', process.env.ADMIN_PASSWORD || 'Alpha@2026!'));
-    L.saveDB();
-    console.log('[cms] default super-admin created: username "admin" (see README)');
+    if (!L.isStrongPassword(process.env.ADMIN_PASSWORD)) throw new Error('Set a strong ADMIN_PASSWORD before first startup.');
+    L.validateMfaEncryptionKey();
+    const username = clean(process.env.ADMIN_USERNAME || 'admin');
+    const name = clean(process.env.ADMIN_NAME || 'School Administrator');
+    const user = L.newUser(username, name, 'super', process.env.ADMIN_PASSWORD);
+    user.mustSetupMfa = true;
+    db.users.push(user);
+    await L.saveDB('users');
+    console.log('[cms] initial super-admin created from environment configuration.');
+    return;
   }
-})();
+  if (db.users.some(user => ['super', 'admin'].includes(user.role) && !user.mfaEnabled)) L.validateMfaEncryptionKey();
+  let changed = false;
+  db.users.forEach(user => {
+    if (user.role === 'super' && !user.mustChangePassword) { user.mustChangePassword = true; changed = true; }
+    if (['super', 'admin'].includes(user.role) && !user.mfaEnabled && !user.mustSetupMfa) { user.mustSetupMfa = true; changed = true; }
+  });
+  if (changed) await L.saveDB('users');
+}
 
 /* ---------- helpers ---------- */
 function send(res, code, html, headers = {}) {
@@ -46,10 +61,14 @@ function redirect(res, to) {
   res.end();
 }
 function ipOf(req) {
-  return (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress || 'unknown';
+  if (process.env.TRUST_PROXY === 'true') {
+    const forwarded = (req.headers['x-forwarded-for'] || '').split(',')[0].trim();
+    if (forwarded) return forwarded;
+  }
+  return req.socket.remoteAddress || 'unknown';
 }
 function secure(req) {
-  return (req.headers['x-forwarded-proto'] || 'https') === 'https';
+  return !!req.socket.encrypted || (process.env.TRUST_PROXY === 'true' && req.headers['x-forwarded-proto'] === 'https');
 }
 function getOrAnonSession(req, res) {
   let s = L.getSession(req);
@@ -65,6 +84,7 @@ function getOrAnonSession(req, res) {
   return s;
 }
 const anonSessions = new Map();
+const mfaSetupSessions = new Map();
 function sessionFor(req) {
   const cookies = L.parseCookies(req);
   const token = cookies.alpha_sid;
@@ -116,11 +136,11 @@ const MANIFEST = JSON.stringify({
 
 /* ---------- public form endpoints ---------- */
 const FORM_RULES = {
-  '/api/contact': { type: 'Contact enquiry', required: ['name', 'phone', 'message'] },
-  '/api/visit': { type: 'School visit request', required: ['name', 'phone'] },
-  '/api/apply': { type: 'Admission application', required: ['child_name', 'guardian_name', 'phone', 'level', 'arrangement'] },
-  '/api/computer-class': { type: 'Computer class enquiry', required: ['name', 'phone'] },
-  '/api/computer-interest': { type: 'Community training interest', required: ['name', 'phone'] }
+  '/api/contact': { type: 'Contact enquiry', required: ['name', 'phone', 'message', 'privacy_consent'] },
+  '/api/visit': { type: 'School visit request', required: ['name', 'phone', 'privacy_consent'] },
+  '/api/apply': { type: 'Admission application', required: ['child_name', 'guardian_name', 'phone', 'level', 'arrangement', 'privacy_consent'] },
+  '/api/computer-class': { type: 'Computer class enquiry', required: ['name', 'phone', 'privacy_consent'] },
+  '/api/computer-interest': { type: 'Community training interest', required: ['name', 'phone', 'privacy_consent'] }
 };
 function clean(v) {
   return String(v == null ? '' : v).replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 2000);
@@ -133,10 +153,44 @@ async function handlePublicForm(req, res, route) {
   if (data.website_url) return json(res, 200, { ok: true, message: 'Thank you — the school office will contact you.' }); // honeypot: pretend success
   const missing = rule.required.filter(k => !clean(data[k]));
   if (missing.length) return json(res, 400, { ok: false, message: 'Please complete the required fields.' });
+  if (!['on', 'yes', 'true'].includes(String(data.privacy_consent).toLowerCase())) return json(res, 400, { ok: false, message: 'Please confirm the privacy notice before submitting.' });
+  if (route === '/api/apply') {
+    const levels = [...L.data.academics.prePrimary, ...L.data.academics.primary];
+    const email = clean(data.email);
+    if (!levels.includes(clean(data.level)) || !['Day', 'Boarding'].includes(clean(data.arrangement))) return json(res, 400, { ok: false, message: 'Please select a valid class and school arrangement.' });
+    if (!/^\+?[0-9 ()-]{7,20}$/.test(clean(data.phone)) || (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) return json(res, 400, { ok: false, message: 'Please enter a valid telephone number and email address.' });
+    const now = new Date();
+    const reference = await L.nextAdmissionReference(now);
+    const application = {
+      applicationReference: reference,
+      applicant: { fullName: clean(data.child_name) },
+      guardians: [{ fullName: clean(data.guardian_name), phone: clean(data.phone), email: email || null, relationship: 'Parent/Guardian', isPrimary: true }],
+      programme: clean(data.level).startsWith('KG') ? 'PRE_PRIMARY' : 'PRIMARY',
+      classApplyingFor: clean(data.level),
+      boardingStatus: clean(data.arrangement).toUpperCase(),
+      documents: [],
+      status: 'SUBMITTED',
+      assignedOfficer: null,
+      notes: data.message ? [{ text: clean(data.message), visibility: 'OFFICE', createdAt: now }] : [],
+      consent: { purpose: 'admissions_review', policyVersion: 'privacy-2026-09-30-v1', acceptedAt: now },
+      submittedAt: now,
+      createdAt: now,
+      updatedAt: now
+    };
+    await L.saveAdmissionApplication(application);
+    await auditEvent(req, 'admission.submit', 'admissionApplication', reference, 'success');
+    await sendOfficeAlert(reference, rule.type);
+    return json(res, 200, { ok: true, reference, message: 'Your application request has been received. The admissions office will contact you with the next steps.' });
+  }
   const out = {};
   Object.keys(data).forEach(k => { out[k] = clean(data[k]); });
-  L.data.submissions.push({ type: rule.type, data: out, at: Date.now() });
-  L.saveDB();
+  delete out.privacy_consent;
+  delete out.website_url;
+  const reference = `ALPHA-${new Date().getFullYear()}-${crypto.randomBytes(6).toString('hex').toUpperCase()}`;
+  L.data.submissions.push({ reference, type: rule.type, data: out, consent: { purpose: 'respond_to_enquiry', policyVersion: 'privacy-2026-09-30-v1', acceptedAt: Date.now() }, at: Date.now(), status: 'new' });
+  await L.saveDB('submissions');
+  await auditEvent(req, 'submission.create', 'submission', reference, 'success', { type: rule.type });
+  await sendOfficeAlert(reference, rule.type);
   const msgs = {
     'Contact enquiry': 'Thank you — your message has reached the school office. We respond during working hours on school days.',
     'School visit request': 'Asante! Your visit request has been received. The school office will confirm a convenient day with you.',
@@ -144,7 +198,38 @@ async function handlePublicForm(req, res, route) {
     'Computer class enquiry': 'Received! The school office will contact you about computer class placement.',
     'Community training interest': 'Your interest has been registered. You will be contacted when approved registration opens.'
   };
-  json(res, 200, { ok: true, message: msgs[rule.type] });
+  json(res, 200, { ok: true, reference, message: msgs[rule.type] });
+}
+
+async function sendOfficeAlert(reference, type) {
+  const endpoint = process.env.OFFICE_ALERT_WEBHOOK_URL;
+  if (!endpoint) return;
+  try {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ school: 'Alpha Adventist Pre & Primary School', reference, type, receivedAt: new Date().toISOString() }),
+      signal: AbortSignal.timeout(5000)
+    });
+    if (!response.ok) console.error(`[alerts] office webhook returned HTTP ${response.status} for ${reference}`);
+  } catch (error) {
+    console.error(`[alerts] office webhook delivery failed for ${reference}`);
+  }
+}
+
+async function purgeExpiredSubmissions() {
+  if (!process.env.FORM_RETENTION_DAYS) return 0;
+  const days = Number(process.env.FORM_RETENTION_DAYS);
+  if (!Number.isSafeInteger(days) || days < 1 || days > 36500) throw new Error('FORM_RETENTION_DAYS must be between 1 and 36500.');
+  const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+  const previousCount = L.data.submissions.length;
+  L.data.submissions = L.data.submissions.filter(submission => Number(submission.at) >= cutoff);
+  const removed = previousCount - L.data.submissions.length;
+  if (removed) {
+    await L.saveDB('submissions');
+    await L.writeAuditEvent({ userId: 'system', action: 'submissions.retention_purge', resourceType: 'submission', resourceId: '', result: 'success', metadata: { count: removed } });
+  }
+  return removed;
 }
 
 /* ---------- admin ---------- */
@@ -155,23 +240,35 @@ const ROLE_PAGES = {
   '/admin/gallery': ['super', 'admin', 'editor'],
   '/admin/courses': ['super', 'admin', 'editor'],
   '/admin/submissions': ['super', 'admin', 'editor'],
+  '/admin/admissions': ['super', 'admin'],
   '/admin/hero': ['super', 'admin'],
   '/admin/statements': ['super', 'admin'],
   '/admin/leadership': ['super', 'admin'],
   '/admin/settings': ['super', 'admin'],
-  '/admin/users': ['super']
+  '/admin/users': ['super'],
+  '/admin/password': ['super', 'admin', 'editor', 'contributor'],
+  '/admin/mfa': ['super', 'admin']
+};
+const ADMISSION_TRANSITIONS = {
+  SUBMITTED: ['DOCUMENTS_REQUIRED', 'UNDER_REVIEW'],
+  DOCUMENTS_REQUIRED: ['UNDER_REVIEW', 'DECLINED'],
+  UNDER_REVIEW: ['DOCUMENTS_REQUIRED', 'ASSESSMENT', 'ACCEPTED', 'WAITLISTED', 'DECLINED'],
+  ASSESSMENT: ['ACCEPTED', 'WAITLISTED', 'DECLINED'],
+  ACCEPTED: ['ENROLLED', 'DECLINED'],
+  WAITLISTED: ['ACCEPTED', 'DECLINED'],
+  DECLINED: [],
+  ENROLLED: []
 };
 function can(role, route) {
   const base = '/' + route.split('/').slice(1, 3).join('/');
   const roles = ROLE_PAGES[base];
-  if (!roles) return ['super', 'admin'].includes(role);
-  return roles.includes(role);
+  return !!roles && roles.includes(role);
 }
 function adminCtx(req, res) {
   const s = sessionFor(req);
   const user = s && s.username ? L.data.users.find(u => u.username === s.username) : null;
   return {
-    db: L.data, path: req.url, session: user ? { username: user.username, role: user.role, csrf: s.csrf } : null
+    db: L.data, path: req.url, session: user ? { username: user.username, role: user.role, csrf: s.csrf, mustChangePassword: !!user.mustChangePassword, mustSetupMfa: !!user.mustSetupMfa } : null
   };
 }
 function requireAuth(req, res, route) {
@@ -181,35 +278,78 @@ function requireAuth(req, res, route) {
     send(res, 403, X.page(ctx, '<section class="sec"><div class="container"><h1>Not permitted</h1><p class="muted">Your role does not allow access to this area of the CMS.</p></div></section>', { title: 'Not permitted' }));
     return { blocked: true };
   }
+  if (ctx.session.mustChangePassword && route !== '/admin/password') {
+    redirect(res, '/admin/password');
+    return { blocked: true };
+  }
+  if (ctx.session.mustSetupMfa && !ctx.session.mustChangePassword && route !== '/admin/mfa') {
+    redirect(res, '/admin/mfa');
+    return { blocked: true };
+  }
   return { ctx };
 }
 function checkCsrf(req, body, ctx) {
   return body._csrf && ctx.session && body._csrf === ctx.session.csrf;
 }
 
+async function auditEvent(req, action, resourceType, resourceId, result, metadata = {}, actor = null) {
+  const session = sessionFor(req);
+  try {
+    await L.writeAuditEvent({
+      userId: actor || session && session.username || 'anonymous', action, resourceType, resourceId,
+      result, ipAddress: ipOf(req), userAgent: String(req.headers['user-agent'] || '').slice(0, 500), metadata
+    });
+  } catch (error) {
+    console.error(`[audit] failed to record ${action}`);
+  }
+}
+
+async function saveAdminChange(req, route, collection, resourceId = '') {
+  await L.saveDB(collection);
+  await auditEvent(req, route, collection, String(resourceId || ''), 'success');
+}
+
 async function handleAdmin(req, res, url) {
   const route = url.pathname;
   /* login */
   if (route === '/admin/login' && req.method === 'POST') {
-    if (!L.rateLimit('login:' + ipOf(req), 6, 10 * 60 * 1000)) return send(res, 429, A.loginPage({ publicCsrf: '' }, 'Too many attempts. Please wait a few minutes and try again.'));
+    if (!L.rateLimit('login:ip:' + ipOf(req), 30, 10 * 60 * 1000)) return send(res, 429, A.loginPage({ publicCsrf: '' }, 'Too many attempts. Please wait a few minutes and try again.'));
     const s = sessionFor(req) || getOrAnonSession(req, res);
     const body = await L.parseForm(req);
     if (!body._csrf || body._csrf !== s.csrf) return send(res, 403, A.loginPage({ publicCsrf: s.csrf }, 'Session expired — please try again.'));
-    const user = L.data.users.find(u => u.username === clean(body.username));
-    if (!user || !L.verifyUser(user, body.password || '')) {
+    const attemptedUsername = clean(body.username).toLowerCase().slice(0, 100) || 'unknown';
+    if (!L.rateLimit('login:user:' + attemptedUsername, 6, 10 * 60 * 1000)) return send(res, 429, A.loginPage({ publicCsrf: s.csrf }, 'Too many attempts for this account. Please wait a few minutes and try again.'));
+    const user = L.data.users.find(u => u.username.toLowerCase() === attemptedUsername);
+    if (!user || String(body.password || '').length > 1024 || !L.verifyUser(user, body.password || '')) {
+      await auditEvent(req, 'auth.login', 'user', attemptedUsername, 'failure', {}, attemptedUsername);
       return send(res, 401, A.loginPage({ publicCsrf: s.csrf }, 'Incorrect username or password.'));
     }
-    /* promote session */
-    const rec = { username: user.username, role: user.role, csrf: crypto.randomBytes(16).toString('hex'), created: Date.now() };
+    if (user.mfaEnabled) {
+      const allowed = L.rateLimit('login:mfa:' + attemptedUsername, 6, 10 * 60 * 1000);
+      let validCode = false;
+      try { validCode = allowed && L.verifyTotp(L.decryptMfaSecret(user.mfaSecretEnc), body.mfa_code); } catch (error) {}
+      if (!validCode) {
+        await auditEvent(req, 'auth.mfa', 'user', attemptedUsername, 'failure', {}, attemptedUsername);
+        return send(res, 401, A.loginPage({ publicCsrf: s.csrf }, 'Authenticator code is invalid or expired.'));
+      }
+    }
+    const token = crypto.randomBytes(24).toString('hex');
+    const rec = { username: user.username, role: user.role, csrf: crypto.randomBytes(16).toString('hex'), created: Date.now(), mustChangePassword: !!user.mustChangePassword, mustSetupMfa: !!user.mustSetupMfa };
     anonSessions.delete(s.token);
-    promotedSessions.set(s.token, rec);
-    res.setHeader('Set-Cookie', L.cookieHeader('alpha_sid', s.token, { secure: secure(req), maxAge: 60 * 60 * 10 }));
-    return redirect(res, '/admin');
+    promotedSessions.set(token, rec);
+    res.setHeader('Set-Cookie', L.cookieHeader('alpha_sid', token, { secure: secure(req), maxAge: 60 * 60 * 10 }));
+    await auditEvent(req, 'auth.login', 'user', user.username, 'success', {}, user.username);
+    return redirect(res, user.mustChangePassword ? '/admin/password' : user.mustSetupMfa ? '/admin/mfa' : '/admin');
   }
   if (route === '/admin/logout' && req.method === 'POST') {
+    const session = sessionFor(req);
+    const body = await L.parseForm(req);
+    if (!session || !body._csrf || body._csrf !== session.csrf) return send(res, 403, 'Security check failed');
+    await auditEvent(req, 'auth.logout', 'user', session.username || 'anonymous', 'success');
     const cookies = L.parseCookies(req);
     promotedSessions.delete(cookies.alpha_sid);
     anonSessions.delete(cookies.alpha_sid);
+    mfaSetupSessions.delete(cookies.alpha_sid);
     res.setHeader('Set-Cookie', L.cookieHeader('alpha_sid', '', { maxAge: 0 }));
     return redirect(res, '/admin');
   }
@@ -219,6 +359,9 @@ async function handleAdmin(req, res, url) {
       const ses = s || getOrAnonSession(req, res);
       return send(res, 200, A.loginPage({ publicCsrf: ses.csrf }, url.searchParams.get('error') || ''));
     }
+    const user = L.data.users.find(item => item.username === s.username);
+    if (user && user.mustChangePassword) return redirect(res, '/admin/password');
+    if (user && user.mustSetupMfa) return redirect(res, '/admin/mfa');
     const ctx = { db: L.data, path: route, session: { username: s.username, role: s.role, csrf: s.csrf } };
     return send(res, 200, A.dashboard(ctx));
   }
@@ -228,6 +371,15 @@ async function handleAdmin(req, res, url) {
     if (login) return redirect(res, '/admin');
     if (blocked) return;
     const msg = url.searchParams.get('msg') || '';
+    if (route === '/admin/password') return send(res, 200, A.passwordPage(ctx, msg));
+    if (route === '/admin/mfa') {
+      const user = L.data.users.find(item => item.username === ctx.session.username);
+      if (!user || !user.mustSetupMfa) return redirect(res, '/admin');
+      const session = sessionFor(req);
+      let secret = mfaSetupSessions.get(session.token);
+      if (!secret) { secret = L.createTotpSecret(); mfaSetupSessions.set(session.token, secret); }
+      return send(res, 200, A.mfaSetupPage(ctx, secret, msg));
+    }
     if (route === '/admin/news') return send(res, 200, A.newsPage(ctx, url.searchParams.get('edit') ? L.data.news.find(n => n.slug === url.searchParams.get('edit')) : null, msg));
     if (route === '/admin/announcements') return send(res, 200, A.announcementsPage(ctx, msg));
     if (route === '/admin/gallery') { const e = url.searchParams.get('edit'); return send(res, 200, A.galleryPage(ctx, e != null ? parseInt(e, 10) : null, msg)); }
@@ -237,6 +389,7 @@ async function handleAdmin(req, res, url) {
     if (route === '/admin/leadership') return send(res, 200, A.leadershipPage(ctx, msg));
     if (route === '/admin/settings') return send(res, 200, A.settingsPage(ctx, msg));
     if (route === '/admin/submissions') return send(res, 200, A.submissionsPage(ctx));
+    if (route === '/admin/admissions') return send(res, 200, A.admissionsPage(ctx, msg, ADMISSION_TRANSITIONS));
     if (route === '/admin/users') return send(res, 200, A.usersPage(ctx, msg));
     return redirect(res, '/admin');
   }
@@ -249,6 +402,56 @@ async function handleAdmin(req, res, url) {
     if (!checkCsrf(req, body, ctx)) return send(res, 403, X.page(ctx, '<section class="sec"><div class="container"><h1>Security check failed</h1><p>Please return to the CMS and try again.</p></div></section>', { title: 'CSRF' }));
     const db = L.data;
     const back = b => redirect(res, b + '?msg=' + encodeURIComponent('Saved'));
+
+    if (route === '/admin/admissions/status') {
+      const reference = clean(body.applicationReference);
+      const application = db.admissionApplications.find(item => item.applicationReference === reference);
+      const nextStatus = clean(body.status);
+      if (!application || !ADMISSION_TRANSITIONS[application.status] || !ADMISSION_TRANSITIONS[application.status].includes(nextStatus)) {
+        return redirect(res, '/admin/admissions?msg=' + encodeURIComponent('Invalid or unavailable status transition'));
+      }
+      const updated = await L.updateAdmissionStatus(reference, [application.status], nextStatus);
+      if (!updated) return redirect(res, '/admin/admissions?msg=' + encodeURIComponent('Application changed in another session; refresh and try again'));
+      await auditEvent(req, 'admission.status_change', 'admissionApplication', reference, 'success', { from: application.status, to: nextStatus });
+      return redirect(res, '/admin/admissions?msg=' + encodeURIComponent('Application status updated'));
+    }
+
+    if (route === '/admin/password') {
+      const userIndex = db.users.findIndex(user => user.username === ctx.session.username);
+      const user = db.users[userIndex];
+      if (!user || !L.verifyUser(user, body.current_password || '')) return send(res, 400, A.passwordPage(ctx, 'Current password is incorrect.'));
+      if (!L.isStrongPassword(body.new_password) || body.new_password !== body.confirm_password) return send(res, 400, A.passwordPage(ctx, 'Use a strong new password and enter it the same way twice.'));
+      const updated = L.newUser(user.username, user.name, user.role, body.new_password);
+      updated.mustChangePassword = false;
+      updated.mustSetupMfa = !!user.mustSetupMfa;
+      db.users[userIndex] = updated;
+      await L.saveDB('users');
+      await auditEvent(req, 'auth.password_change', 'user', user.username, 'success');
+      for (const [token, session] of promotedSessions) if (session.username === user.username) promotedSessions.delete(token);
+      const token = crypto.randomBytes(24).toString('hex');
+      promotedSessions.set(token, { username: user.username, role: user.role, csrf: crypto.randomBytes(16).toString('hex'), created: Date.now(), mustSetupMfa: updated.mustSetupMfa });
+      res.setHeader('Set-Cookie', L.cookieHeader('alpha_sid', token, { secure: secure(req), maxAge: 60 * 60 * 10 }));
+      return redirect(res, '/admin');
+    }
+    if (route === '/admin/mfa') {
+      const userIndex = db.users.findIndex(user => user.username === ctx.session.username);
+      const user = db.users[userIndex];
+      const session = sessionFor(req);
+      const secret = session && mfaSetupSessions.get(session.token);
+      if (!user || !user.mustSetupMfa || !secret || !L.verifyTotp(secret, body.mfa_code)) return send(res, 400, A.mfaSetupPage(ctx, secret || '', 'Authenticator code is invalid or expired.'));
+      user.mfaSecretEnc = L.encryptMfaSecret(secret);
+      user.mfaEnabled = true;
+      user.mustSetupMfa = false;
+      await L.saveDB('users');
+      await auditEvent(req, 'auth.mfa_enroll', 'user', user.username, 'success', {}, user.username);
+      const oldToken = L.parseCookies(req).alpha_sid;
+      mfaSetupSessions.delete(oldToken);
+      for (const [token, record] of promotedSessions) if (record.username === user.username) promotedSessions.delete(token);
+      const token = crypto.randomBytes(24).toString('hex');
+      promotedSessions.set(token, { username: user.username, role: user.role, csrf: crypto.randomBytes(16).toString('hex'), created: Date.now() });
+      res.setHeader('Set-Cookie', L.cookieHeader('alpha_sid', token, { secure: secure(req), maxAge: 60 * 60 * 10 }));
+      return redirect(res, '/admin');
+    }
 
     if (route === '/admin/news/save') {
       if (!clean(body.title)) return redirect(res, '/admin/news?msg=' + encodeURIComponent('Title is required'));
@@ -270,20 +473,20 @@ async function handleAdmin(req, res, url) {
       item.featured = !!body.featured;
       if (item.featured) db.news.forEach(n => { if (n !== item) n.featured = false; });
       if (!existing) db.news.unshift(item);
-      L.saveDB();
+      await saveAdminChange(req, route, 'news', slug);
       return back('/admin/news');
     }
     if (route === '/admin/news/delete') {
       db.news = db.news.filter(n => n.slug !== clean(body.slug));
-      L.saveDB(); return redirect(res, '/admin/news?msg=' + encodeURIComponent('Deleted'));
+      await saveAdminChange(req, route, 'news', body.slug); return redirect(res, '/admin/news?msg=' + encodeURIComponent('Deleted'));
     }
     if (route === '/admin/announcements/save') {
       if (!clean(body.title)) return redirect(res, '/admin/announcements?msg=' + encodeURIComponent('Title required'));
       db.announcements.unshift({ title: clean(body.title), body: clean(body.body), tag: clean(body.tag), dateLabel: clean(body.dateLabel) || String(new Date().getFullYear()) });
-      L.saveDB(); return back('/admin/announcements');
+      await saveAdminChange(req, route, 'announcements', body.title); return back('/admin/announcements');
     }
     if (route === '/admin/announcements/delete') {
-      db.announcements.splice(parseInt(body.index, 10), 1); L.saveDB();
+      db.announcements.splice(parseInt(body.index, 10), 1); await saveAdminChange(req, route, 'announcements', body.index);
       return redirect(res, '/admin/announcements?msg=' + encodeURIComponent('Deleted'));
     }
     if (route === '/admin/gallery/save') {
@@ -291,24 +494,24 @@ async function handleAdmin(req, res, url) {
       if (!item.caption) return redirect(res, '/admin/gallery?msg=' + encodeURIComponent('Caption required'));
       if (body.index != null && body.index !== '') db.gallery[parseInt(body.index, 10)] = item;
       else db.gallery.push(item);
-      L.saveDB(); return back('/admin/gallery');
+      await saveAdminChange(req, route, 'gallery', body.index || item.caption); return back('/admin/gallery');
     }
     if (route === '/admin/gallery/delete') {
-      db.gallery.splice(parseInt(body.index, 10), 1); L.saveDB();
+      db.gallery.splice(parseInt(body.index, 10), 1); await saveAdminChange(req, route, 'gallery', body.index);
       return redirect(res, '/admin/gallery?msg=' + encodeURIComponent('Deleted'));
     }
     if (route === '/admin/courses/save') {
       if (!clean(body.title)) return redirect(res, '/admin/courses?msg=' + encodeURIComponent('Title required'));
       db.courses.push({ title: clean(body.title), blurb: clean(body.blurb), audience: clean(body.audience), status: body.status === 'current' ? 'current' : 'proposed' });
-      L.saveDB(); return back('/admin/courses');
+      await saveAdminChange(req, route, 'courses', body.title); return back('/admin/courses');
     }
     if (route === '/admin/courses/toggle') {
       const c = db.courses[parseInt(body.index, 10)];
-      c.status = c.status === 'current' ? 'proposed' : 'current'; L.saveDB();
+      c.status = c.status === 'current' ? 'proposed' : 'current'; await saveAdminChange(req, route, 'courses', c.title);
       return redirect(res, '/admin/courses?msg=' + encodeURIComponent('Status updated'));
     }
     if (route === '/admin/courses/delete') {
-      db.courses.splice(parseInt(body.index, 10), 1); L.saveDB();
+      db.courses.splice(parseInt(body.index, 10), 1); await saveAdminChange(req, route, 'courses', body.index);
       return redirect(res, '/admin/courses?msg=' + encodeURIComponent('Deleted'));
     }
     if (route === '/admin/hero/save') {
@@ -318,13 +521,13 @@ async function handleAdmin(req, res, url) {
       h.cta = { label: clean(body.cta_label), href: clean(body.cta_href) };
       h.cta2 = clean(body.cta2_label) ? { label: clean(body.cta2_label), href: clean(body.cta2_href) } : null;
       h.enabled = !!body.enabled;
-      L.saveDB(); return back('/admin/hero');
+      await saveAdminChange(req, route, 'hero', body.index); return back('/admin/hero');
     }
     if (route === '/admin/statements/save') {
       db.statements.mission = clean(body.mission);
       db.statements.vision = clean(body.vision);
       db.statements.philosophy = clean(body.philosophy);
-      L.saveDB(); return back('/admin/statements');
+      await saveAdminChange(req, route, 'statements', 'primary'); return back('/admin/statements');
     }
     if (route === '/admin/leadership/save') {
       db.leadership.name = clean(body.name);
@@ -333,7 +536,7 @@ async function handleAdmin(req, res, url) {
       db.leadership.signature = clean(body.signature);
       db.leadership.shortMessage = clean(body.shortMessage);
       db.leadership.fullMessage = clean(body.fullMessage).split(/\n{2,}/).filter(Boolean);
-      L.saveDB(); return back('/admin/leadership');
+      await saveAdminChange(req, route, 'leadership', db.leadership.name); return back('/admin/leadership');
     }
     if (route === '/admin/settings/save') {
       const s = db.settings;
@@ -349,21 +552,36 @@ async function handleAdmin(req, res, url) {
       s.address.box = clean(body.box); s.address.city = clean(body.city);
       s.officeHours = clean(body.officeHours); s.socialNote = clean(body.socialNote);
       s.centreCode = clean(body.centreCode);
-      L.saveDB(); return back('/admin/settings');
+      await saveAdminChange(req, route, 'settings', 'primary'); return back('/admin/settings');
     }
     if (route === '/admin/submissions/delete') {
-      db.submissions.splice(parseInt(body.index, 10), 1); L.saveDB();
+      db.submissions.splice(parseInt(body.index, 10), 1); await saveAdminChange(req, route, 'submissions', body.index);
       return redirect(res, '/admin/submissions?msg=' + encodeURIComponent('Deleted'));
     }
     if (route === '/admin/users/save') {
-      if (!clean(body.username) || !body.password) return redirect(res, '/admin/users?msg=' + encodeURIComponent('Username and password required'));
-      if (db.users.some(u => u.username === clean(body.username))) return redirect(res, '/admin/users?msg=' + encodeURIComponent('Username already exists'));
-      db.users.push(L.newUser(clean(body.username), clean(body.name), clean(body.role), body.password));
-      L.saveDB(); return back('/admin/users');
+      const username = clean(body.username).toLowerCase();
+      const name = clean(body.name);
+      const role = clean(body.role);
+      if (!username || !name || !body.password) return redirect(res, '/admin/users?msg=' + encodeURIComponent('Username, name and password are required'));
+      if (!['super', 'admin', 'editor', 'contributor'].includes(role)) return redirect(res, '/admin/users?msg=' + encodeURIComponent('Invalid role'));
+      if (!L.isStrongPassword(body.password)) return redirect(res, '/admin/users?msg=' + encodeURIComponent('Password must be at least 12 characters with uppercase, lowercase, number and symbol'));
+      if (['super', 'admin'].includes(role)) L.validateMfaEncryptionKey();
+      if (db.users.some(u => u.username.toLowerCase() === username)) return redirect(res, '/admin/users?msg=' + encodeURIComponent('Username already exists'));
+      const user = L.newUser(username, name, role, body.password);
+      if (['super', 'admin'].includes(role)) user.mustSetupMfa = true;
+      db.users.push(user);
+      await L.saveDB('users');
+      await auditEvent(req, 'user.create', 'user', username, 'success', { role });
+      return back('/admin/users');
     }
     if (route === '/admin/users/delete') {
       const i = parseInt(body.index, 10);
-      if (db.users[i] && db.users[i].username !== ctx.session.username) { db.users.splice(i, 1); L.saveDB(); }
+      if (db.users[i] && db.users[i].username !== ctx.session.username) {
+        const username = db.users[i].username;
+        db.users.splice(i, 1);
+        await L.saveDB('users');
+        await auditEvent(req, 'user.delete', 'user', username, 'success');
+      }
       return redirect(res, '/admin/users?msg=' + encodeURIComponent('User removed'));
     }
     return redirect(res, '/admin');
@@ -388,6 +606,7 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://local');
   const p = url.pathname;
   try {
+    if (secure(req)) res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
     /* static */
     if (['/img/', '/css/', '/js/', '/fonts/'].some(pre => p.startsWith(pre)) || p === '/favicon.ico') {
       if (L.serveStatic(req, res, p === '/favicon.ico' ? '/img/favicon-32.png' : p, PUBLIC_DIR)) return;
@@ -433,9 +652,38 @@ const server = http.createServer(async (req, res) => {
     }
     return send(res, 405, 'Method not allowed');
   } catch (err) {
-    console.error('[error]', p, err);
+    console.error('[error]', p, err.name, err.code || '');
     try { send(res, 500, '<!DOCTYPE html><html><body style="font-family:sans-serif;padding:40px"><h1>Something went wrong</h1><p>Please try again, or call the school office.</p></body></html>'); } catch (e) {}
   }
 });
 
-server.listen(PORT, '0.0.0.0', () => console.log(`[alpha] serving on :${PORT}`));
+async function start() {
+  await L.initDB();
+  await seedUsers();
+  await purgeExpiredSubmissions();
+  server.listen(PORT, '0.0.0.0', () => console.log(`[alpha] serving on :${PORT}`));
+  if (process.env.FORM_RETENTION_DAYS) {
+    const retentionTimer = setInterval(() => purgeExpiredSubmissions().catch(() => console.error('[retention] scheduled purge failed')), 24 * 60 * 60 * 1000);
+    retentionTimer.unref();
+  }
+}
+
+let shuttingDown = false;
+async function shutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`[alpha] received ${signal}; draining requests`);
+  server.close(async error => {
+    if (error) process.exitCode = 1;
+    try { await L.closeDB(); } catch (closeError) { process.exitCode = 1; }
+  });
+  if (server.closeIdleConnections) server.closeIdleConnections();
+}
+
+process.once('SIGINT', () => shutdown('SIGINT'));
+process.once('SIGTERM', () => shutdown('SIGTERM'));
+
+start().catch(error => {
+  console.error('[startup] database initialization failed; check MONGO_URI and database access.');
+  process.exitCode = 1;
+});

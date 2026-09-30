@@ -205,7 +205,7 @@
       }).then(function (r) { return r.json(); }).then(function (res) {
         if (status) {
           status.className = 'form__status ' + (res.ok ? 'ok' : 'err');
-          status.textContent = res.message || (res.ok ? 'Thank you — your message has been received.' : 'Something went wrong. Please try again.');
+          status.textContent = (res.message || (res.ok ? 'Thank you — your message has been received.' : 'Something went wrong. Please try again.')) + (res.reference ? ' Reference: ' + res.reference : '');
         }
         if (res.ok) form.reset();
       }).catch(function () {

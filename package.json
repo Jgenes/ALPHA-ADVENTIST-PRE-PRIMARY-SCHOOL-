@@ -1,0 +1,14 @@
+{
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "scripts": {
+    "backup:mongodb": "node scripts/backup-mongodb.js",
+    "migrate:mongodb": "node scripts/migrate-mongodb.js",
+    "restore:mongodb": "node scripts/restore-mongodb.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "mongodb": "^7.7.0"
+  }
+}

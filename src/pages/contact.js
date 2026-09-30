@@ -50,6 +50,7 @@ ${phero(ctx, 'Contact', 'Contact Alpha', 'We would love to hear from you — cal
         <div class="field"><label for="ct-topic">Topic</label><select id="ct-topic" name="topic"><option>General enquiry</option><option>Admissions</option><option>Boarding</option><option>Computer learning</option><option>Parent / guardian matter</option><option>Other</option></select></div>
         <div class="field"><label for="ct-msg">Your Message <span class="req">*</span></label><textarea id="ct-msg" name="message" required></textarea></div>
         <div class="hp-field" aria-hidden="true"><label>Leave this field empty</label><input type="text" name="website_url" tabindex="-1" autocomplete="off"></div>
+        <div class="field"><label style="display:flex;gap:10px;align-items:flex-start"><input type="checkbox" name="privacy_consent" value="yes" required style="width:auto;margin-top:4px"><span>I have read the <a href="/privacy">privacy notice</a> and authorize the school to use these details to respond to my enquiry.</span></label></div>
         <p class="form__note">${icon('lock')}<span>Your message is delivered to the school office only. Personal information submitted through this website is never published or shared.</span></p>
         <div class="form__status" role="status"></div>
         <button class="btn btn--primary btn--block" type="submit">${icon('send')} Send Message</button>

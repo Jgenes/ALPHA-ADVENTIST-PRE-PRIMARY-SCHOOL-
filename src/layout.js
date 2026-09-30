@@ -1,6 +1,7 @@
 'use strict';
 const L = require('./lib');
 const esc = L.esc;
+const BASE_URL = (process.env.BASE_URL || 'https://alphaadventist.ac.tz').replace(/\/+$/, '');
 
 /* ============ ICONS (inline SVG, 24x24 stroke) ============ */
 const P = {
@@ -210,7 +211,7 @@ function page(ctx, body, meta = {}) {
   const s = ctx.db.settings;
   const title = meta.title || `${s.schoolName} — ${s.affiliation}, Kigoma`;
   const desc = meta.desc || 'Alpha Adventist Pre & Primary School is a Seventh-day Adventist educational institution within the Western Tanzania Conference – Kigoma, offering holistic Pre-Primary and Primary education for day and boarding pupils.';
-  const url = `https://alphaadventist.ac.tz${ctx.path}`;
+  const url = `${BASE_URL}${ctx.path}`;
   const jsonld = meta.jsonld ? `<script type="application/ld+json">${JSON.stringify(meta.jsonld)}</script>` : '';
   return `<!DOCTYPE html>
 <html lang="en">
@@ -225,7 +226,7 @@ function page(ctx, body, meta = {}) {
 <meta property="og:title" content="${esc(title)}">
 <meta property="og:description" content="${esc(desc)}">
 <meta property="og:url" content="${esc(url)}">
-<meta property="og:image" content="https://alphaadventist.ac.tz/img/og-image.jpg">
+<meta property="og:image" content="${esc(BASE_URL)}/img/og-image.jpg">
 <meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Alpha Adventist Pre & Primary School pupils at a school ceremony">
 <meta name="twitter:card" content="summary_large_image">
@@ -266,8 +267,8 @@ function schoolJsonLd(ctx) {
     },
     parentOrganization: { '@type': 'Organization', name: 'Western Tanzania Conference of Seventh-day Adventists' },
     motto: s.motto,
-    logo: 'https://alphaadventist.ac.tz/img/logo-256.png',
-    image: 'https://alphaadventist.ac.tz/img/og-image.jpg'
+    logo: `${BASE_URL}/img/logo-256.png`,
+    image: `${BASE_URL}/img/og-image.jpg`
   };
 }
 

@@ -76,6 +76,7 @@ ${phero(ctx, 'Computer Learning', 'Preparing Learners for the Digital Future', '
       <div class="field"><label for="c-level">Current Level</label><select id="c-level" name="level"><option value="">Select…</option>${[...db.academics.prePrimary, ...db.academics.primary].map(l => `<option>${esc(l)}</option>`).join('')}</select></div>
       <div class="field"><label for="c-msg">What would you like to learn or improve?</label><textarea id="c-msg" name="message"></textarea></div>
       <div class="hp-field" aria-hidden="true"><label>Leave this field empty</label><input type="text" name="website_url" tabindex="-1" autocomplete="off"></div>
+      <div class="field"><label style="display:flex;gap:10px;align-items:flex-start"><input type="checkbox" name="privacy_consent" value="yes" required style="width:auto;margin-top:4px"><span>I have read the <a href="/privacy">privacy notice</a> and authorize the school to use these details to respond to my enquiry.</span></label></div>
       <div class="form__status" role="status"></div>
       <button class="btn btn--primary btn--block" type="submit">${icon('keyboard')} Join Computer Class</button>
     </form>
@@ -118,6 +119,7 @@ ${phero(ctx, 'Computer Learning', 'Preparing Learners for the Digital Future', '
       </div>
       <div class="field"><label for="i-course" style="color:#dfe6f5">Course of Interest</label><select id="i-course" name="course"><option value="">Select…</option>${proposed.map(c => `<option>${esc(c.title)}</option>`).join('')}</select></div>
       <div class="hp-field" aria-hidden="true"><label>Leave this field empty</label><input type="text" name="website_url" tabindex="-1" autocomplete="off"></div>
+      <div class="field"><label style="display:flex;gap:10px;align-items:flex-start;color:#dfe6f5"><input type="checkbox" name="privacy_consent" value="yes" required style="width:auto;margin-top:4px"><span>I have read the <a href="/privacy">privacy notice</a> and authorize the school to use these details to contact me if registration opens.</span></label></div>
       <div class="form__status" role="status"></div>
       <button class="btn btn--gold btn--block" type="submit">${icon('send')} Register Interest</button>
     </form>

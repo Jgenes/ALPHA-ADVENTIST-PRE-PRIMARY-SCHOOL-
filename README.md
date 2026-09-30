@@ -10,37 +10,56 @@ Identity line: **Education • Faith • Technology • Talent • Character •
 ## 1. Run the platform
 
 ```bash
-node server.js          # zero-dependency Node.js (v18+) server, port 3000
+node server.js          # Node.js 20.19+, port 3000; loads .env automatically
 PORT=8080 node server.js
 ```
 
-Open `http://localhost:3000`. No npm packages are required — the server, router,
-CMS backend and renderer are written on the Node standard library only.
+Run `npm install` first, then open `http://localhost:3000`. Set `MONGO_URI` in
+`.env` to use MongoDB for CMS data. `MONGODB_URI` and `MONGODB_DB_NAME` are the
+preferred names; the older `MONGO_URI` and `MONGO_DB_NAME` keys remain supported.
+The current CMS database supports MongoDB collections and retains the JSON file
+as a local fallback when no Mongo URI is configured. Copy `.env.example` to
+`.env` and use separate development, staging, and production database names.
 
+Every public enquiry now receives a reference number shown in the confirmation
+and the private CMS inbox. To send the school an external alert, configure
+`OFFICE_ALERT_WEBHOOK_URL` with a trusted webhook that can forward the reference
+and enquiry type to the office by email, SMS or WhatsApp. Personal form details
+are not sent to the webhook. Without it, submissions remain available in
+**CMS → Form Submissions**.
+
+Public enquiry forms require a privacy acknowledgement and store its policy
+version and timestamp. This is not permission to publish child photographs.
+Automatic form-data deletion is disabled until management approves a retention
+period and sets `FORM_RETENTION_DAYS` in the environment.
+     
 ### CMS sign-in (first run)
 
-| Field    | Value          |
-|----------|----------------|
-| URL      | `/admin`       |
-| Username | `admin`        |
-| Password | `Alpha@2026!`  |
+Set `ADMIN_USERNAME` and a unique strong `ADMIN_PASSWORD` in the environment
+before first startup. There is no built-in administrator password. Existing
+super-admins are required to change their password after this security update;
+they sign in with their current password and are redirected to the change form.
+Set `MFA_ENCRYPTION_KEY` to a separately backed-up random 32-byte key encoded as
+64 hexadecimal characters, or set `MFA_ENCRYPTION_KEY_FILE` to a mode-600 file containing it. Generate one with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` and store it only in your secret manager or ignored `.env`. Privileged `super` and `admin` accounts must enroll an authenticator after password rotation; sign-in then requires its six-digit TOTP code. Losing this key prevents decryption of enrolled MFA secrets.
+- MongoDB backups: enable daily Atlas backups/continuous cloud backup for production and retain backups outside the application account. The encrypted application-level backup can also be run daily with `node scripts/backup-mongodb.js`; set `MONGO_BACKUP_DIR` to a dedicated mode-700 directory and provide `MONGO_BACKUP_ENCRYPTION_KEY` or a mode-600 `MONGO_BACKUP_ENCRYPTION_KEY_FILE`. Keep this 32-byte key separate from the encrypted archives. Schedule backups with a managed job/cron and copy archives to off-host storage.
 
-> Created automatically on first start. **Change it immediately** via
-> *Users & Roles* (create a new super-admin, then remove the default account).
-> Sessions expire after 10 hours; login is rate-limited; every admin POST is CSRF-protected.
+Sessions expire after 10 hours; login is limited by source and account; admin
+POSTs are CSRF-protected.
 
 ## 1.1 Deploy to Render
 
-This repository includes a Render Blueprint in `render.yaml`. The application uses only Node.js built-ins, so no `npm install` is needed. The Blueprint attaches a persistent disk at `/var/data` for the CMS database. Render persistent disks require a paid web-service plan; do not remove the disk unless you have another persistent database/storage plan, or CMS edits can be lost on redeploy.
+This repository includes a Render Blueprint in `render.yaml`. It installs the declared Node.js dependencies and attaches a persistent disk at `/var/data` for JSON fallback storage. Render persistent disks require a paid web-service plan; do not remove the disk unless you have another persistent database/storage plan, or CMS edits can be lost on redeploy.
 
 1. Push this project to a GitHub or GitLab repository.
 2. In Render, choose **New → Blueprint**, connect the repository, and select its branch. Render reads `render.yaml` and creates the web service and persistent disk.
 3. When prompted for `ADMIN_PASSWORD`, enter a unique, strong password and keep it private. On the disk's first initialization, the site copies the content database without its development admin account, then creates the `admin` user using this password.
-4. After deployment, open the service URL and sign in at `/admin` with username `admin` and the password you supplied.
-5. Set `BASE_URL` in the Render service environment to the deployed Render URL, or to your custom HTTPS domain after connecting it. Redeploy for canonical URLs and the sitemap to reflect the selected domain.
-6. Add the custom domain in Render if needed and follow Render's DNS instructions. Render provides HTTPS for connected domains.
+4. Set `MONGODB_URI`, `MONGODB_DB_NAME`, `ADMIN_PASSWORD`, and `MFA_ENCRYPTION_KEY` as private Render environment variables. Use a least-privilege MongoDB application user restricted to the Render network and TLS. Set `TRUST_PROXY=true` only because Render is the trusted TLS proxy. Optionally set `OFFICE_ALERT_WEBHOOK_URL` for office notifications. Never commit these values.
+5. After deployment, open the service URL and sign in at `/admin` with username `admin` and the password you supplied.
+6. Set `BASE_URL` in the Render service environment to the deployed Render URL, or to your custom HTTPS domain after connecting it. Redeploy for canonical URLs and the sitemap to reflect the selected domain.
+7. Add the custom domain in Render if needed and follow Render's DNS instructions. Render provides HTTPS for connected domains.
 
-The service listens on Render's assigned `PORT`. The CMS database persists on the attached disk at `/var/data/db.json`; keep regular backups of that file. `ADMIN_PASSWORD` is only used to create the initial admin on a fresh disk. Changing the environment variable later does not reset an existing CMS password.
+The service listens on Render's assigned `PORT`. MongoDB is the production source of truth; the `/var/data/db.json` store is only a local/fallback option. Changing `ADMIN_PASSWORD` later does not reset an existing account.
+The existing Mongo `platform_state` record stays in compatibility mode by default. The web server never migrates it implicitly. Before changing its layout, back up MongoDB, test the migration against a separate staging database, verify counts and sample records, and only then schedule production deployment.
 
 ---
 
@@ -67,7 +86,7 @@ The service listens on Render's assigned `PORT`. The CMS database persists on th
 ### CMS (`/admin`) — role-based
 - **Roles:** `super` (all + users) · `admin` (all content/settings) · `editor` (news, announcements, gallery, courses, submissions) · `contributor` (news & announcements).
 - **Editable:** mission/vision/philosophy, leadership (name, title, portrait path, messages), hero slides (text, photo, CTAs, enable), news, announcements, gallery (captions/categories/alt), computer courses (status current vs coming-soon), contact settings, WhatsApp line, email publication flag, form-submissions inbox, users.
-- Storage: atomic JSON writes to `data/db.json` — trivially backed up and portable to a database in a later phase.
+- Storage: MongoDB collections for users, news, events, submissions, announcements, gallery, courses, and school settings. The original `platform_state` document is retained as a migration/rollback snapshot; normalized collection writes do not overwrite it.
 
 ### Security & child privacy (implemented)
 HTTPS-ready headers (HSTS via proxy, X-Frame-Options, nosniff, Referrer-Policy, Permissions-Policy), secure HttpOnly SameSite cookies, scrypt password hashing, CSRF tokens on all admin POSTs, login + form rate limiting, honeypot spam protection, input sanitisation, output escaping everywhere, `noindex` on admin, and a published privacy/safeguarding notice. No pupil records, results, medical or fee data are ever exposed; gallery captions never identify children.
@@ -92,6 +111,11 @@ Brand colours sampled from the official crest: navy `#0A1E59`, gold `#EAB239`, S
 - **Phase 3 (designed, not faked):** secure Parent / Student / Teacher portals behind authentication; e-learning, payments, certificate verification, digital library.
 
 ## 6. Maintenance notes
-- Backups: copy `data/db.json` (and `public/img/`) on a schedule.
+- MongoDB backups: enable daily Atlas backups/continuous cloud backup for production and retain backups outside the application account. The encrypted application-level backup can also be run daily with `node scripts/backup-mongodb.js`; set `MONGO_BACKUP_DIR` to a dedicated mode-700 directory and `MONGO_BACKUP_ENCRYPTION_KEY` to a separately managed 32-byte key encoded as 64 hex characters. Schedule it with a managed job/cron and copy the encrypted archive to off-host storage.
+- Restore test: set `NODE_ENV=staging`, `MONGODB_RESTORE_URI` to the staging cluster, and `MONGODB_RESTORE_DB_NAME` to an empty database different from the backup source, then run `node scripts/restore-mongodb.js /secure/path/to/archive.ejson.enc`. The restore utility refuses non-empty targets. Verify collection counts, sign-in, CMS rendering and form handling in staging. Production recovery should use the approved Atlas backup restore workflow after authorization, not the staging utility. Test and record a staging restore at least quarterly.
+- Collection migration: create and verify a fresh encrypted backup, point the environment at the separate staging database, set `MONGO_MIGRATION_BACKUP_FILE` to that archive and `MONGO_MIGRATION_APPROVED=true`, then run `node scripts/migrate-mongodb.js`. For production, additionally set `MONGO_MIGRATION_STAGE_VERIFIED=true` only after recording staging results. The migration is resumable and leaves `platform_state` in place; remove the approval flags after it completes.
+- For self-hosted MongoDB, use `mongodump --archive --gzip` with a mode-600 tools config file; never put credentials in command arguments or repository files. Retain encrypted backups off-host and document the restore operator and key custodian.
+- Collection migration: the first startup copies the legacy `platform_state` content into named collections and writes a migration marker. It does not delete or replace `platform_state`; retain a verified backup before upgrading.
+- Keep `public/img/` and any approved external media storage in a separate backup plan. Do not back up uploads or private records into a public repository.
 - Add photographs: drop optimised `-480/-800/-1200/-1600` WebP+JPEG renditions into `public/img/`, add the key to `IMG_POOL` in `src/pages/admin.js`, then publish via *CMS → Gallery/Hero*.
 - Change the public domain: edit `BASE_URL` env var (canonical URLs, sitemap, OG tags).

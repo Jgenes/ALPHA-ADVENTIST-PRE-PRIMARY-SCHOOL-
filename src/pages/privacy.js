@@ -14,7 +14,9 @@ ${phero(ctx, 'Privacy', 'Website Privacy & Child Safeguarding Notice', 'How this
     ${sectionHead('Our Commitment', 'Children First')}
     <p>Alpha Adventist Pre & Primary School operates this website as its official digital platform. Because the school serves children, privacy and safeguarding are designed into every part of the website.</p>
     <h3>Information we collect</h3>
-    <p>Enquiry, admission, school-visit and computer-training forms collect only the details needed for the school office to respond: names, telephone or WhatsApp number, an optional email address, the level of interest and your message. This information is stored securely for the school office and is <strong>never published</strong> on the website or shared with third parties.</p>
+    <p>Enquiry, admission, school-visit and computer-training forms collect only the details needed for the school office to respond: names, telephone or WhatsApp number, an optional email address, the level of interest and your message. Submission requires an affirmative privacy acknowledgement; the purpose, policy version and time of acceptance are recorded. This information is stored for the school office and is <strong>never published</strong> on the website. Configured office alerts contain only the enquiry reference and type, not the submitted details.</p>
+    <h3>Retention and deletion</h3>
+    <p>The school has not yet configured a public numeric retention period. Until management approves one, authorised office staff can remove resolved enquiries from the CMS. The platform supports automatic purging after an approved number of days through the private <code>FORM_RETENTION_DAYS</code> setting; that setting is currently optional and must not be selected without the school's records policy.</p>
     <h3>Information we never publish</h3>
     <ul class="checklist">
       <li>${icon('check')}<span>Private student records, individual academic results or medical information.</span></li>
@@ -23,7 +25,7 @@ ${phero(ctx, 'Privacy', 'Website Privacy & Child Safeguarding Notice', 'How this
       <li>${icon('check')}<span>Sensitive safeguarding information of any kind.</span></li>
     </ul>
     <h3>Photographs of children</h3>
-    <p>Only approved school photographs are published on this website, following the school's approval and consent process. Captions describe activities, programmes and events — they do not identify individual pupils or attach personal information to children's images.</p>
+    <p>Only approved school photographs are published on this website, following the school's approval and media-consent process. Enquiry-form privacy acknowledgement is not media consent. Captions describe activities, programmes and events — they do not identify individual pupils or attach personal information to children's images.</p>
     <h3>Website security</h3>
     <ul class="checklist">
       <li>${icon('check')}<span>HTTPS delivery, secure administrator authentication and role-based permissions.</span></li>
