@@ -1,0 +1,494 @@
+'use strict';
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs/promises');
+const path = require('node:path');
+const crypto = require('node:crypto');
+const L = require('../src/lib');
+const A = require('../src/platform/access');
+const { createConfig } = require('../src/config');
+const { createApplication } = require('../server');
+const { createUserRecord, requestIp } = require('../src/platform/auth');
+const { maintenance, deliverAlerts } = require('../src/platform/jobs');
+const { verifyAudit } = require('../src/platform/audit');
+const { Agent, fixture, textFile, nextMonday, addDays, approve } = require('./helpers');
+
+test('ADSP security, persistence and institutional workflows', { timeout: 120000 }, async t => {
+  const f = await fixture();
+  const { app, agents: u, users, anonymous } = f;
+  t.after(() => f.close());
+  let leave, contract, content, privateDocument, publicDocument, consent, media;
+  const start = nextMonday();
+  await t.test('production configuration fails closed and has no default credentials', async () => {
+    assert.throws(() => createConfig({ NODE_ENV: 'production', DATA_DIR: f.dir, BASE_URL: 'https://school.example.test' }), /MongoDB/);
+    assert.throws(() => createConfig({ NODE_ENV: 'production', DATA_DIR: f.dir, BASE_URL: 'http://school.example.test' }), /HTTPS/);
+    assert.equal(f.config.adminPassword, undefined);
+    assert.equal(L.isStrongPassword('short'), false);
+    assert.equal(L.isStrongPassword('a'.repeat(200)), false);
+    assert.ok(L.isStrongPassword(f.password));
+    assert.equal(A.has(users.tech, 'contract.view_all'), false);
+    assert.equal(A.has(users.tech, 'leave.approve'), false);
+    assert.throws(() => A.validRoles(['__proto__']));
+    assert.throws(() => A.validRoles(['toString']));
+    assert.throws(() => A.validRoles(['system_admin', 'head_teacher']));
+    assert.throws(() => A.validRoles(['system_admin', 'cms_publisher']));
+  });
+  await t.test('private APIs deny anonymous access, legacy writes are retired, private files are not static', async () => {
+    for (const route of ['/api/staff', '/api/admissions', '/api/users', '/api/documents', '/api/contracts', '/api/leave', '/api/audit', '/api/privacy', '/api/search?q=contract']) assert.equal((await anonymous.request('GET', route)).status, 403, route);
+    assert.equal((await anonymous.request('POST', '/admin/news/save', { title: 'Bypass' })).status, 410);
+    for (const route of ['/data/db.json', '/data/seed.json', '/.git/config', '/uploads/test.pdf', '/work/cj.txt', '/img/ALPHA%20ADVENTIST%20PRE%20Website%20final%20Detailes%20(1).pdf', '/img/choir-green-800.jpg']) assert.equal((await anonymous.request('GET', route)).status, 404, route);
+  });
+  await t.test('real-origin SEO, robots, bilingual pages, safe images and PWA exclusions', async () => {
+    for (const route of ['/', '/sw', '/admissions', '/sw/admissions', '/contact', '/sw/contact', '/downloads', '/privacy', '/safeguarding', '/talents']) {
+      const res = await anonymous.request('GET', route);
+      assert.equal(res.status, 200, route);
+      assert.ok(res.text.includes('https://school.example.test' + route), 'Canonical uses configured origin');
+      assert.ok(!res.text.includes('alphaadventist.ac.tz'));
+      if (route.startsWith('/sw')) assert.match(res.text, /<html lang="sw">/);
+    }
+    const robots = (await anonymous.request('GET', '/robots.txt')).text;
+    assert.match(robots, /Allow: \//); assert.ok(!robots.includes('Disallow: /\n'));
+    const map = (await anonymous.request('GET', '/sitemap.xml')).text;
+    assert.ok(map.includes('/sw/contact')); assert.ok(!map.includes('/portal'));
+    const kids = (await anonymous.request('GET', '/students')).text;
+    assert.ok(kids.includes('Tusome') || kids.includes('TUSOME KISWAHILI'));
+    assert.doesNotMatch(kids, /<a\b[^>]*\bhref="(?:https?:|tel:|mailto:)/);
+    const sw = (await anonymous.request('GET', '/service-worker.js')).text;
+    assert.match(sw, /PRIVATE/); assert.match(sw, /request.method !== 'GET'/);
+    assert.ok(!sw.includes("cache.add('/portal"));
+    const cookie = await new Agent(f.base).request('GET', '/portal');
+    assert.match(cookie.headers.get('cache-control'), /no-store/);
+    assert.match(cookie.headers.get('set-cookie'), /HttpOnly; SameSite=Lax/);
+    assert.match(cookie.headers.get('content-security-policy'), /object-src 'none'/);
+  });
+  await t.test('the original GitHub homepage and CMS shell are used instead of the redesign', async () => {
+    const home = await anonymous.request('GET', '/');
+    assert.match(home.text, /class="hero" data-hero/);
+    assert.equal((home.text.match(/class="hero__slide/g) || []).length, 4);
+    for (const section of ['who-we-are', 'pillars', 'academics', 'technology', 'school-life', 'faith', 'talent', 'admissions-cta', 'parents', 'kids', 'contact']) assert.ok(home.text.includes('id="' + section + '"'), section);
+    assert.ok(home.text.includes('class="trust__grid"'));
+    assert.ok(home.text.includes('class="news-feat"'));
+    assert.ok(!home.text.includes('adsp-hero'));
+    assert.ok(!home.text.includes('campus-illustration.svg'));
+    const sw = await anonymous.request('GET', '/sw');
+    assert.match(sw.text, /class="hero" data-hero/);
+    assert.ok(sw.text.includes('Karibu Shule ya Awali na Msingi'));
+    const login = await anonymous.request('GET', '/portal');
+    assert.ok(login.text.includes('card form admin-login'));
+    assert.ok(!login.text.includes('p-auth-story'));
+    const workspace = await u.teacher.request('GET', '/portal');
+    assert.ok(workspace.text.includes('class="admin-wrap"'));
+    assert.ok(workspace.text.includes('class="admin-side p-sidebar"'));
+    assert.ok(workspace.text.includes('class="admin-main p-workspace"'));
+    const parents = await anonymous.request('GET', '/parents');
+    assert.ok(parents.text.includes('data-parent-modal'));
+    assert.ok(!parents.text.includes('official document pending'));
+  });
+  await t.test('CSRF, origin checks, role separation and self-elevation restrictions', async () => {
+    const payload = { username: 'unwanted.user', name: 'Synthetic unwanted', roles: ['hr_officer'], password: f.password };
+    assert.equal((await u.tech.request('POST', '/api/users', payload)).status, 403);
+    assert.equal((await u.head.request('POST', '/api/users', payload, { csrf: false })).status, 403);
+    assert.equal((await u.head.request('POST', '/api/users', payload, { headers: { Origin: 'https://evil.example' } })).status, 403);
+    assert.equal((await u.head.request('PATCH', '/api/users/' + users.head.id, { revision: users.head.revision, roles: ['hr_officer'] })).status, 403);
+    const tech = await app.store.run(tx => tx.get('users', users.tech.id));
+    assert.equal((await u.head.request('PATCH', '/api/users/' + tech.id, { revision: tech.revision, roles: ['hr_officer'] })).status, 403);
+    for (const route of ['/api/admissions', '/api/contracts', '/api/staff', '/api/privacy']) assert.equal((await u.tech.request('GET', route)).status, 403, route);
+    assert.equal((await u.publisher.request('GET', '/api/submissions')).status, 403);
+  });
+  await t.test('all five public forms require consent, whitelist fields, return durable references and alerts', async () => {
+    const missing = await anonymous.request('POST', '/api/apply', { child_name: 'Synthetic pupil', guardian_name: 'Synthetic guardian', phone: '+255700000000', level: 'KG I', arrangement: 'Day' });
+    assert.equal(missing.status, 400);
+    const forms = ['contact', 'visit', 'apply', 'computer-class', 'computer-interest'];
+    const references = [];
+    for (const kind of forms) {
+      const data = { name: 'Synthetic parent', child_name: 'Synthetic pupil', guardian_name: 'Synthetic guardian', phone: '+255700000000', email: 'guardian@example.test', level: 'KG I', arrangement: 'Day', message: 'Synthetic test request', privacy_consent: 'yes', status: 'ENROLLED', roles: ['head_teacher'], submissionKey: 'unique-' + kind };
+      const result = await anonymous.ok('POST', '/api/' + kind, data);
+      assert.match(result.reference, /^ALPHA-\d{4}-[A-F0-9]{12}$/);
+      references.push(result.reference);
+      const retry = await anonymous.ok('POST', '/api/' + kind, data);
+      assert.equal(retry.reference, result.reference);
+    }
+    assert.equal(new Set(references).size, 5);
+    const applications = await u.office.ok('GET', '/api/admissions');
+    assert.equal(applications.length, 1); assert.equal(applications[0].status, 'SUBMITTED');
+    assert.equal(applications[0].data.roles, undefined);
+    assert.equal(applications[0].consent.policyVersion, f.config.policyVersion);
+    assert.equal((await u.office.ok('GET', '/api/submissions')).length, 4);
+    const jobs = await u.tech.ok('GET', '/api/system');
+    assert.equal(jobs.outbox.length, 5);
+    assert.ok(jobs.outbox.every(job => job.status === 'PENDING'));
+    assert.ok(!JSON.stringify(jobs).includes('Synthetic pupil'));
+    assert.ok(!JSON.stringify(jobs).includes('+255700000000'));
+  });
+  await t.test('admissions statuses cannot be skipped, and audit records retain the real previous state', async () => {
+    const application = (await u.office.ok('GET', '/api/admissions'))[0];
+    assert.equal((await u.office.request('PATCH', '/api/admissions/' + application.id, { revision: application.revision, status: 'ENROLLED' })).status, 409);
+    const reviewed = await u.office.ok('PATCH', '/api/admissions/' + application.id, { revision: application.revision, status: 'UNDER_REVIEW', comment: 'Synthetic review.' });
+    assert.equal(reviewed.history[0].from, 'SUBMITTED'); assert.equal(reviewed.history[0].to, 'UNDER_REVIEW');
+    assert.equal((await u.office.request('PATCH', '/api/admissions/' + application.id, { revision: application.revision, status: 'ACCEPTED' })).status, 409);
+  });
+  await t.test('alert delivery is signed, retries durably and never sends personal form details', async () => {
+    f.config.alertUrl = 'https://alert-provider.example.test/webhook'; f.config.alertSecret = crypto.randomBytes(24).toString('hex');
+    const payloads = [];
+    await deliverAlerts(app.platform, async (url, options) => {
+      payloads.push(options.body);
+      const expected = crypto.createHmac('sha256', f.config.alertSecret).update(options.headers['X-Alpha-Timestamp'] + '.' + options.body).digest('hex');
+      assert.equal(options.headers['X-Alpha-Signature'], 'sha256=' + expected);
+      assert.equal(options.redirect, 'error');
+      assert.ok(!options.body.includes('Synthetic pupil')); assert.ok(!options.body.includes('guardian@example.test'));
+      return new Response('', { status: 503 });
+    });
+    assert.equal(payloads.length, 5);
+    const before = await app.store.run(tx => tx.list('outbox'));
+    assert.ok(before.every(job => job.status === 'RETRY' && job.attempts === 1 && job.nextAttemptAt > Date.now()));
+    await app.store.run(async tx => { for (const item of await tx.list('outbox')) await tx.update('outbox', { ...item, nextAttemptAt: 0 }); });
+    await deliverAlerts(app.platform, async () => new Response('', { status: 200 }));
+    const after = await app.store.run(tx => tx.list('outbox'));
+    assert.ok(after.every(job => job.status === 'DELIVERED' && job.attempts === 2));
+    f.config.alertUrl = '';
+  });
+  await t.test('HR sets staff profiles, while teachers can view only self/authorised department', async () => {
+    for (const key of ['head', 'hr', 'hod', 'teacher', 'other']) {
+      const departmentId = key === 'other' ? 'pre-primary' : 'primary';
+      const supervisorId = key === 'teacher' ? users.hod.id : key === 'head' ? '' : users.head.id;
+      await u.hr.ok('PUT', '/api/staff/' + users[key].id, { staffId: 'SYN-' + key.toUpperCase(), position: prettyPosition(key), departmentId, employmentType: 'Permanent', employmentDate: '2026-01-01', supervisorId, phone: '', email: '' });
+    }
+    assert.equal((await u.teacher.ok('GET', '/api/staff')).length, 1);
+    assert.ok(!(await u.hod.ok('GET', '/api/staff')).some(profile => profile.id === users.other.id));
+    assert.equal((await u.teacher.request('PUT', '/api/staff/' + users.other.id, { staffId: 'FAKE' })).status, 403);
+    await u.hr.ok('POST', '/api/leave/balances', { userId: users.teacher.id, typeId: 'annual', year: Number(start.slice(0, 4)), entitledDays: 18 });
+  });
+  await t.test('leave days and ownership are server-calculated; submission reserves allowance and blocks overlap', async () => {
+    leave = await u.teacher.ok('POST', '/api/leave', { typeId: 'annual', startDate: start, returnDate: addDays(start, 3), reason: 'Synthetic personal leave', handover: 'Synthetic colleague', emergencyContact: '+255700000001', days: 1, ownerId: users.other.id, submit: true });
+    assert.equal(leave.ownerId, users.teacher.id); assert.equal(leave.days, 3); assert.equal(leave.status, 'SUBMITTED');
+    assert.equal((await u.teacher.ok('GET', '/api/leave/balances'))[0].reservedDays, 3);
+    assert.equal((await u.other.ok('GET', '/api/leave')).length, 0);
+    assert.equal((await u.teacher.request('POST', '/api/leave', { typeId: 'annual', startDate: start, returnDate: addDays(start, 2), reason: 'Duplicate', handover: 'Colleague', emergencyContact: '0700000000', submit: true })).status, 409);
+    assert.equal((await u.other.request('POST', '/api/leave/' + leave.id + '/action', { revision: leave.revision, action: 'CANCEL' })).status, 403);
+  });
+  await t.test('approval steps cannot be bypassed, duplicated, or self-approved; leave is debited once', async () => {
+    const flow = (await u.hod.ok('GET', '/api/approvals')).find(item => item.id === leave.workflowId);
+    assert.ok(flow);
+    assert.equal((await u.head.request('POST', '/api/approvals/' + flow.id + '/decision', { revision: flow.revision, decision: 'APPROVE' })).status, 403);
+    assert.equal((await u.teacher.request('POST', '/api/approvals/' + flow.id + '/decision', { revision: flow.revision, decision: 'APPROVE' })).status, 403);
+    const decisions = await Promise.all([u.hod.request('POST', '/api/approvals/' + flow.id + '/decision', { revision: flow.revision, decision: 'APPROVE' }), u.hod.request('POST', '/api/approvals/' + flow.id + '/decision', { revision: flow.revision, decision: 'APPROVE' })]);
+    assert.deepEqual(decisions.map(item => item.status).sort(), [200, 409]);
+    await approve(u.hr, flow.id); await approve(u.head, flow.id);
+    const saved = (await u.teacher.ok('GET', '/api/leave')).find(item => item.id === leave.id);
+    assert.equal(saved.status, 'APPROVED');
+    const balance = (await u.teacher.ok('GET', '/api/leave/balances'))[0];
+    assert.equal(balance.usedDays, 3); assert.equal(balance.reservedDays, 0);
+    await u.teacher.ok('POST', '/api/leave/' + saved.id + '/action', { revision: saved.revision, action: 'CANCEL' });
+    const released = (await u.teacher.ok('GET', '/api/leave/balances'))[0]; assert.equal(released.usedDays, 0);
+    assert.equal((await u.teacher.request('POST', '/api/leave/' + saved.id + '/action', { revision: saved.revision, action: 'CANCEL' })).status, 409);
+  });
+  await t.test('returned leave releases reservations and preserves decision history on correction', async () => {
+    const record = await u.teacher.ok('POST', '/api/leave', { typeId: 'annual', startDate: addDays(start, 7), returnDate: addDays(start, 9), reason: 'Needs handover review', handover: 'Colleague', emergencyContact: '0700000000', submit: true });
+    await approve(u.hod, record.workflowId, 'RETURN', 'Clarify the handover.');
+    const returned = (await u.teacher.ok('GET', '/api/leave')).find(item => item.id === record.id);
+    assert.equal(returned.status, 'RETURNED'); assert.equal((await u.teacher.ok('GET', '/api/leave/balances'))[0].reservedDays, 0);
+    const changed = await u.teacher.ok('PUT', '/api/leave/' + returned.id, { ...returned, handover: 'Updated colleague' });
+    const resubmitted = await u.teacher.ok('POST', '/api/leave/' + changed.id + '/action', { revision: changed.revision, action: 'SUBMIT' });
+    assert.equal(resubmitted.workflowIds.length, 2); assert.notEqual(resubmitted.workflowId, returned.workflowId);
+  });
+  await t.test('CMS authors cannot inspect or edit others’ drafts, bypass review, or publish their own work', async () => {
+    content = await u.author.ok('POST', '/api/cms', { kind: 'news', language: 'en', title: 'Synthetic review story', slug: 'synthetic-review-story', category: 'School News', excerpt: 'Synthetic summary', body: 'Approved text with <script>alert(1)</script> shown only as text.' });
+    assert.equal(content.status, 'DRAFT');
+    assert.equal((await anonymous.request('GET', '/news/' + content.slug)).status, 404);
+    assert.ok(!(await u.otherAuthor.ok('GET', '/api/cms')).some(item => item.id === content.id));
+    assert.equal((await u.otherAuthor.request('PUT', '/api/cms/' + content.id, { ...content, title: 'Tampered' })).status, 403);
+    assert.equal((await u.publisher.request('POST', '/api/cms/' + content.id + '/action', { revision: content.revision, action: 'PUBLISH' })).status, 409);
+    content = await u.author.ok('POST', '/api/cms/' + content.id + '/action', { revision: content.revision, action: 'SUBMIT' });
+    await approve(u.editor, content.workflowId); await approve(u.head, content.workflowId);
+    content = (await u.publisher.ok('GET', '/api/cms')).find(item => item.id === content.id);
+    assert.equal((await u.author.request('POST', '/api/cms/' + content.id + '/action', { revision: content.revision, action: 'PUBLISH' })).status, 403);
+    content = await u.publisher.ok('POST', '/api/cms/' + content.id + '/action', { revision: content.revision, action: 'PUBLISH' });
+    const page = await anonymous.request('GET', '/news/' + content.slug);
+    assert.equal(page.status, 200); assert.ok(page.text.includes('&lt;script&gt;alert(1)&lt;/script&gt;'));
+    assert.ok(!page.text.includes('<script>alert(1)</script>'));
+    const draft = await u.author.ok('PUT', '/api/cms/' + content.id, { ...content, title: 'Private draft title', body: 'Not reviewed yet' });
+    assert.equal(draft.status, 'DRAFT');
+    const stillLive = await anonymous.request('GET', '/news/' + content.slug); assert.ok(stillLive.text.includes('Synthetic review story')); assert.ok(!stillLive.text.includes('Private draft title'));
+    const search = await u.other.ok('GET', '/api/search?q=Synthetic%20review');
+    assert.ok(search.every(item => item.status === 'PUBLISHED')); assert.ok(!JSON.stringify(search).includes('Private draft title'));
+  });
+  await t.test('private uploads are encrypted, names and type are validated, and binary scanning fails closed', async () => {
+    assert.equal((await u.hr.request('POST', '/api/documents', { file: { name: 'fake.pdf', content: Buffer.from('not a pdf').toString('base64') } })).status, 400);
+    assert.equal((await u.hr.request('POST', '/api/documents', { file: { name: 'sample.pdf', content: Buffer.from('%PDF-1.4\n%%EOF').toString('base64') } })).status, 503);
+    assert.equal((await u.hr.request('POST', '/api/documents', { file: { name: 'unsafe.html', content: Buffer.from('<script>bad()</script>').toString('base64') } })).status, 415);
+    assert.equal((await u.hr.request('POST', '/api/documents', { file: { name: 'large.txt', content: Buffer.alloc(5 * 1024 * 1024 + 1, 65).toString('base64') } })).status, 413);
+    privateDocument = await u.hr.ok('POST', '/api/documents', { title: 'Synthetic confidential policy', documentNumber: 'SYN-HR-POL-001', description: 'Test only', classification: 'CONFIDENTIAL', category: 'HR', changeSummary: 'Initial version', access: { roles: ['hr_officer', 'dpo', 'head_teacher'] }, file: textFile('CONFIDENTIAL SYNTHETIC PAYLOAD') });
+    assert.equal(privateDocument.draft.file.storageKey, undefined);
+    const raw = await app.store.run(tx => tx.get('document_versions', privateDocument.draft.id));
+    const ciphertext = await fs.readFile(app.platform.files.keyPath('private', raw.file.storageKey));
+    assert.ok(!ciphertext.includes(Buffer.from('CONFIDENTIAL SYNTHETIC PAYLOAD')));
+    assert.equal((await fs.stat(app.platform.files.keyPath('private', raw.file.storageKey))).mode & 0o777, 0o600);
+    for (const agent of [u.other, u.teacher, u.tech]) assert.equal((await agent.request('POST', '/api/documents/' + raw.id + '/download-link', {})).status, 403);
+    assert.ok(!(await u.teacher.ok('GET', '/api/documents')).some(item => item.id === privateDocument.id));
+    assert.equal((await anonymous.request('GET', '/downloads/' + privateDocument.id)).status, 404);
+  });
+  await t.test('controlled public documents require review, are versioned, and supersede without deletion', async () => {
+    publicDocument = await u.teacher.ok('POST', '/api/documents', { title: 'Synthetic parent guide', documentNumber: 'SYN-PAR-GDE-001', description: 'Synthetic test-only public guide', classification: 'PUBLIC', category: 'Parents', changeSummary: 'Initial approved edition', file: textFile('PUBLIC SYNTHETIC GUIDE V1') });
+    const version = await u.teacher.ok('POST', '/api/documents/' + publicDocument.draft.id + '/action', { revision: publicDocument.draft.revision, action: 'SUBMIT' });
+    await approve(u.office, version.workflowId); await approve(u.head, version.workflowId);
+    let approved = (await u.head.ok('GET', '/api/documents')).find(item => item.id === publicDocument.id)?.draft;
+    assert.equal(approved?.status, 'APPROVED', 'The independent issuer can see the approved version in the library');
+    await u.head.ok('POST', '/api/documents/' + approved.id + '/action', { revision: approved.revision, action: 'PUBLISH' });
+    assert.equal((await anonymous.request('GET', '/downloads/' + publicDocument.id)).text, 'PUBLIC SYNTHETIC GUIDE V1');
+    const parent = (await u.teacher.ok('GET', '/api/documents')).find(item => item.id === publicDocument.id);
+    const v2 = await u.teacher.ok('POST', '/api/documents/' + parent.id + '/versions', { revision: parent.revision, classification: 'CONFIDENTIAL', changeSummary: 'Second edition', file: textFile('PUBLIC SYNTHETIC GUIDE V2') });
+    assert.equal(v2.classification, 'PUBLIC', 'Classification is immutable');
+    assert.equal(v2.draft.version, 2);
+    assert.equal((await anonymous.request('GET', '/downloads/' + parent.id)).text, 'PUBLIC SYNTHETIC GUIDE V1');
+    const next = await u.teacher.ok('POST', '/api/documents/' + v2.draft.id + '/action', { revision: v2.draft.revision, action: 'SUBMIT' });
+    await approve(u.office, next.workflowId); await approve(u.head, next.workflowId);
+    approved = await app.store.run(tx => tx.get('document_versions', next.id));
+    await u.head.ok('POST', '/api/documents/' + approved.id + '/action', { revision: approved.revision, action: 'PUBLISH' });
+    assert.equal((await anonymous.request('GET', '/downloads/' + parent.id)).text, 'PUBLIC SYNTHETIC GUIDE V2');
+    assert.equal((await app.store.run(tx => tx.get('document_versions', version.id))).status, 'SUPERSEDED');
+  });
+  await t.test('replacing an unapproved draft never exposes that draft as issued history', async () => {
+    const current = (await u.teacher.ok('GET', '/api/documents')).find(item => item.id === publicDocument.id);
+    const v3 = await u.teacher.ok('POST', '/api/documents/' + current.id + '/versions', { revision: current.revision, changeSummary: 'Unreviewed working notes', file: textFile('UNAPPROVED DRAFT MUST REMAIN PRIVATE') });
+    const v4 = await u.teacher.ok('POST', '/api/documents/' + current.id + '/versions', { revision: v3.revision, changeSummary: 'Replacement working notes', file: textFile('New draft') });
+    assert.equal((await app.store.run(tx => tx.get('document_versions', v3.draft.id))).status, 'RETIRED_DRAFT');
+    const otherView = (await u.other.ok('GET', '/api/documents')).find(item => item.id === current.id);
+    assert.equal(otherView.draft, null);
+    assert.ok(!otherView.versions.some(item => item.id === v3.draft.id));
+    assert.equal((await u.other.request('POST', '/api/documents/' + v3.draft.id + '/download-link', {})).status, 403);
+    assert.ok((await u.teacher.ok('GET', '/api/documents')).find(item => item.id === current.id).versions.some(item => item.id === v3.draft.id));
+    assert.equal(v4.draft.version, 4);
+  });
+  await t.test('contracts route administration → finance → authority → signatory → employee without peer access', async () => {
+    contract = await u.hr.ok('POST', '/api/contracts', { ownerId: users.teacher.id, title: 'Synthetic employment contract', startDate: start, endDate: addDays(start, 90), financialReview: true, file: textFile('SYNTHETIC CONTRACT PRIVATE TERMS') });
+    assert.equal((await u.teacher.ok('GET', '/api/contracts')).length, 0, 'Draft contracts are HR-only');
+    assert.equal((await u.finance.ok('GET', '/api/contracts')).length, 0);
+    contract = await u.hr.ok('POST', '/api/contracts/' + contract.id + '/submit', { revision: contract.revision });
+    await approve(u.office, contract.workflowId);
+    assert.ok((await u.finance.ok('GET', '/api/contracts')).some(item => item.id === contract.id));
+    await approve(u.finance, contract.workflowId); await approve(u.head, contract.workflowId); await approve(u.head, contract.workflowId);
+    let visible = (await u.teacher.ok('GET', '/api/contracts')).find(item => item.id === contract.id);
+    assert.equal(visible.status, 'AWAITING_EMPLOYEE');
+    await approve(u.teacher, contract.workflowId);
+    visible = (await u.teacher.ok('GET', '/api/contracts')).find(item => item.id === contract.id);
+    assert.equal(visible.status, 'ACTIVE');
+    assert.equal((await u.other.ok('GET', '/api/contracts')).length, 0);
+    assert.equal((await u.finance.ok('GET', '/api/contracts')).length, 0, 'Financial reviewers lose scope after their stage');
+    assert.equal((await u.other.request('POST', '/api/contracts/' + contract.id + '/download-link', {})).status, 403);
+    assert.equal((await u.other.ok('GET', '/api/search?q=Synthetic%20employment')).length, 0);
+  });
+  await t.test('private download grants are short-lived, single-use, session-bound and re-authorised', async () => {
+    const grant = await u.teacher.ok('POST', '/api/contracts/' + contract.id + '/download-link', {});
+    assert.equal(grant.expiresIn, 60);
+    assert.equal((await anonymous.request('GET', grant.url)).status, 403);
+    assert.equal((await u.other.request('GET', grant.url)).status, 403);
+    const download = await u.teacher.request('GET', grant.url);
+    assert.equal(download.status, 200); assert.equal(download.text, 'SYNTHETIC CONTRACT PRIVATE TERMS');
+    assert.match(download.headers.get('cache-control'), /no-store/);
+    assert.equal((await u.teacher.request('GET', grant.url)).status, 403);
+    const expires = await u.teacher.ok('POST', '/api/contracts/' + contract.id + '/download-link', {});
+    await app.store.run(async tx => { const row = await tx.get('download_grants', L.sha256(expires.url.split('/').at(-1))); await tx.update('download_grants', { ...row, expiresAt: Date.now() - 1 }); });
+    assert.equal((await u.teacher.request('GET', expires.url)).status, 403);
+  });
+  await t.test('targeted notices and versioned acknowledgements cannot leak to other audiences', async () => {
+    let notice = await u.hr.ok('POST', '/api/notices', { title: 'Synthetic primary staff notice', message: 'Read and acknowledge this test notice.', category: 'HR', priority: 'Important', acknowledgementRequired: true, audience: { type: 'SELECTED', departmentIds: ['primary'] } });
+    assert.equal((await u.teacher.ok('GET', '/api/notices')).length, 0, 'Unpublished notices hidden');
+    notice = await u.head.ok('POST', '/api/notices/' + notice.id + '/publish', { revision: notice.revision });
+    assert.ok((await u.teacher.ok('GET', '/api/notices')).some(item => item.id === notice.id));
+    assert.ok(!(await u.other.ok('GET', '/api/notices')).some(item => item.id === notice.id));
+    assert.equal((await u.other.request('POST', '/api/notices/' + notice.id + '/acknowledge', { version: notice.version, acknowledge: true })).status, 403);
+    assert.equal((await u.teacher.request('POST', '/api/notices/' + notice.id + '/acknowledge', { version: notice.version - 1, acknowledge: true })).status, 409);
+    const receipt = await u.teacher.ok('POST', '/api/notices/' + notice.id + '/acknowledge', { version: notice.version, acknowledge: true });
+    const duplicate = await u.teacher.ok('POST', '/api/notices/' + notice.id + '/acknowledge', { version: notice.version, acknowledge: true });
+    assert.equal(duplicate.acknowledgedAt, receipt.acknowledgedAt);
+    assert.equal((await u.head.ok('GET', '/api/notices/' + notice.id + '/report')).acknowledged, 1);
+    let revised = await u.hr.ok('PUT', '/api/notices/' + notice.id, { ...notice, message: 'A revised notice requiring new acknowledgement.' });
+    revised = await u.head.ok('POST', '/api/notices/' + notice.id + '/publish', { revision: revised.revision });
+    assert.equal((await u.head.ok('GET', '/api/notices/' + notice.id + '/report')).acknowledged, 0);
+    assert.equal((await u.teacher.request('POST', '/api/notices/' + notice.id + '/acknowledge', { version: notice.version, acknowledge: true })).status, 409);
+  });
+  await t.test('calendar, search and notifications obey the same resource audiences', async () => {
+    await u.head.ok('POST', '/api/calendar', { title: 'Synthetic HR training', description: 'Restricted event', date: start, category: 'Training', audience: { type: 'SELECTED', userIds: [users.hr.id] } });
+    assert.equal((await u.teacher.ok('GET', '/api/calendar')).length, 0);
+    assert.equal((await u.teacher.ok('GET', '/api/search?q=Synthetic%20HR%20training')).length, 0);
+    assert.ok((await u.hr.ok('GET', '/api/calendar')).length > 0);
+    const notice = (await u.teacher.ok('GET', '/api/notifications'))[0];
+    assert.ok(notice);
+    assert.equal((await u.other.request('POST', '/api/notifications/' + notice.id + '/read', {})).status, 403);
+  });
+  await t.test('media requires per-channel signed guardian consent, independent review, and immediate withdrawal', async () => {
+    const evidence = await u.dpo.ok('POST', '/api/documents', { title: 'Synthetic guardian consent evidence', documentNumber: 'SYN-DPO-CNS-001', classification: 'HIGHLY_CONFIDENTIAL', category: 'Child protection', changeSummary: 'Signed synthetic test evidence', access: { roles: ['dpo', 'head_teacher'] }, file: textFile() });
+    const today = new Date().toISOString().slice(0, 10);
+    const channels = { website: true, facebook: false, instagram: false, youtube: false, print: false, externalPromotion: false };
+    consent = await u.dpo.ok('POST', '/api/privacy/consents', { studentRef: 'SYN-PUPIL-001', guardianName: 'Synthetic Guardian', relationship: 'Parent', grantedAt: today, expiresAt: addDays(today, 365), channels, evidenceVersionId: evidence.draft.id, authorityVerified: true });
+    assert.equal((await u.tech.request('GET', '/api/privacy')).status, 403);
+    assert.equal((await u.media.request('GET', '/api/privacy')).status, 403);
+    const png = await require('sharp')({ create: { width: 10, height: 10, channels: 3, background: '#345646' } }).png().toBuffer();
+    const payload = { title: 'Synthetic test activity', alt: 'A synthetic single-colour test image', category: 'School Life', studentRefs: ['SYN-PUPIL-001'], childrenPresent: true, subjectsVerified: true, noChildNames: true, file: { name: 'synthetic.png', content: png.toString('base64') } };
+    assert.equal((await u.media.request('POST', '/api/media', payload)).status, 503, 'No real scanner means no binary upload');
+    const originalScanner = app.platform.files.scan;
+    app.platform.files.scan = async () => {}; // Test-only scanner stub; no bypass exists in runtime configuration.
+    try { media = await u.media.ok('POST', '/api/media', payload); }
+    finally { app.platform.files.scan = originalScanner; }
+    assert.equal((await anonymous.request('GET', '/media/' + media.id)).status, 404);
+    media = await u.media.ok('POST', '/api/media/' + media.id + '/action', { revision: media.revision, action: 'SUBMIT' });
+    await approve(u.dpo, media.workflowId); await approve(u.head, media.workflowId);
+    media = (await u.publisher.ok('GET', '/api/media')).find(item => item.id === media.id);
+    media = await u.publisher.ok('POST', '/api/media/' + media.id + '/action', { revision: media.revision, action: 'PUBLISH' });
+    const image = await anonymous.request('GET', '/media/' + media.id);
+    assert.equal(image.status, 200); assert.match(image.headers.get('cache-control'), /no-store/);
+    await u.dpo.ok('POST', '/api/privacy/consents/' + consent.id + '/withdraw', { revision: consent.revision, reason: 'Verified synthetic guardian request.' });
+    assert.equal((await anonymous.request('GET', '/media/' + media.id)).status, 404);
+    const storedMedia = await app.store.run(tx => tx.get('media', media.id));
+    await assert.rejects(fs.access(app.platform.files.keyPath('public', storedMedia.file.storageKey)));
+    assert.equal(storedMedia.status, 'WITHDRAWN');
+  });
+  await t.test('approval route configuration preserves existing snapshots and cannot remove required authority', async () => {
+    const definitions = await u.head.ok('GET', '/api/workflows');
+    const standard = definitions.find(item => item.id === 'leave-standard');
+    assert.equal((await u.tech.request('PUT', '/api/workflows/leave-standard', { ...standard })).status, 403);
+    assert.equal((await u.head.request('PUT', '/api/workflows/leave-standard', { ...standard, steps: standard.steps.slice(0, 1) })).status, 400);
+    const updated = await u.head.ok('PUT', '/api/workflows/leave-standard', { ...standard, name: 'Updated route for future requests' });
+    assert.equal(updated.version, 2);
+    const pending = await app.store.run(async tx => (await tx.list('workflow_instances')).find(item => item.kind === 'LEAVE_REQUEST' && item.status === 'PENDING'));
+    assert.equal(pending.definitionVersion, 1);
+    const shortened = await u.head.ok('POST', '/api/workflows', { id: 'leave-urgent', kind: 'LEAVE_REQUEST', name: 'Urgent leave · HR and head', steps: standard.steps.slice(1) });
+    assert.equal(shortened.version, 1);
+  });
+  await t.test('audit logs are append-only, tamper-evident and auditors are scoped by default', async () => {
+    const result = await u.head.ok('GET', '/api/audit');
+    assert.equal(result.integrityValid, true); assert.ok(result.total > 30);
+    const auditor = await u.auditor.ok('GET', '/api/audit');
+    assert.equal(auditor.records.length, 0); assert.equal(auditor.limitedToAssignedScopes, true);
+    assert.equal((await u.teacher.request('GET', '/api/audit')).status, 403);
+    await app.store.run(async tx => {
+      const records = await tx.list('audit_logs');
+      const head = await tx.get('system_settings', 'audit-head');
+      assert.equal(verifyAudit(records, f.config.auditKey, head), true);
+      records[0].result = 'denied';
+      assert.equal(verifyAudit(records, f.config.auditKey, head), false);
+      await assert.rejects(tx.update('audit_logs', records[0]), /append-only/);
+      await assert.rejects(tx.remove('audit_logs', records[0].id), /append-only/);
+    });
+  });
+  await t.test('school contact settings remain private drafts until independent scheduled publication', async () => {
+    const details = { officePhone: '+255700000021', headPhone: '+255700000022', whatsappPhone: '+255700000022', email: 'office@example.test', box: 'Synthetic postal box', locationText: 'Synthetic test location', officeHours: 'Synthetic test hours', centreCode: 'SYN001', mapUrl: '', facebookUrl: '', instagramUrl: '', youtubeUrl: '', detailsVerified: true };
+    let settings = await u.author.ok('POST', '/api/cms', { kind: 'settings', slug: 'school-contact', title: 'School contact details', excerpt: 'Verified synthetic contact details', body: JSON.stringify(details) });
+    assert.ok(!(await anonymous.request('GET', '/contact')).text.includes('office@example.test'));
+    settings = await u.author.ok('POST', '/api/cms/' + settings.id + '/action', { revision: settings.revision, action: 'SUBMIT' });
+    await approve(u.editor, settings.workflowId); await approve(u.head, settings.workflowId);
+    settings = (await u.publisher.ok('GET', '/api/cms')).find(item => item.id === settings.id);
+    settings = await u.publisher.ok('POST', '/api/cms/' + settings.id + '/action', { revision: settings.revision, action: 'PUBLISH', publishAt: new Date(Date.now() + 3600000).toISOString() });
+    assert.equal(settings.status, 'SCHEDULED');
+    await maintenance(app.platform);
+    assert.ok(!(await anonymous.request('GET', '/contact')).text.includes('office@example.test'));
+    await app.store.run(async tx => { const record = await tx.get('cms_content', settings.id); await tx.update('cms_content', { ...record, publishAt: new Date(Date.now() - 1000).toISOString() }); });
+    await maintenance(app.platform);
+    assert.ok((await anonymous.request('GET', '/contact')).text.includes('office@example.test'));
+    assert.ok((await anonymous.request('GET', '/sw/contact')).text.includes('office@example.test'));
+    assert.equal((await anonymous.request('GET', '/pages/school-contact')).status, 404);
+    assert.equal((await u.author.request('POST', '/api/cms', { kind: 'settings', slug: 'school-contact', title: 'Unsafe setting', excerpt: 'Test', body: JSON.stringify({ ...details, facebookUrl: 'javascript:alert(1)' }) })).status, 400);
+  });
+  await t.test('consent ordering is deterministic, missing pupils fail closed, expiry does not wait for jobs', async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const body = { studentRef: consent.studentRef, guardianName: 'Synthetic guardian', relationship: 'Parent', grantedAt: today, expiresAt: addDays(today, 365), channels: { website: true, facebook: false, instagram: false, youtube: false, print: false, externalPromotion: false }, evidenceVersionId: consent.evidenceVersionId, authorityVerified: true };
+    const permit = await u.dpo.ok('POST', '/api/privacy/consents', body);
+    const refusal = await u.dpo.ok('POST', '/api/privacy/consents', { ...body, channels: { ...body.channels, website: false } });
+    const valid = require('../src/platform/privacy').validMediaConsent;
+    await app.store.run(async tx => { for (const item of [permit, refusal]) { const current = await tx.get('media_consents', item.id); await tx.update('media_consents', { ...current, recordedAt: today + 'T12:00:00.000Z' }); } });
+    assert.equal(await app.store.run(tx => valid(tx, media)), false, 'Latest refusal wins even when times match');
+    const old = await app.store.run(tx => tx.get('media_consents', permit.id));
+    await u.dpo.ok('POST', '/api/privacy/consents/' + old.id + '/withdraw', { revision: old.revision, reason: 'Synthetic old-record withdrawal.' });
+    assert.equal(await app.store.run(tx => valid(tx, media)), false);
+    const renewed = await u.dpo.ok('POST', '/api/privacy/consents', body);
+    assert.equal(await app.store.run(tx => valid(tx, media)), true);
+    assert.equal(await app.store.run(tx => valid(tx, { ...media, studentRefs: [consent.studentRef, 'NO-CONSENT-RECORD'] })), false);
+    assert.equal((await anonymous.request('GET', '/media/' + media.id)).status, 404, 'Fresh consent never auto-republishes withdrawn media');
+    await app.store.run(async tx => {
+      const current = await tx.get('media_consents', renewed.id); await tx.update('media_consents', { ...current, expiresAt: addDays(today, -1) });
+      const picture = await tx.get('media', media.id); await tx.update('media', { ...picture, status: 'PUBLISHED' }); await app.platform.files.publish(picture.file);
+    });
+    assert.equal((await anonymous.request('GET', '/media/' + media.id)).status, 404, 'Per-request consent check blocks expiry before maintenance');
+    await maintenance(app.platform);
+    assert.equal((await app.store.run(tx => tx.get('media', media.id))).status, 'WITHDRAWN');
+  });
+  await t.test('session revocation is rechecked inside transactions, including same-user download sessions', async () => {
+    const second = new Agent(f.base); await second.login(users.teacher, f.password);
+    const grant = await u.teacher.ok('POST', '/api/contracts/' + contract.id + '/download-link', {});
+    assert.equal((await second.request('GET', grant.url)).status, 403);
+    const held = await app.auth.actor({ headers: { cookie: second.cookie }, socket: { remoteAddress: '127.0.0.1' } }, { setHeader() {} });
+    await second.ok('POST', '/api/auth/logout', {});
+    let reached = false;
+    await assert.rejects(app.platform.run(held, () => { reached = true; }), error => error.code === 'AUTH_REQUIRED');
+    assert.equal(reached, false);
+    assert.equal((await u.teacher.request('GET', grant.url)).status, 200);
+  });
+  await t.test('oversized chunked requests receive a clean 413 response, not a destroyed socket', async () => {
+    const http = require('node:http');
+    const status = await new Promise((resolve, reject) => {
+      const request = http.request(f.base + '/api/contact', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Transfer-Encoding': 'chunked' } }, response => { response.resume(); response.on('end', () => resolve(response.statusCode)); });
+      request.on('error', reject);
+      for (let i = 0; i < 20; i++) request.write(' '.repeat(8192));
+      request.end();
+    });
+    assert.equal(status, 413);
+  });
+  await t.test('password rotation preserves MFA and role metadata and revokes old sessions', async () => {
+    const before = await app.store.run(tx => tx.get('users', users.hr.id));
+    const oldCookie = u.hr.cookie;
+    const password = crypto.randomBytes(24).toString('base64url') + 'aA2!';
+    await u.hr.ok('POST', '/api/auth/password', { currentPassword: f.password, password, confirmPassword: password });
+    const after = await app.store.run(tx => tx.get('users', users.hr.id));
+    assert.equal(after.mfaSecretEnc, before.mfaSecretEnc); assert.equal(after.mfaEnabled, true);
+    assert.deepEqual(after.roles, before.roles); assert.equal(after.departmentId, before.departmentId);
+    const old = new Agent(f.base); old.cookie = oldCookie;
+    assert.equal((await old.request('GET', '/api/staff')).status, 403);
+    assert.equal((await u.hr.request('GET', '/api/staff')).status, 200);
+  });
+  await t.test('MFA enrolment is mandatory before privileged actions and TOTP replay is denied', async () => {
+    const raw = await createUserRecord('fixture.setup', 'Synthetic setup officer', ['system_admin'], f.password);
+    const newUser = await app.store.run(tx => tx.insert('users', raw));
+    const agent = new Agent(f.base);
+    const login = await agent.login(newUser, f.password);
+    assert.equal(login.needsPasswordChange, true);
+    assert.equal((await agent.request('GET', '/api/system')).json.code, 'PASSWORD_REQUIRED');
+    const password = crypto.randomBytes(24).toString('base64url') + 'aB2!';
+    await agent.ok('POST', '/api/auth/password', { currentPassword: f.password, password, confirmPassword: password });
+    assert.equal((await agent.request('GET', '/api/system')).json.code, 'MFA_REQUIRED');
+    const enrollment = await agent.ok('POST', '/api/auth/mfa/setup', {});
+    assert.match(enrollment.secret, /^[A-Z2-7]+$/);
+    const usedCode = L.totp(enrollment.secret);
+    await agent.ok('POST', '/api/auth/mfa/confirm', { code: usedCode });
+    assert.equal((await agent.request('GET', '/api/system')).status, 200);
+    const replay = new Agent(f.base); await replay.ok('GET', '/api/auth/session');
+    assert.equal((await replay.request('POST', '/api/auth/login', { username: newUser.username, password, mfa_code: usedCode })).status, 401);
+  });
+  await t.test('retention purges personal forms on schedule and keeps the audit evidence', async () => {
+    await app.store.run(async tx => {
+      for (const item of await tx.list('submissions')) await tx.update('submissions', { ...item, expiresAt: Date.now() - 1 });
+      for (const item of await tx.list('admissions')) await tx.update('admissions', { ...item, expiresAt: Date.now() - 1 });
+    });
+    await maintenance(app.platform);
+    assert.equal((await u.office.ok('GET', '/api/submissions')).length, 0);
+    assert.equal((await u.office.ok('GET', '/api/admissions')).length, 0);
+    const logs = await app.store.run(tx => tx.list('audit_logs'));
+    assert.ok(logs.some(item => item.action === 'retention.purge'));
+  });
+  await t.test('proxy headers cannot spoof the limiter and per-account lockout survives a restart', async () => {
+    assert.equal(requestIp({ headers: { 'x-forwarded-for': 'attacker, 192.0.2.2' }, socket: { remoteAddress: '192.0.2.1' } }, { proxyHops: 0 }), '192.0.2.1');
+    assert.equal(requestIp({ headers: { 'x-forwarded-for': '198.51.100.9, 192.0.2.2' }, socket: { remoteAddress: '192.0.2.1' } }, { proxyHops: 1 }), '192.0.2.2');
+    const agent = new Agent(f.base); await agent.ok('GET', '/api/auth/session');
+    for (let i = 0; i < 6; i++) assert.equal((await agent.request('POST', '/api/auth/login', { username: 'fixture.locked', password: 'invalid' }, { headers: { 'X-Forwarded-For': '203.0.113.' + i } })).status, 401);
+    assert.equal((await agent.request('POST', '/api/auth/login', { username: 'fixture.locked', password: 'invalid' }, { headers: { 'X-Forwarded-For': '203.0.113.99' } })).status, 429);
+    await app.close();
+    f.app = await createApplication(f.config, { jobs: false });
+    await new Promise(resolve => f.app.server.listen(0, '0.0.0.0', resolve));
+    const restarted = new Agent(`http://127.0.0.1:${f.app.server.address().port}`);
+    await restarted.ok('GET', '/api/auth/session');
+    assert.equal((await restarted.request('POST', '/api/auth/login', { username: 'fixture.locked', password: 'invalid' })).status, 429);
+    assert.ok(await f.app.store.run(tx => tx.get('contracts', contract.id)));
+    const records = await f.app.store.run(tx => tx.list('audit_logs'));
+    assert.equal(verifyAudit(records, f.config.auditKey, await f.app.store.run(tx => tx.get('system_settings', 'audit-head'))), true);
+  });
+});
+function prettyPosition(value) { return 'Synthetic ' + value; }

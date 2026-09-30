@@ -9,7 +9,7 @@ module.exports = {
   render(ctx) {
     const s = ctx.db.settings;
     const wa = `https://wa.me/${s.whatsapp.href}?text=${encodeURIComponent('Hello Alpha Adventist Pre & Primary School, I have an enquiry.')}`;
-    const maps = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.mapQuery)}`;
+    const maps = s.mapUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.mapQuery)}`;
     const body = `
 ${phero(ctx, 'Contact', 'Contact Alpha', 'We would love to hear from you — call, WhatsApp, email or visit the school office in the Msimba area of Kigoma.', 'leadership-guests')}
 

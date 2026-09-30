@@ -15,6 +15,7 @@ module.exports = {
 ${phero(ctx, 'Gallery', 'Alpha in Pictures', 'Approved photographs from ceremonies, classrooms, choir, campus and daily life at Alpha Adventist Pre & Primary School.', 'choir-teal')}
 <section class="sec">
   <div class="container">
+    ${db.gallery.length ? '' : '<div class="adsp-empty"><span>♡</span><h3>School moments, shared with care.</h3><p>Photographs appear here only after current guardian consent and school approval. You can request a withdrawal through our <a href="/privacy">privacy page</a>.</p></div>'}
     <div class="gal-filters" role="group" aria-label="Filter gallery by category">
       <button type="button" data-gal-filter="all" aria-pressed="true">All photographs</button>
       ${used.map(c => `<button type="button" data-gal-filter="${esc(c)}" aria-pressed="false">${esc(c)}</button>`).join('')}
@@ -26,7 +27,7 @@ ${phero(ctx, 'Gallery', 'Alpha in Pictures', 'Approved photographs from ceremoni
         <figcaption>${esc(g.caption)}</figcaption>
       </button>`).join('')}
     </div>
-    <p class="note-strip" style="margin-top:30px">${icon('lock')}<span><strong>Child privacy:</strong> only approved school photographs are published on this website. Captions describe activities and never identify individual pupils. Additional categories — classrooms, computer learning, sports, worship and talent — will be filled as the school approves further photographs.</span></p>
+    <p class="note-strip" style="margin-top:30px">${icon('lock')}<span><strong>Child privacy:</strong> only approved school photographs are published on this website. Captions describe activities and never identify individual pupils. Media is removed from public access when consent expires or is withdrawn.</span></p>
   </div>
 </section>
 <div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Photograph viewer">

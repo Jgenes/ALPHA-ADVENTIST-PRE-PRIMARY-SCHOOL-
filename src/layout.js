@@ -1,10 +1,13 @@
 'use strict';
 const L = require('./lib');
 const esc = L.esc;
-const BASE_URL = (process.env.BASE_URL || 'https://alphaadventist.ac.tz').replace(/\/+$/, '');
+const { LIVE_URL } = require('./config');
+const baseOf = ctx => (ctx.baseUrl || process.env.BASE_URL || LIVE_URL).replace(/\/+$/, '');
+const localPath = (ctx, path) => ctx.lang === 'sw' && ['/', '/admissions', '/contact'].includes(path) ? '/sw' + (path === '/' ? '' : path) : path;
 
 /* ============ ICONS (inline SVG, 24x24 stroke) ============ */
 const P = {
+  pause: '<path d="M8 5v14M16 5v14"/>',
   book: '<path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 5.5V20.5"/><path d="M9 7.5h7M9 11h7"/>',
   flame: '<path d="M12 3c1 3-3 4.5-3 8a3.5 3.5 0 0 0 7 0c0-1.2-.4-2.2-1-3-.3 1-.9 1.6-1.6 2 .5-2.4-.2-5-1.4-7z"/><path d="M12 21a6 6 0 0 0 6-6c0-1.6-.5-3-1.3-4.2M12 21a6 6 0 0 1-6-6c0-1.6.5-3 1.3-4.2"/>',
   chip: '<rect x="7" y="7" width="10" height="10" rx="2"/><path d="M10 3v4M14 3v4M10 17v4M14 17v4M3 10h4M3 14h4M17 10h4M17 14h4"/>',
@@ -62,16 +65,10 @@ function icon(name, cls = '') {
 
 /* ============ image helper ============ */
 function pic(base, alt, opts = {}) {
-  const widths = opts.widths || [480, 800, 1200, 1600];
-  const sizes = opts.sizes || '(max-width: 700px) 92vw, (max-width: 1100px) 60vw, 1200px';
-  const cls = opts.cls ? ` class="${opts.cls}"` : '';
-  const eager = opts.eager ? '' : ' loading="lazy"';
-  const decoding = ' decoding="async"';
-  const webpSrc = widths.map(w => `/img/${base}-${w}.webp ${w}w`).join(', ');
-  const jpgSrc = `/img/${base}-800.jpg 800w, /img/${base}-1600.jpg 1600w`;
-  const fallback = widths.includes(800) ? `/img/${base}-800.jpg` : `/img/${base}-1600.jpg`;
-  const ratio = opts.ratio ? ` style="aspect-ratio:${opts.ratio}"` : '';
-  return `<picture><source type="image/webp" srcset="${webpSrc}" sizes="${sizes}"><img src="${fallback}" srcset="${jpgSrc}" sizes="${sizes}" alt="${esc(alt)}"${cls}${eager}${decoding}${ratio} width="${opts.w || 1600}" height="${opts.h || 1066}"></picture>`;
+  const approved = /^\/media\/MED-[a-f0-9-]+$/.test(String(base));
+  const src = approved ? base : '/img/logo-512.png';
+  const description = approved ? alt : 'Alpha school crest — a photograph will be shown only after consent and publication approval';
+  return `<picture${approved ? '' : ' class="media-pending"'}><img src="${esc(src)}" alt="${esc(description)}" ${opts.cls ? `class="${esc(opts.cls)}"` : ''} ${opts.eager ? 'fetchpriority="high"' : 'loading="lazy"'} decoding="async" width="1200" height="820" ${opts.ratio ? `style="aspect-ratio:${esc(opts.ratio)}"` : ''}></picture>`;
 }
 
 /* ============ small partials ============ */
@@ -92,25 +89,31 @@ function sectionHead(kicker, title, text, opts = {}) {
 
 /* ============ NAV ============ */
 const NAV = [
-  { href: '/', label: 'Home' },
-  { href: '/about', label: 'About Us' },
-  { href: '/academics', label: 'Academics' },
-  { href: '/admissions', label: 'Admissions' },
-  { href: '/computer-learning', label: 'Computer Learning' },
-  { href: '/school-life', label: 'School Life' },
-  { href: '/parents', label: 'Parents' },
-  { href: '/students', label: 'Students' },
-  { href: '/news', label: 'News & Events' },
-  { href: '/gallery', label: 'Gallery' },
-  { href: '/contact', label: 'Contact' }
+  { href: '/', label: 'Home', sw: 'Mwanzo' },
+  { href: '/about', label: 'About Us', sw: 'Kuhusu Shule' },
+  { href: '/academics', label: 'Academics', sw: 'Taaluma' },
+  { href: '/admissions', label: 'Admissions', sw: 'Uandikishaji' },
+  { href: '/computer-learning', label: 'Computer Learning', sw: 'TEHAMA' },
+  { href: '/school-life', label: 'School Life', sw: 'Maisha ya Shule' },
+  { href: '/parents', label: 'Parents', sw: 'Wazazi' },
+  { href: '/students', label: 'Students', sw: 'Wanafunzi' },
+  { href: '/news', label: 'News & Events', sw: 'Habari' },
+  { href: '/gallery', label: 'Gallery', sw: 'Picha' },
+  { href: '/contact', label: 'Contact', sw: 'Wasiliana' },
+  { href: '/downloads', label: 'Downloads', sw: 'Nyaraka' },
+  { href: '/portal', label: 'Portal Login', sw: 'Ingia Portal' }
 ];
 
 function header(ctx) {
   const s = ctx.db.settings;
-  const path = ctx.path;
+  const path = ctx.path.replace(/^\/sw(?=\/|$)/, '') || '/';
+  const sw = ctx.lang === 'sw';
   const isActive = href => (href === '/' ? path === '/' : path === href || path.startsWith(href + '/'));
-  const links = NAV.map(n => `<li><a href="${n.href}" ${isActive(n.href) ? 'aria-current="page"' : ''}>${esc(n.label)}</a></li>`).join('');
-  const mlinks = NAV.map(n => `<li><a href="${n.href}" ${isActive(n.href) ? 'aria-current="page"' : ''}>${esc(n.label)}</a></li>`).join('');
+  const navItem = n => `<li><a href="${localPath(ctx, n.href)}" ${isActive(n.href) ? 'aria-current="page"' : ''}>${esc(sw ? n.sw : n.label)}</a></li>`;
+  const links = NAV.map(navItem).join('');
+  const mlinks = links;
+  const alternate = ['/', '/admissions', '/contact'].includes(path) ? path : '/';
+  const languageSwitch = `<div class="language-switch" aria-label="Language"><a href="${alternate}" lang="en" ${!sw ? 'aria-current="true"' : ''}>EN</a><span>/</span><a href="/sw${alternate === '/' ? '' : alternate}" lang="sw" ${sw ? 'aria-current="true"' : ''}>SW</a></div>`;
   const wa = `https://wa.me/${s.whatsapp.href}?text=${encodeURIComponent('Hello Alpha Adventist Pre & Primary School, I would like to enquire about the school.')}`;
   return `
 <a class="skip-link" href="#main">Skip to main content</a>
@@ -126,7 +129,7 @@ function header(ctx) {
 </div>
 <header class="site-head" id="top">
   <div class="container site-head__in">
-    <a class="brand" href="/" aria-label="Alpha Adventist Pre & Primary School — Home">
+    <a class="brand" href="${localPath(ctx, '/')}" aria-label="Alpha Adventist Pre & Primary School — Home">
       <img class="brand__logo" src="/img/logo-96.png" srcset="/img/logo-96.png 96w, /img/logo-160.png 160w" sizes="52px" alt="Alpha Adventist School crest with the motto Wisdom in Truth" width="52" height="51" decoding="async">
       <span class="brand__text">
         <strong>Alpha Adventist <span>Pre &amp; Primary School</span></strong>
@@ -137,7 +140,7 @@ function header(ctx) {
       <ul>${links}</ul>
     </nav>
     <div class="site-head__actions">
-      <a class="btn btn--primary btn--sm" href="/admissions#apply">Apply for Admission</a>
+      ${languageSwitch}<a class="btn btn--primary btn--sm" href="${localPath(ctx, '/admissions')}#apply">${sw ? 'Omba Nafasi' : 'Apply for Admission'}</a>
       <button class="navtoggle" type="button" aria-expanded="false" aria-controls="mobileNav" data-navtoggle>
         ${icon('menu')}<span class="sr-only">Open menu</span>
       </button>
@@ -147,7 +150,7 @@ function header(ctx) {
     <nav aria-label="Mobile navigation">
       <ul>${mlinks}</ul>
       <div class="mobilenav__ctas">
-        <a class="btn btn--primary" href="/admissions#apply">Apply for Admission</a>
+        <a class="btn btn--primary" href="${localPath(ctx, '/admissions')}#apply">${sw ? 'Omba Nafasi' : 'Apply for Admission'}</a>
         <a class="btn btn--gold" href="/computer-learning#join">Join Computer Class</a>
         <a class="btn btn--ghost" href="/contact">Contact Us</a>
       </div>
@@ -157,7 +160,7 @@ function header(ctx) {
 <div class="quickbar" role="navigation" aria-label="Quick contact actions">
   <a href="${esc(wa)}" target="_blank" rel="noopener">${icon('whatsapp')}<span>WhatsApp</span></a>
   <a href="tel:${esc(s.phones[0].href)}">${icon('phone')}<span>${esc(s.phones[0].number)}</span></a>
-  <a href="/admissions#apply">${icon('pencil')}<span>Apply</span></a>
+  <a href="${localPath(ctx, '/admissions')}#apply">${icon('pencil')}<span>${sw ? 'Omba Nafasi' : 'Apply'}</span></a>
 </div>
 <div class="floating-contact" aria-label="Contact Alpha Adventist School">
   <a class="floating-contact__link floating-contact__link--whatsapp" href="${esc(wa)}" target="_blank" rel="noopener" aria-label="Chat with the school on WhatsApp" title="Chat with us on WhatsApp">
@@ -184,7 +187,7 @@ function footer(ctx) {
       <p class="footer__desc">A holistic Christian learning community in Kigoma, Tanzania, nurturing knowledgeable, disciplined, creative and spiritually grounded learners from KG I to Standard VII — in day and boarding life.</p>
       <p class="footer__identity">${esc(s.identityLine)}</p>
     </div>
-    ${col('Explore', [['Home', '/'], ['About Us', '/about'], ['Academics', '/academics'], ['Admissions', '/admissions'], ['News & Events', '/news'], ['Gallery', '/gallery'], ['Contact', '/contact']])}
+    ${col('Explore', [['Home', '/'], ['About Us', '/about'], ['Academics', '/academics'], ['Admissions', '/admissions'], ['News & Events', '/news'], ['Gallery', '/gallery'], ['Downloads', '/downloads'], ['Contact', '/contact']])}
     ${col('Learning', [['Computer Learning', '/computer-learning'], ['Faith & Spiritual Life', '/faith'], ['School Life', '/school-life'], ['Parent Corner', '/parents'], ['Alpha Kids Zone', '/students'], ['Book a School Visit', '/admissions#visit']])}
     <div class="footer__col">
       <h3>Contact</h3>
@@ -194,13 +197,14 @@ function footer(ctx) {
         <li>${icon('whatsapp')}<span><a href="${esc(wa)}" target="_blank" rel="noopener">WhatsApp: ${esc(s.whatsapp.number)}</a></span></li>
         ${s.emailPublished ? `<li>${icon('mail')}<span><a href="mailto:${esc(s.email)}">${esc(s.email)}</a></span></li>` : ''}
       </ul>
+      ${(s.social || []).length ? `<p class="footer__links">${s.social.map(channel => `<a href="${esc(channel.url)}" target="_blank" rel="noopener noreferrer">${esc(channel.name)}</a>`).join(' · ')}</p>` : ''}
       <p class="footer__social-note">${esc(s.socialNote)}</p>
     </div>
   </div>
   <div class="footer__bottom">
     <div class="container footer__bottom-in">
       <p>© ${year} Alpha Adventist Pre &amp; Primary School. All rights reserved.</p>
-      <p class="footer__links"><a href="/privacy">Website Privacy &amp; Child Safeguarding Notice</a> <span>•</span> <a href="/admin">Staff sign in</a></p>
+      <p class="footer__links"><a href="/privacy">Website Privacy &amp; Child Safeguarding Notice</a> <span>•</span> <a href="/portal">Staff portal</a> <span>•</span> <a href="/downloads">Downloads</a> <span>•</span> <a href="/safeguarding">Report a concern</a></p>
     </div>
   </div>
 </footer>`;
@@ -211,38 +215,43 @@ function page(ctx, body, meta = {}) {
   const s = ctx.db.settings;
   const title = meta.title || `${s.schoolName} — ${s.affiliation}, Kigoma`;
   const desc = meta.desc || 'Alpha Adventist Pre & Primary School is a Seventh-day Adventist educational institution within the Western Tanzania Conference – Kigoma, offering holistic Pre-Primary and Primary education for day and boarding pupils.';
+  const BASE_URL = baseOf(ctx);
   const url = `${BASE_URL}${ctx.path}`;
-  const jsonld = meta.jsonld ? `<script type="application/ld+json">${JSON.stringify(meta.jsonld)}</script>` : '';
+  const bilingualPath = ctx.path.replace(/^\/sw(?=\/|$)/, '') || '/';
+  const alternateTags = ['/', '/admissions', '/contact'].includes(bilingualPath) ? `<link rel="alternate" hreflang="en" href="${esc(BASE_URL + bilingualPath)}"><link rel="alternate" hreflang="sw" href="${esc(BASE_URL + '/sw' + (bilingualPath === '/' ? '' : bilingualPath))}"><link rel="alternate" hreflang="x-default" href="${esc(BASE_URL + bilingualPath)}">` : '';
+  const jsonld = meta.jsonld ? `<script type="application/ld+json" nonce="${esc(ctx.nonce)}">${JSON.stringify(meta.jsonld).replace(/</g, '\\u003c')}</script>` : '';
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="${ctx.lang === 'sw' ? 'sw' : 'en'}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(title)}</title>
 <meta name="description" content="${esc(desc)}">
 <link rel="canonical" href="${esc(url)}">
+${alternateTags}
+<meta property="og:locale" content="${ctx.lang === 'sw' ? 'sw_TZ' : 'en_TZ'}">
 <meta property="og:site_name" content="${esc(s.schoolName)}">
 <meta property="og:type" content="${meta.ogType || 'website'}">
 <meta property="og:title" content="${esc(title)}">
 <meta property="og:description" content="${esc(desc)}">
 <meta property="og:url" content="${esc(url)}">
-<meta property="og:image" content="${esc(BASE_URL)}/img/og-image.jpg">
+<meta property="og:image" content="${esc(BASE_URL)}/img/og-image.png">
 <meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="Alpha Adventist Pre & Primary School pupils at a school ceremony">
+<meta property="og:image:alt" content="Alpha Adventist Pre & Primary School — Wisdom in Truth">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#0A1E59">
 <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon-32.png">
 <link rel="apple-touch-icon" href="/img/apple-touch-180.png">
 <link rel="manifest" href="/site.webmanifest">
-<link rel="preload" as="image" href="/img/${(ctx.db.hero[0] && ctx.db.hero[0].image) || 'choir-green'}-1600.webp" type="image/webp">
+
 <link rel="stylesheet" href="/fonts/fonts.css">
-<link rel="stylesheet" href="/css/main.css?v=3">
+<link rel="stylesheet" href="/css/main.css?v=5"><link rel="stylesheet" href="/css/platform-public.css?v=3">
 ${jsonld}</head>
 <body class="${meta.bodyClass || ''}">
-${header(ctx)}
+${ctx.path === '/students' ? `<header class="kids-safe-head"><a href="/students"><img src="/img/logo-96.png" alt="School crest" width="38" height="38"> Alpha Kids Zone</a><a href="/">School home</a></header>` : header(ctx)}
 <main id="main">${body}</main>
-${footer(ctx)}
-<script src="/js/main.js" defer></script>
+${ctx.path === '/students' ? '<footer class="kids-safe-footer">Learn safely. Ask a trusted adult for help. No ads, chat, accounts or saved scores.</footer>' : footer(ctx)}
+<script src="/js/main.js?v=5" defer></script>
 </body>
 </html>`;
 }
@@ -250,7 +259,9 @@ ${footer(ctx)}
 /* school structured data */
 function schoolJsonLd(ctx) {
   const s = ctx.db.settings;
+  const BASE_URL = baseOf(ctx);
   return {
+    url: BASE_URL,
     '@context': 'https://schema.org',
     '@type': 'School',
     name: s.schoolName,
@@ -268,8 +279,8 @@ function schoolJsonLd(ctx) {
     parentOrganization: { '@type': 'Organization', name: 'Western Tanzania Conference of Seventh-day Adventists' },
     motto: s.motto,
     logo: `${BASE_URL}/img/logo-256.png`,
-    image: `${BASE_URL}/img/og-image.jpg`
+    image: `${BASE_URL}/img/og-image.png`
   };
 }
 
-module.exports = { icon, pic, btn, sectionHead, header, footer, page, NAV, schoolJsonLd, ICONS: P };
+module.exports = { icon, pic, btn, sectionHead, header, footer, page, NAV, schoolJsonLd, localPath, baseOf, ICONS: P };

@@ -75,6 +75,11 @@ module.exports = {
   </div>
 </section>
 
+<section class="sec sec--sand" id="kiswahili" lang="sw"><div class="container">
+  ${sectionHead('TUSOME KISWAHILI', 'Soma. Elewa. Furahia.', 'Soma hadithi fupi, kisha fungua swali. Majibu yako hayatumwi au kuhifadhiwa.', { align: 'center' })}
+  <div class="adsp-reading"><details><summary>Asha na kitabu chake</summary><p>Asha ana kitabu. Kila jioni, anasoma na bibi yake. Leo wanasoma kuhusu ndege. Asha anafurahia kujifunza maneno mapya.</p><details><summary>Asha anasoma na nani?</summary><p>Anasoma na bibi yake. Hongera!</p></details></details><details><summary>Bustani ya shule</summary><p>Juma na rafiki zake wanapanda mboga. Wanamwagilia mimea maji kila asubuhi. Wanashirikiana kutunza bustani yao.</p><details><summary>Watoto wanamwagilia mimea lini?</summary><p>Kila asubuhi. Vizuri sana!</p></details></details></div>
+</div></section>
+
 <section class="sec" id="safety">
   <div class="container">
     ${sectionHead('Internet Safety Corner', 'Be Smart. Be Safe. Be Kind.', 'Alpha teaches digital safety alongside every computer skill. These rules protect you everywhere you use technology.', { align: 'center' })}
@@ -91,7 +96,7 @@ module.exports = {
 <section class="sec kids">
   <div class="container text-center">
     <h2>Keep Exploring!</h2>
-    <p class="muted" style="max-width:56ch;margin:0 auto 22px">Discover school news, see your classmates in the gallery, and learn about computer classes at Alpha.</p>
+    <p class="muted" style="max-width:56ch;margin:0 auto 22px">Read school news, practise your Kiswahili and learn about computer skills at Alpha.</p>
     <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
       ${btn('/news', 'School News', 'primary')}
       ${btn('/gallery', 'Photo Gallery', 'gold', 'camera')}

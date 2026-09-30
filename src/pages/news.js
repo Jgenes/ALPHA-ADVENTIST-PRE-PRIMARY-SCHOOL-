@@ -46,7 +46,7 @@ function article(ctx, slug) {
   if (!n) return null;
   const related = db.news.filter(a => a !== n && a.category === n.category).concat(db.news.filter(a => a !== n && a.category !== n.category)).slice(0, 2);
   const shareText = encodeURIComponent(n.title + ' — Alpha Adventist Pre & Primary School');
-  const shareUrl = encodeURIComponent('https://alphaadventist.ac.tz/news/' + n.slug);
+  const shareUrl = encodeURIComponent(X.baseOf(ctx) + '/news/' + n.slug);
   const waShare = `https://wa.me/?text=${shareText}%20${shareUrl}`;
   const body = `
 ${phero(ctx, 'News & Events', n.title, n.excerpt, n.image)}
@@ -101,7 +101,7 @@ ${phero(ctx, 'News & Events', n.title, n.excerpt, n.image)}
         '@context': 'https://schema.org', '@type': 'NewsArticle',
         headline: n.title, description: n.excerpt, author: { '@type': 'Organization', name: n.author },
         datePublished: n.sortDate || undefined,
-        image: `https://alphaadventist.ac.tz/img/${n.image}-1600.jpg`,
+        image: X.baseOf(ctx) + (n.mediaId ? '/media/' + n.mediaId : '/img/og-image.png'),
         publisher: { '@type': 'Organization', name: 'Alpha Adventist Pre & Primary School' }
       }
     }

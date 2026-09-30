@@ -1,0 +1,42 @@
+/* Additive platform features only. The original GitHub design system and
+   homepage components live in main.css; do not introduce another visual theme. */
+:root{--gold-700:#825c0d;--faint:#65718a}
+body{overflow-wrap:anywhere}
+.language-switch{display:flex;align-items:center;gap:6px;font:700 .76rem var(--sans);white-space:nowrap;color:var(--muted)}
+.language-switch a{padding:5px;color:var(--navy);text-decoration:none}
+.language-switch a[aria-current]{border-bottom:2px solid var(--gold)}
+.brand__logo{flex-shrink:0}.brand__text{min-width:0}.brand{flex-shrink:1}
+.mainnav{flex:1 1 auto;min-width:0}.mainnav ul{flex-wrap:wrap}
+.mainnav a[href="/portal"]{color:var(--navy);font-weight:800}
+.home-actions{display:flex;flex-wrap:wrap;gap:12px}
+.techgrid{grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr))}
+.hero__tag{max-width:48ch}
+/* Reuse the school's existing crest when no consented photograph is published.
+   No invented campus artwork or unverified pupil photo is used as a fallback. */
+.media-pending{display:block;background:var(--navy-050);overflow:hidden}
+.media-pending img{width:100%;height:100%;object-fit:contain!important;padding:clamp(30px,7vw,100px);background:var(--navy-050)}
+.hero__media .media-pending,.hero__media .media-pending img{background:var(--navy-800)}
+.hero__media .media-pending img{object-position:80% 50%;opacity:.3;padding:80px 12%;max-height:none}
+.life-card .media-pending img,.news-feat__media .media-pending img{background:var(--navy-100)}
+.footer__social-note:empty{display:none}.footer__links{display:flex;flex-wrap:wrap;gap:8px}
+/* New forms/downloads use the repository's established cards and brand tokens. */
+.adsp-consent{display:flex!important;align-items:flex-start!important;gap:10px;font-size:.86rem;line-height:1.7;margin:12px 0 18px}
+.adsp-consent input{width:16px!important;min-height:16px!important;flex:none;margin-top:5px;accent-color:var(--navy)}
+.adsp-download-filter{display:flex;align-items:center;gap:15px;font-size:.9rem;margin-bottom:25px;flex-wrap:wrap}
+.adsp-download-filter select{padding:12px;border:1px solid var(--line);border-radius:var(--r-sm);background:#fff}
+.adsp-download-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px}
+.adsp-download-icon{width:48px;height:48px;display:grid;place-items:center;background:var(--navy-050);color:var(--navy);border-radius:var(--r-md);margin-bottom:20px}
+.adsp-download-meta{display:grid;grid-template-columns:1fr 1fr;gap:15px;margin:25px 0}.adsp-download-meta div{min-width:0}
+.adsp-download-meta dt{font-size:.8rem;color:var(--muted)}.adsp-download-meta dd{font-size:.9rem;overflow-wrap:anywhere;margin:5px 0 0}
+.adsp-empty{text-align:center;background:var(--sand);border:1px solid var(--line);border-radius:var(--r-lg);padding:40px;max-width:800px;margin:auto}
+.adsp-empty>span{display:grid;place-items:center;width:50px;height:50px;border-radius:var(--r-md);color:var(--navy);background:var(--navy-050);margin:0 auto 20px}
+.adsp-empty p{color:var(--muted);max-width:55ch;margin:15px auto 25px}
+.adsp-steps{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:20px;padding:0;list-style-position:inside;color:var(--ink);font-size:.9rem;line-height:1.8}
+.adsp-steps li{padding:18px;background:var(--navy-050);border-radius:var(--r-sm)}
+.kids-safe-head{display:flex;justify-content:space-between;align-items:center;gap:20px;padding:18px max(16px,calc((100vw - 1136px)/2));background:#fff;border-bottom:1px solid var(--line)}
+.kids-safe-head a{display:flex;align-items:center;gap:12px;color:var(--navy);text-decoration:none;font-weight:700;font-size:.9rem}
+.kids-safe-footer{text-align:center;background:var(--sand);padding:30px;font-size:.85rem;color:var(--muted)}
+.adsp-reading{display:grid;grid-template-columns:1fr 1fr;gap:25px}.adsp-reading details{padding:22px;background:#fff;border-radius:var(--r-md);border:1px solid var(--line)}
+.adsp-reading summary{font-weight:700;cursor:pointer;color:var(--navy)}.adsp-reading p{font-size:1rem;margin-top:16px;line-height:1.9}.adsp-reading small{display:block;color:var(--muted);margin-top:8px}
+@media(max-width:1100px){.adsp-download-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:760px){.site-head__actions>.btn{display:none}.site-head__actions{margin-left:auto}.language-switch{gap:3px}.hero__tag{font-size:.64rem;max-width:calc(100% - 32px)}.hero__media .media-pending img{object-position:center;opacity:.2;padding:50px}.adsp-download-grid,.adsp-reading,.adsp-steps{grid-template-columns:1fr}.kids-safe-head{padding:15px}.kids-safe-head a{font-size:.8rem;gap:8px}.kids-safe-head img{width:32px;height:32px}.adsp-empty{padding:30px 20px}}

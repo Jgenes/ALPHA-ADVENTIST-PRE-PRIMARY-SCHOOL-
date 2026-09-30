@@ -2,3 +2,17 @@
 .env.*
 !.env.example
 node_modules/
+.runtime/
+private/
+backups/
+uploads/
+work/
+coverage/
+*.sqlite
+*.sqlite-*
+*.ejson.enc
+*.log
+.sudo_as_admin_successful
+# Runtime records and keys never belong in source control.
+data/*
+!data/seed.json

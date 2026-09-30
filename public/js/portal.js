@@ -1,0 +1,461 @@
+'use strict';
+(() => {
+  const context = JSON.parse(document.getElementById('portal-context').textContent);
+  const SVG = {"book":"<path d=\"M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z\"/><path d=\"M4 5.5V20.5\"/><path d=\"M9 7.5h7M9 11h7\"/>","flame":"<path d=\"M12 3c1 3-3 4.5-3 8a3.5 3.5 0 0 0 7 0c0-1.2-.4-2.2-1-3-.3 1-.9 1.6-1.6 2 .5-2.4-.2-5-1.4-7z\"/><path d=\"M12 21a6 6 0 0 0 6-6c0-1.6-.5-3-1.3-4.2M12 21a6 6 0 0 1-6-6c0-1.6.5-3 1.3-4.2\"/>","chip":"<rect x=\"7\" y=\"7\" width=\"10\" height=\"10\" rx=\"2\"/><path d=\"M10 3v4M14 3v4M10 17v4M14 17v4M3 10h4M3 14h4M17 10h4M17 14h4\"/>","star":"<path d=\"m12 3.6 2.5 5.1 5.6.8-4 4 .9 5.6-5-2.7-5 2.7.9-5.6-4-4 5.6-.8z\"/>","shield":"<path d=\"M12 3 5 6v5c0 4.5 3 8.4 7 10 4-1.6 7-5.5 7-10V6z\"/><path d=\"m9.3 11.8 2 2 3.6-4\"/>","rocket":"<path d=\"M12 15c-2 0-3-1-3-3 0-4 2-7.5 3-9 1 1.5 3 5 3 9 0 2-1 3-3 3z\"/><path d=\"M9 12c-2 .5-3.5 2-4 5 2.6-.3 4.2-1 5-2M15 12c2 .5 3.5 2 4 5-2.6-.3-4.2-1-5-2\"/><circle cx=\"12\" cy=\"10\" r=\"1.4\"/>","phone":"<path d=\"M6.8 3.5h2.4l1.3 3.4-1.8 1.4a12.6 12.6 0 0 0 5 5l1.4-1.8 3.4 1.3v2.4c0 1-.8 1.9-1.9 1.8C10 16.6 7.4 14 5 6.9c-.3-1.1.2-2.4 1.8-3.4z\"/>","mail":"<rect x=\"3\" y=\"5\" width=\"18\" height=\"14\" rx=\"2\"/><path d=\"m3.5 7 8.5 6 8.5-6\"/>","pin":"<path d=\"M12 21s7-6.1 7-11a7 7 0 1 0-14 0c0 4.9 7 11 7 11z\"/><circle cx=\"12\" cy=\"10\" r=\"2.6\"/>","whatsapp":"<path d=\"M12 3a9 9 0 0 0-7.8 13.5L3 21l4.6-1.2A9 9 0 1 0 12 3z\"/><path d=\"M8.8 9.2c-.3 1.6 1 3.6 2.3 4.8 1.2 1.1 2.9 2 4.2 1.7l.5-1.5-2-1-.9.8c-.9-.4-2-1.4-2.4-2.3l.8-.9-1-2z\"/>","clock":"<circle cx=\"12\" cy=\"12\" r=\"8.5\"/><path d=\"M12 7.5V12l3 2\"/>","menu":"<path d=\"M4 7h16M4 12h16M4 17h16\"/>","close":"<path d=\"m6 6 12 12M18 6 6 18\"/>","arrow":"<path d=\"M5 12h14M13 6l6 6-6 6\"/>","arrowUp":"<path d=\"M7 17 17 7M9 7h8v8\"/>","check":"<path d=\"m5 12.5 4.5 4.5L19 7.5\"/>","camera":"<path d=\"M4 8h3l2-2.5h6L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z\"/><circle cx=\"12\" cy=\"13\" r=\"3.4\"/>","calendar":"<rect x=\"3.5\" y=\"5\" width=\"17\" height=\"16\" rx=\"2\"/><path d=\"M3.5 10h17M8 3v4M16 3v4\"/>","mega":"<path d=\"M4 10v4a1 1 0 0 0 1 1h2l8 4V5L7 9H5a1 1 0 0 0-1 1z\"/><path d=\"M18.5 9.5a4 4 0 0 1 0 5\"/>","users":"<circle cx=\"9\" cy=\"8.5\" r=\"3.2\"/><path d=\"M3.5 19c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5\"/><circle cx=\"16.8\" cy=\"9.5\" r=\"2.6\"/><path d=\"M15.5 14.3c2.4.2 4.3 1.8 4.9 4.7\"/>","laptop":"<rect x=\"4\" y=\"5\" width=\"16\" height=\"10\" rx=\"1.5\"/><path d=\"M2.5 18.5h19\"/>","music":"<path d=\"M9 18.5V6l10-2v12.5\"/><circle cx=\"6.5\" cy=\"18.5\" r=\"2.5\"/><circle cx=\"16.5\" cy=\"16.5\" r=\"2.5\"/>","ball":"<circle cx=\"12\" cy=\"12\" r=\"8.5\"/><path d=\"M12 3.5c2.5 2.4 2.5 14.6 0 17M3.8 9.5c4.6 2 11.8 2 16.4 0M3.8 14.5c4.6-2 11.8-2 16.4 0\"/>","palette":"<path d=\"M12 3a9 9 0 1 0 0 18c1.6 0 2.2-1 1.6-2.2-.7-1.4.2-2.8 1.8-2.8H18a3.6 3.6 0 0 0 3-3.6C21 7 17 3 12 3z\"/><circle cx=\"8\" cy=\"9\" r=\"1.1\"/><circle cx=\"12\" cy=\"7.5\" r=\"1.1\"/><circle cx=\"15.8\" cy=\"9.6\" r=\"1.1\"/>","mic":"<rect x=\"9.5\" y=\"3\" width=\"5\" height=\"10\" rx=\"2.5\"/><path d=\"M6 11a6 6 0 0 0 12 0M12 17v4M9 21h6\"/>","leaf":"<path d=\"M5 19C5 9 12 4 20 4c0 9-5 15-13 15\"/><path d=\"M5 19c2-5 6-9 10-11\"/>","cross":"<path d=\"M12 4v16M7 9h10\"/>","heart":"<path d=\"M12 20s-7.5-4.7-7.5-10A4.3 4.3 0 0 1 12 7.6 4.3 4.3 0 0 1 19.5 10c0 5.3-7.5 10-7.5 10z\"/>","grid":"<rect x=\"4\" y=\"4\" width=\"7\" height=\"7\" rx=\"1.5\"/><rect x=\"13\" y=\"4\" width=\"7\" height=\"7\" rx=\"1.5\"/><rect x=\"4\" y=\"13\" width=\"7\" height=\"7\" rx=\"1.5\"/><rect x=\"13\" y=\"13\" width=\"7\" height=\"7\" rx=\"1.5\"/>","lock":"<rect x=\"5\" y=\"10.5\" width=\"14\" height=\"10\" rx=\"2\"/><path d=\"M8 10.5V8a4 4 0 0 1 8 0v2.5\"/>","clipboard":"<rect x=\"5\" y=\"4.5\" width=\"14\" height=\"16.5\" rx=\"2\"/><path d=\"M9 4.5A1.5 1.5 0 0 1 10.5 3h3A1.5 1.5 0 0 1 15 4.5V6H9z\"/><path d=\"M9 11h6M9 15h6\"/>","flask":"<path d=\"M10 3v5.5L4.8 18a2 2 0 0 0 1.8 3h10.8a2 2 0 0 0 1.8-3L14 8.5V3\"/><path d=\"M8.5 3h7M7.5 14.5h9\"/>","growth":"<path d=\"M4 19h16M6 16v-4M10.5 16V8M15 16v-6M19.5 16V5\"/>","target":"<circle cx=\"12\" cy=\"12\" r=\"8.5\"/><circle cx=\"12\" cy=\"12\" r=\"4.5\"/><circle cx=\"12\" cy=\"12\" r=\"1\"/>","sun":"<circle cx=\"12\" cy=\"12\" r=\"4\"/><path d=\"M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3 7 7M17 17l1.7 1.7M18.7 5.3 17 7M7 17l-1.7 1.7\"/>","home":"<path d=\"m4 11 8-7 8 7\"/><path d=\"M6 9.5V20h12V9.5\"/>","download":"<path d=\"M12 4v10M8 10.5l4 4 4-4M5 19h14\"/>","share":"<circle cx=\"6\" cy=\"12\" r=\"2.5\"/><circle cx=\"17\" cy=\"6\" r=\"2.5\"/><circle cx=\"17\" cy=\"18\" r=\"2.5\"/><path d=\"m8.3 10.8 6.4-3.6M8.3 13.2l6.4 3.6\"/>","link":"<path d=\"M10 14a4 4 0 0 0 6 .4l2.5-2.5a4 4 0 0 0-5.6-5.6L11.5 7.7\"/><path d=\"M14 10a4 4 0 0 0-6-.4L5.5 12.1a4 4 0 0 0 5.6 5.6l1.4-1.4\"/>","sparkle":"<path d=\"M12 3.5 13.8 9l5.7 1.8-5.7 1.8L12 18.5 10.2 12.6 4.5 10.8 10.2 9z\"/><path d=\"M19 3.5v3M17.5 5h3\"/>","keyboard":"<rect x=\"3\" y=\"7\" width=\"18\" height=\"10\" rx=\"2\"/><path d=\"M6.5 10.5h.01M10 10.5h.01M13.5 10.5h.01M17 10.5h.01M6.5 13.5h.01M17 13.5h.01M9.5 13.5h5\"/>","globe":"<circle cx=\"12\" cy=\"12\" r=\"8.5\"/><path d=\"M3.5 12h17M12 3.5c2.5 2.4 2.5 14.6 0 17M12 3.5c-2.5 2.4-2.5 14.6 0 17\"/>","pencil":"<path d=\"m14.5 5.5 4 4L8 20H4v-4z\"/><path d=\"m12.5 7.5 4 4\"/>","badge":"<circle cx=\"12\" cy=\"9\" r=\"5.5\"/><path d=\"m8.8 13.5-1.3 7 4.5-2.6 4.5 2.6-1.3-7\"/>","bed":"<path d=\"M3 18v-8M3 14h18v4M3 14V7\"/><path d=\"M7 11h4a3 3 0 0 1 3 3\"/><circle cx=\"7\" cy=\"10\" r=\"0.6\"/>","eye":"<path d=\"M2.5 12S6 5.8 12 5.8 21.5 12 21.5 12 18 18.2 12 18.2 2.5 12 2.5 12z\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/>","send":"<path d=\"M21 3 3 10.5l7 3 3 7z\"/><path d=\"M21 3 10 13.5\"/>","quote":"<path d=\"M9 7c-3 1-4.5 3.4-4.5 6.5V17H10v-6H7.2C7.6 9.4 8.4 8.4 10 7.6zM19 7c-3 1-4.5 3.4-4.5 6.5V17H20v-6h-2.8c.4-1.6 1.2-2.6 2.8-3.4z\"/>","chevron":"<path d=\"m8 10 4 4 4-4\"/>"};
+  const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+  const icon = name => `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${SVG[name] || SVG.book}</svg>`;
+  const pretty = value => String(value || '').replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, char => char.toUpperCase());
+  const has = permission => context.user?.permissions.includes(permission);
+  const any = permissions => permissions.some(has);
+  const date = value => value ? new Date(value).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+  const bytes = value => value >= 1048576 ? (value / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.ceil(value / 1024)) + ' KB';
+  const status = value => `<span class="p-status" data-tone="${['REJECTED', 'DECLINED', 'WITHDRAWN', 'FAILED', 'EXPIRED', 'Urgent'].includes(value) ? 'danger' : ['UNDER_REVIEW', 'SUBMITTED', 'RETURNED', 'APPROVED', 'SCHEDULED', 'PENDING', 'Important', 'AWAITING_EMPLOYEE'].includes(value) ? 'warning' : ['DRAFT', 'Information', 'NEW'].includes(value) ? 'info' : 'success'}">${esc(pretty(value))}</span>`;
+  const button = (action, label, id = '', secondary = false, extra = '') => `<button type="button" class="p-btn ${secondary ? 'p-btn-secondary' : 'p-btn-primary'}" data-action="${action}" data-id="${esc(id)}" ${extra}>${esc(label)}</button>`;
+  const empty = (title, description, ic = 'leaf') => `<div class="p-empty"><span>${icon(ic)}</span><h3>${esc(title)}</h3><p>${esc(description)}</p></div>`;
+  const card = (title, body, link = '', label = 'View all') => `<section class="admin-card p-card"><div class="p-card-head"><h2>${esc(title)}</h2>${link ? `<a href="${link}">${esc(label)} ${icon('arrow')}</a>` : ''}</div>${body}</section>`;
+  const info = (text, warning = false) => `<div class="p-info${warning ? ' p-info-warning' : ''}">${icon('shield')}<p>${text}</p></div>`;
+  const toolbar = (description, actions = '') => `<div class="p-toolbar"><p>${esc(description)}</p><div class="p-row-actions">${actions}</div></div>`;
+  const table = (heads, rows) => `<div class="admin-card p-card p-table-wrap"><table class="admin-table p-table"><thead><tr>${heads.map(head => `<th scope="col">${esc(head)}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
+  const field = (name, label, value = '', type = 'text', required = true, hint = '') => `<div class="p-field"><label for="f-${name}">${esc(label)}${required ? ' *' : ''}</label><input id="f-${name}" name="${name}" type="${type}" value="${type === 'file' ? '' : esc(value)}" ${required ? 'required' : ''} ${type === 'password' ? 'minlength="12" maxlength="128" autocomplete="new-password"' : ''} ${type === 'number' ? 'min="0" step="1"' : ''} ${type === 'file' ? 'accept=".txt,.pdf"' : ''}>${hint ? `<small>${esc(hint)}</small>` : ''}</div>`;
+  const area = (name, label, value = '', required = true, hint = '') => `<div class="p-field"><label for="f-${name}">${esc(label)}${required ? ' *' : ''}</label><textarea id="f-${name}" name="${name}" ${required ? 'required' : ''}>${esc(value)}</textarea>${hint ? `<small>${esc(hint)}</small>` : ''}</div>`;
+  const select = (name, label, options, value = '', required = true) => `<div class="p-field"><label for="f-${name}">${esc(label)}${required ? ' *' : ''}</label><select id="f-${name}" name="${name}" ${required ? 'required' : ''}>${required ? '<option value="">Choose…</option>' : '<option value="">None</option>'}${options.map(option => { const id = typeof option === 'string' ? option : option.id; const title = typeof option === 'string' ? pretty(option) : option.name; return `<option value="${esc(id)}" ${id === value ? 'selected' : ''}>${esc(title)}</option>`; }).join('')}</select></div>`;
+  const check = (name, label, checked = false, required = false) => `<label class="p-checkbox"><input name="${name}" type="checkbox" ${checked ? 'checked' : ''} ${required ? 'required' : ''}><span>${esc(label)}</span></label>`;
+  const facts = object => `<dl class="p-facts">${Object.entries(object).map(([key, value]) => `<div><dt>${esc(key)}</dt><dd>${esc(value === '' || value === null || value === undefined ? '—' : value)}</dd></div>`).join('')}</dl>`;
+  const group = (...items) => `<div class="p-form-grid">${items.join('')}</div>`;
+  const comma = value => String(value || '').split(',').map(item => item.trim()).filter(Boolean);
+  const state = { rows: [], meta: {}, extra: {} };
+  let dialogState = null;
+  let toastTimer;
+  async function api(url, method = 'GET', body, csrfRetried = false) {
+    if (method === 'POST' && url.startsWith('/api/auth/')) {
+      // Never send a stale token from a login tab left open during a restart,
+      // timeout, or another tab's session rotation. Ordinary business writes
+      // are NOT automatically retried or rebound to a different account.
+      const session = await api('/api/auth/session');
+      if (context.user && session.user?.id !== context.user.id) {
+        document.body.replaceChildren(); window.location.replace('/portal');
+        throw new Error('Your session ended. Please sign in again.');
+      }
+    }
+    const response = await fetch(url, { method, credentials: 'same-origin', cache: 'no-store', headers: { Accept: 'application/json', ...(body ? { 'Content-Type': 'application/json', 'X-CSRF-Token': context.csrf } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) });
+    let result;
+    try { result = await response.json(); } catch { throw new Error('The service could not respond. Please try again.'); }
+    if (!response.ok || result.ok === false) {
+      if (result.code === 'CSRF_FAILED' && url === '/api/auth/login' && !csrfRetried) return api(url, method, body, true);
+      if (result.code === 'CSRF_FAILED' && url === '/api/auth/login') {
+        const help = document.querySelector('[data-framed-login]');
+        if (help) help.hidden = false;
+        throw new Error('Your browser could not keep the sign-in session. Open the portal in a new tab using the link below, then sign in there.');
+      }
+      if (['AUTH_REQUIRED', 'MFA_REQUIRED', 'PASSWORD_REQUIRED'].includes(result.code)) { document.body.replaceChildren(); window.location.replace('/portal'); }
+      throw new Error(result.message || 'The request could not be completed.');
+    }
+    if (typeof result.csrf === 'string') context.csrf = result.csrf;
+    return result.data === undefined ? result : result.data;
+  }
+  function toast(message) {
+    const element = document.getElementById('toast');
+    if (!element) return;
+    element.textContent = message; element.hidden = false;
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => { element.hidden = true; }, 6000);
+  }
+  function formError(form, error) { const element = form.querySelector('.p-form-status'); element.textContent = error.message; element.hidden = false; }
+  function openDialog(kind, title, html, record = null) {
+    dialogState = { kind, record };
+    document.getElementById('dialog-title').textContent = title;
+    document.getElementById('dialog-fields').innerHTML = html;
+    document.querySelector('#record-form .p-form-status').hidden = true;
+    document.querySelector('#record-form button[type=submit]').disabled = false;
+    document.querySelector('#record-form button[type=submit]').hidden = false;
+    document.getElementById('record-dialog').showModal();
+  }
+  async function fileValue(file) {
+    if (!(file instanceof File) || !file.size) return undefined;
+    if (file.size > 5 * 1024 * 1024) throw new Error('Choose a file no larger than 5 MB.');
+    const content = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result).split(',')[1]); reader.onerror = () => reject(new Error('Could not read this file.')); reader.readAsDataURL(file); });
+    return { name: file.name, content };
+  }
+  const downloadButton = (kind, id, label = 'Download') => button('download', label, id, true, `data-kind="${kind}"`);
+  function uploadHint() { return info(state.meta.binaryUploadsEnabled ? 'Use a PDF or UTF-8 text document, up to 5 MB. Files are encrypted and privately stored.' : 'Plain-text (.txt) documents are supported. PDF and photo uploads stay disabled until the operator configures a malware scanner.'); }
+  async function renderDashboard() {
+    const data = await api('/api/dashboard');
+    const staff = has('staff.view_self');
+    const name = data.name.split(' ')[0];
+    const welcome = `<section class="admin-card p-welcome"><h2>Welcome, ${esc(name)}.</h2><p class="muted">${staff ? 'Your staff records, school updates and requests in one place.' : 'Manage the technical services and accounts assigned to you.'}</p>${data.pendingApprovals ? `<p><strong>${data.pendingApprovals}</strong> ${data.pendingApprovals === 1 ? 'request needs' : 'requests need'} your attention. <a href="/portal/approvals">Review requests ${icon('arrow')}</a></p>` : ''}</section>`;
+    const tiles = staff ? [
+      ['Available annual leave', data.annualLeave === null ? '—' : data.annualLeave, 'days', data.annualLeave === null ? 'HR entitlement not recorded yet' : 'Excludes reserved & used days', 'calendar', '/portal/leave'],
+      ['My contract', pretty(data.contractStatus), '', data.contractEndDate ? 'Until ' + date(data.contractEndDate) : 'Only your issued records appear here', 'clipboard', '/portal/contracts'],
+      ['Notice board', data.unreadNotices, 'new', data.acknowledgementsDue ? data.acknowledgementsDue + ' require acknowledgement' : 'Stay connected to your school', 'mega', '/portal/notices'],
+      ['Document library', data.documents, 'issued', 'Authorised, controlled documents', 'book', '/portal/documents']
+    ] : has('system.read') ? [
+      ['Active accounts', data.accountsTotal, '', 'Identity and access administration', 'users', '/portal/users'],
+      ['Database', data.database === 'sqlite' ? 'Development' : 'MongoDB', '', data.database === 'sqlite' ? 'Local transactional SQLite' : 'Transactional replica-set storage', 'chip', '/portal/system'],
+      ['Alert queue', data.alertsPending, 'pending', data.officeAlertsConfigured ? 'External integration configured' : 'Messaging provider not configured', 'mail', '/portal/system'],
+      ['Business access', 'Separate', '', 'No automatic HR or approval authority', 'shield', '/portal/help']
+    ] : [['My notifications', data.notifications.length, 'unread', 'Only messages addressed to you', 'mail', '/portal/notifications']];
+    const tilesHtml = `<div class="p-tiles">${tiles.map(([title, value, unit, note, ic, href]) => `<a class="admin-card p-tile" href="${href}"><div class="p-tile-top">${esc(title)}<span>${icon(ic)}</span></div><div class="p-tile-value"><strong class="${typeof value === 'string' && value.length > 3 ? 'p-value-small' : ''}">${esc(value)}</strong><span>${unit}</span></div><p>${esc(note)}</p></a>`).join('')}</div>`;
+    const actions = (staff ? [['calendar', 'Apply for leave', 'Plan your time away', '/portal/leave'], ['clipboard', 'Track a request', 'See where things stand', '/portal/requests'], ['book', 'Find a document', 'The approved version', '/portal/documents']] : [['users', 'Manage accounts', 'Technical administration', '/portal/users'], ['chip', 'Service health', 'Delivery & maintenance', '/portal/system'], ['shield', 'Security help', 'Know your boundaries', '/portal/help']]).filter(([, , , href]) => staff || has('system.read') || href === '/portal/help');
+    const quick = card('Quick actions', `<div class="p-actions-grid">${actions.map(([ic, title, desc, href]) => `<a class="p-quick-action" href="${href}"><span>${icon(ic)}</span>${title}<small>${desc}</small></a>`).join('')}</div>`);
+    const updates = card('Your latest updates', data.notifications.length ? data.notifications.map(item => `<div class="p-notice-line"><span class="p-mini-icon">${icon('mega')}</span><div><h3>${esc(item.title)}</h3><p>${date(item.createdAt)}</p></div><a href="${esc(item.href)}" aria-label="Open update">${icon('arrowUp')}</a></div>`).join('') : empty('You’re all caught up.', 'New notices and updates about your requests will appear here.', 'check'), '/portal/notifications');
+    const upcoming = card('Coming up at school', data.upcoming.length ? data.upcoming.map(item => `<div class="p-notice-line"><span class="p-mini-icon">${icon('calendar')}</span><div><h3>${esc(item.title)}</h3><p>${date(item.date)} · ${esc(item.category)}</p></div></div>`).join('') : empty('No upcoming events', 'There are no upcoming events for your audience yet.', 'calendar'), staff ? '/portal/calendar' : '');
+    const guide = `<aside class="p-guide"><span>${icon('shield')} A SHARED RESPONSIBILITY</span><h3>A safe space starts with all of us.</h3><p>Protect school information, share only approved documents, and keep children’s privacy at the heart of every decision.</p><a href="/portal/help">A quick security refresher ${icon('arrow')}</a></aside>`;
+    return welcome + tilesHtml + (staff && !data.profile ? info('<strong>Welcome to your workspace.</strong> HR hasn’t completed your staff profile yet. Your leave balance and contract tiles will update when authorised records are added.') : '') + `<div class="p-columns"><div class="p-stack">${quick}${updates}</div><div class="p-stack">${upcoming}${guide}</div></div>`;
+  }
+  async function renderProfile() {
+    const profiles = await api('/api/staff');
+    const profile = profiles.find(item => item.id === context.user.id);
+    if (!profile) return card('My profile', empty('Your profile is being prepared.', 'Ask HR to connect your Staff ID, department and supervisor to your account.', 'users'));
+    const department = state.meta.departments.find(item => item.id === profile.departmentId)?.name || profile.departmentId;
+    return toolbar('Your employment contact details. Contact HR to request corrections.') + card(profile.name, `<div class="p-card-body">${facts({ 'Staff ID': profile.staffId, Position: profile.position, Department: department, 'Employment type': profile.employmentType, 'Employment date': date(profile.employmentDate), 'Official email': profile.email, 'Official telephone': profile.phone, Supervisor: profile.supervisorId || 'Not assigned' })}</div>`);
+  }
+  async function renderLeave() {
+    const [records, balances] = await Promise.all([api('/api/leave'), api('/api/leave/balances')]);
+    state.rows = records;
+    const own = balances.filter(item => item.userId === context.user.id && item.year === new Date().getFullYear());
+    const balanceLine = own.length ? own.map(item => `<strong>${esc(pretty(item.typeId))}:</strong> ${item.entitledDays - item.usedDays - item.reservedDays} available · ${item.reservedDays} reserved`).join(' &nbsp; / &nbsp; ') : 'HR has not recorded a leave entitlement for you yet.';
+    return toolbar('Apply, keep track of your approvals, and plan your handover.', button('new-leave', '+ Apply for leave')) + info(balanceLine + '<br>Days are calculated by the server from the school’s configured working week. The return date is not counted.') + (records.length ? table(['Request', 'Type & dates', 'Days', 'Status', 'Actions'], records.slice().reverse().map(record => `<tr><td><strong>${esc(record.reference)}</strong><small>${esc(record.staffId)}</small></td><td>${esc(pretty(record.typeId))}<small>${date(record.startDate)} → ${date(record.returnDate)}</small></td><td>${record.days}</td><td>${status(record.status)}</td><td><div class="p-row-actions">${button('view-leave', 'Details', record.id, true)}${record.ownerId === context.user.id && ['DRAFT', 'RETURNED'].includes(record.status) ? button('edit-leave', 'Correct', record.id, true) + button('submit-leave', 'Submit', record.id) : ''}${record.ownerId === context.user.id && ['DRAFT', 'RETURNED', 'SUBMITTED', 'UNDER_REVIEW', 'APPROVED'].includes(record.status) ? button('cancel-leave', 'Cancel', record.id, true) : ''}</div></td></tr>`)) : card('My leave requests', empty('Time away, without the paperwork.', 'Your leave applications and their current status will appear here.', 'calendar')));
+  }
+  async function renderContracts() {
+    const records = await api('/api/contracts'); state.rows = records;
+    return toolbar('Private, controlled employment records. Only your authorised records are shown.', has('contract.create') ? button('new-contract', '+ Draft a contract') : '') + info('Contracts follow administration review, optional finance review, management approval, signatory attestation and employee acknowledgement. Attestation is not a certified digital-signature service.') + (records.length ? `<div class="p-record-grid">${records.map(record => `<article class="admin-card p-record-card">${status(record.status)}<h2>${esc(record.title)}</h2><p>${esc(record.reference)} · Version ${record.version}</p>${facts({ 'Start date': date(record.startDate), 'Expiry date': date(record.endDate), 'Employee reference': record.ownerId, Document: record.file ? bytes(record.file.size) : '—' })}<div class="p-row-actions">${downloadButton('contract', record.id)}${has('contract.create') && ['DRAFT', 'RETURNED'].includes(record.status) ? button('submit-contract', 'Submit for review', record.id) + button('edit-contract', 'Revise', record.id, true) : ''}${has('contract.create') && ['ACTIVE', 'EXPIRED'].includes(record.status) ? button('renew-contract', 'Draft renewal', record.id, true) : ''}${record.status === 'AWAITING_EMPLOYEE' && record.ownerId === context.user.id ? '<a class="p-btn p-btn-primary" href="/portal/approvals">Acknowledge in approval inbox</a>' : ''}</div></article>`).join('')}</div>` : card('My contracts', empty('Your issued contracts will be here.', 'HR drafts and unassigned records are not visible to ordinary employees.', 'lock')));
+  }
+  async function renderDocuments() {
+    const records = await api('/api/documents'); state.rows = records;
+    return toolbar('Find the approved version, or prepare a controlled document for review.', has('document.create') ? button('new-document', '+ New document') : '') + uploadHint() + (records.length ? `<div class="p-record-grid">${records.map(record => {
+      const draft = record.draft, current = record.current, version = draft || current;
+      return `<article class="admin-card p-record-card"><div class="p-row-actions">${status(record.classification)}${status(version.status)}</div><h2>${esc(record.title)}</h2><p>${esc(record.documentNumber)} · ${esc(record.category)}</p><p>${esc(record.description)}</p>${facts({ 'Live version': current ? current.version + '.0' : 'Not issued', 'Draft version': draft ? draft.version + '.0' : 'None', 'Review date': date(version.reviewDate), 'Publication date': date(current?.publishedAt) })}<div class="p-row-actions">${current ? downloadButton('document', current.id, 'Download issued version') : ''}${draft ? downloadButton('document', draft.id, 'Review draft') : ''}${draft && ['DRAFT', 'RETURNED'].includes(draft.status) && draft.createdBy === context.user.id ? button('submit-document', 'Submit for review', draft.id) : ''}${draft?.status === 'APPROVED' && has('document.publish') && draft.createdBy !== context.user.id ? button('publish-document', 'Issue approved version', draft.id) : ''}${has('document.create') && (record.ownerId === context.user.id || record.createdBy === context.user.id) ? button('version-document', 'New version', record.id, true) : ''}${current && has('document.archive') ? button('archive-document', 'Archive', current.id, true) : ''}</div><details class="p-details"><summary><p>Version references & archive (${record.versions.length})</p></summary><p class="p-small">Use a private version reference when linking consent evidence.</p><p class="p-code">${esc(version.id)}</p>${record.versions.map(item => `<p class="p-small">Version ${item.version}.0 · ${pretty(item.status)} ${downloadButton('document', item.id, 'Download')}</p>`).join('')}</details></article>`;
+    }).join('')}</div>` : card('Document library', empty('One trusted place for school documents.', 'Only issued documents or drafts you are authorised to review appear here.', 'book')));
+  }
+  async function renderNotices() {
+    const records = await api('/api/notices'); state.rows = records;
+    return toolbar('The right information, for the right people. Open a notice to read it.', has('notice.create') ? button('new-notice', '+ Write a notice') : '') + (records.length ? card('School notice board', records.slice().reverse().map(record => `<details class="p-details" data-notice="${esc(record.id)}"><summary><div><h3>${esc(record.title)}</h3><p>${esc(record.category)} · ${date(record.publishedAt || record.createdAt)} · Version ${record.version}</p></div><div>${status(record.priority)} ${status(record.status)}</div></summary><div class="p-prose">${esc(record.message)}</div><div class="p-row-actions">${record.acknowledgementRequired && record.status === 'PUBLISHED' ? record.acknowledgement?.acknowledgedAt ? status('Acknowledged') : button('acknowledge-notice', 'I have read and understood', record.id) : ''}${has('notice.publish') && record.status === 'DRAFT' && record.createdBy !== context.user.id ? button('publish-notice', 'Review & publish', record.id) : ''}${has('notice.publish') && record.status === 'PUBLISHED' ? button('notice-report', 'Acknowledgement report', record.id, true) : ''}${record.createdBy === context.user.id && has('notice.create') ? button('edit-notice', 'Create revision', record.id, true) : ''}</div></details>`).join('')) : card('School notice board', empty('You’re up to date.', 'Notices appear here when they are published for your audience.', 'mega')));
+  }
+  async function renderCalendar() {
+    const records = await api('/api/calendar'); state.rows = records;
+    return toolbar('Staff meetings, training and school dates for your audience. Public events use the reviewed CMS workflow.', has('calendar.manage') ? button('new-event', '+ Add staff event') : '') + (records.length ? table(['Event', 'Date', 'Category', 'Audience'], records.sort((a, b) => a.date.localeCompare(b.date)).map(record => `<tr><td><strong>${esc(record.title)}</strong><small>${esc(record.description)}</small></td><td>${date(record.date)}</td><td>${esc(record.category)}</td><td>${status(record.audience.type)}</td></tr>`)) : card('Calendar & training', empty('There are no dates in your calendar yet.', 'Management can add staff events or target selected departments and individuals.', 'calendar')));
+  }
+  async function renderApprovals(requests = false) {
+    const records = await api(requests ? '/api/requests' : '/api/approvals'); state.rows = records;
+    return toolbar(requests ? 'A traceable history of your authorised requests and decisions.' : 'Only requests assigned to your current approval stage appear here. You cannot approve your own work.') + (records.length ? `<div class="p-stack">${records.map(record => `<article class="admin-card p-card"><div class="p-card-head"><div><h2>${esc(record.resource.title || record.resource.reference)}</h2><p class="p-small">${esc(pretty(record.kind))} · Route version ${record.definitionVersion}</p></div>${status(record.status)}</div><div class="p-card-body"><p class="p-small">${record.status === 'PENDING' ? 'Current stage: ' + esc(record.steps[record.stepIndex].label) : 'Completed route: ' + esc(pretty(record.status))}</p>${record.kind === 'LEAVE_REQUEST' ? facts({ 'Staff ID': record.resource.staffId, Type: pretty(record.resource.typeId), From: date(record.resource.startDate), Return: date(record.resource.returnDate), Days: record.resource.days, Handover: record.resource.handover }) + `<p class="p-prose">${esc(record.resource.reason)}</p>` : ''}${record.kind === 'CMS_PUBLICATION' ? `<h3>${esc(record.resource.title)}</h3><p>${esc(record.resource.excerpt)}</p><div class="p-code">${esc(record.resource.body)}</div>` : ''}${record.kind === 'MEDIA_PUBLICATION' ? `<p>${esc(record.resource.alt)}</p><p class="p-small">Check every subject reference, the current channel consent and the caption before approving.</p>` : ''}${record.resource.file ? `<p>${downloadButton({ EMPLOYMENT_CONTRACT: 'contract', CONTROLLED_DOCUMENT: 'document', LEAVE_REQUEST: 'leave', MEDIA_PUBLICATION: 'media' }[record.kind], record.resource.id, 'Open private attachment')}</p>` : ''}${record.decisions.length ? `<details><summary class="p-small">Decision history (${record.decisions.length})</summary><ol class="p-timeline">${record.decisions.map(decision => `<li><strong>${esc(pretty(decision.decision))} · ${esc(decision.stepId)}</strong><small>${date(decision.at)} · ${esc(decision.actorId)}</small><p>${esc(decision.comment)}</p></li>`).join('')}</ol></details>` : ''}${!requests && record.status === 'PENDING' ? `<div class="p-row-actions" style="margin-top:18px">${button('approve', record.steps[record.stepIndex].selector === 'owner' ? 'Acknowledge' : 'Approve', record.id)}${button('return', 'Return for correction', record.id, true)}${button('reject', 'Reject', record.id, true)}${button('comment', 'Comment', record.id, true)}${button('escalate', 'Escalate', record.id, true)}</div>` : ''}</div></article>`).join('')}</div>` : card(requests ? 'My requests' : 'Approval inbox', empty(requests ? 'Your request journey starts here.' : 'Nothing needs your approval right now.', requests ? 'Submit a leave application or a document to see its history.' : 'Requests are routed by responsibility, department and record state — not just your job title.', 'check')));
+  }
+  async function renderCms() {
+    const records = await api('/api/cms'); state.rows = records;
+    return toolbar('Draft → editorial review → approval → separate publication. Live content is preserved while a new draft is prepared.', has('cms.create') ? button('new-content', '+ Create content') + button('school-details', 'School contact details', '', true) : '') + info('Authors, editors, approvers and publishers have separate responsibilities. The author or an editor who changed this revision cannot approve or publish it.') + (records.length ? table(['Content', 'Type / language', 'Workflow', 'Live version', 'Actions'], records.slice().reverse().map(record => `<tr><td><strong>${esc(record.title)}</strong><small>/${esc(record.kind === 'news' ? 'news' : 'pages')}/${esc(record.slug)}</small></td><td>${esc(pretty(record.kind))}<small>${record.language === 'sw' ? 'Kiswahili' : 'English'}</small></td><td>${status(record.status)}<small>Revision ${record.version}</small></td><td>${record.published ? 'v' + record.published.version : 'Not published'}${record.status === 'SCHEDULED' ? '<small>' + date(record.publishAt) + '</small>' : ''}</td><td><div class="p-row-actions">${has('cms.create') && ['DRAFT', 'RETURNED', 'REJECTED', 'PUBLISHED'].includes(record.status) && (record.createdBy === context.user.id || has('cms.edit_any')) ? button('edit-content', 'Edit', record.id, true) : ''}${has('cms.create') && ['DRAFT', 'RETURNED'].includes(record.status) && (record.createdBy === context.user.id || has('cms.edit_any')) ? button('submit-content', 'Submit', record.id) : ''}${has('cms.publish') && record.status === 'APPROVED' ? button('publish-content', 'Publish / schedule', record.id) : ''}${has('cms.archive') && record.status !== 'ARCHIVED' ? button('archive-content', 'Archive', record.id, true) : ''}</div></td></tr>`)) : card('Website content', empty('Good stories begin with a draft.', 'Create news, a page, an event, a vacancy, a homepage banner or an FAQ. Publication requires independent review.', 'pencil')));
+  }
+  async function renderAdmissions(enquiries = false) {
+    const records = await api(enquiries ? '/api/submissions' : '/api/admissions'); state.rows = records;
+    return toolbar(enquiries ? 'A private inbox for contact, school visit and computer-learning enquiries.' : 'An admissions review desk for submitted application requests. This is not a self-service parent portal.') + info('Treat family details as confidential. References can be shared for follow-up; application contents must not be sent over unapproved channels.') + (records.length ? `<div class="p-stack">${records.map(record => `<details class="admin-card p-card p-details"><summary><div><h3>${esc(enquiries ? record.data.name : record.data.child_name)}</h3><p>${esc(record.reference)} · ${esc(record.type)} · ${date(record.createdAt)}</p></div>${status(record.status)}</summary>${facts(Object.fromEntries(Object.entries(record.data).filter(([, value]) => value).map(([key, value]) => [pretty(key), value])))}<p class="p-small" style="margin-top:20px">Privacy acknowledged ${date(record.consent.acceptedAt)} · ${esc(record.consent.policyVersion)}<br>Scheduled deletion: ${date(record.expiresAt)}</p>${record.history.length ? `<ol class="p-timeline">${record.history.map(item => `<li><strong>${esc(pretty(item.to))}</strong><small>${date(item.at)}</small><p>${esc(item.note)}</p></li>`).join('')}</ol>` : ''}${button('enquiry-status', 'Update status', record.id)}</details>`).join('')}</div>` : card(enquiries ? 'Enquiry inbox' : 'Admissions desk', empty('No requests have arrived yet.', 'Public forms create a reference, a private office record, an in-app notice and a durable external-alert job.', 'mail')));
+  }
+  async function renderStaff() {
+    const [profiles, users, balances] = await Promise.all([api('/api/staff'), api('/api/users'), api('/api/leave/balances')]);
+    state.rows = profiles; state.extra.users = users; state.extra.balances = balances;
+    return toolbar('Manage approved employment contact details and recorded leave entitlements. No salary or investigation data is held in staff profiles.', button('new-profile', '+ Staff profile') + button('balance', 'Set leave entitlement', '', true)) + (profiles.length ? table(['Staff member', 'Department', 'Employment', 'Supervisor', 'Actions'], profiles.map(record => `<tr><td><strong>${esc(record.name)}</strong><small>${esc(record.staffId)} · ${esc(record.position)}</small></td><td>${esc(state.meta.departments.find(item => item.id === record.departmentId)?.name || record.departmentId)}</td><td>${esc(record.employmentType)}<small>Since ${date(record.employmentDate)}</small></td><td>${esc(users.find(user => user.id === record.supervisorId)?.name || 'Not assigned')}</td><td>${button('edit-profile', 'Update profile', record.id, true)}</td></tr>`)) : card('People & HR', empty('Connect the people behind the work.', 'Provision accounts first, then add Staff IDs, departments, supervisors and employment details.', 'users')));
+  }
+  async function renderUsers() {
+    const records = await api('/api/users'); state.rows = records;
+    return toolbar('Identity administration is separate from institutional authority. No account includes a built-in password.', has('user.create') ? button('new-user', '+ Create account') : '') + info('New accounts must change their initial password. Privileged users must then enrol MFA. Technical administrators can provision ordinary accounts, but only management can grant business roles. Role changes invalidate existing sessions.') + table(['Account', 'Roles', 'MFA', 'Status', 'Actions'], records.map(record => `<tr><td><strong>${esc(record.name)}</strong><small>${esc(record.username)}</small></td><td>${record.roles.map(role => `<small>${esc(pretty(role))}</small>`).join('')}</td><td>${status(record.mfaEnabled ? 'Enabled' : 'Not enrolled')}</td><td>${status(record.active ? 'Active' : 'Disabled')}</td><td><div class="p-row-actions">${record.id !== context.user.id && has('role.grant') && !record.roles.some(role => ['system_admin', 'ict_officer'].includes(role)) ? button('edit-roles', 'Assign roles', record.id, true) : ''}${record.id !== context.user.id && has('user.manage') ? button('toggle-user', record.active ? 'Disable' : 'Enable', record.id, true) : ''}</div></td></tr>`));
+  }
+  async function renderNotifications() {
+    const records = await api('/api/notifications'); state.rows = records;
+    return toolbar('Updates about the work and notices that concern you.') + (records.length ? card('Notification centre', records.map(record => `<div class="p-notice-line"><span class="p-mini-icon">${icon(record.readAt ? 'check' : 'mega')}</span><div><h3>${esc(record.title)}</h3><p>${date(record.createdAt)}</p><a class="p-text-btn" href="${esc(record.href)}">Open workspace →</a></div>${!record.readAt ? button('read-notification', 'Mark read', record.id, true) : ''}</div>`).join('')) : card('Notification centre', empty('You’re all caught up.', 'We’ll let you know when there’s something for you to see.', 'check')));
+  }
+  async function renderWorkflows() {
+    const records = await api('/api/workflows'); state.rows = records;
+    return toolbar('One shared approval engine. Changes are versioned; submitted requests keep a snapshot of their original route.', has('workflow.configure') ? button('new-workflow', '+ Create approval route') + button('leave-type', 'Leave policy settings', '', true) : '') + info('Self-approval is prohibited. Routes cannot remove final institutional authority. Delegation is not enabled; use an audited escalation and arrange a policy-approved route for new requests.') + `<div class="p-record-grid">${records.map(record => `<article class="admin-card p-record-card">${status(record.kind)}<h2>${esc(record.name)}</h2><p>Definition v${record.version} · <code>${esc(record.id)}</code></p><ol class="p-timeline">${record.steps.map(step => `<li><strong>${esc(step.label)}</strong><p>${esc(pretty(step.selector))}${step.roles?.length ? ' · ' + step.roles.map(pretty).map(esc).join(', ') : ''}</p><small>${esc(step.permission)}${step.condition ? ' · conditional: ' + esc(step.condition) : ''}</small></li>`).join('')}</ol>${has('workflow.configure') ? button('edit-workflow', 'Configure next version', record.id, true) : ''}</article>`).join('')}</div>`;
+  }
+  async function renderPrivacy() {
+    const data = await api('/api/privacy'); state.extra.privacy = data; state.rows = [...data.consents, ...data.requests, ...data.incidents];
+    const consents = data.consents.length ? table(['Private pupil ref', 'Guardian / evidence', 'Channels & review', 'Status', 'Actions'], data.consents.slice().reverse().map(record => `<tr><td><strong>${esc(record.studentRef)}</strong><small>${date(record.grantedAt)}</small></td><td>${esc(record.guardianName)}<small>${esc(record.relationship)}</small>${downloadButton('document', record.evidenceVersionId, 'Consent evidence')}</td><td>${Object.entries(record.channels).filter(([, value]) => value).map(([key]) => `<small>${esc(pretty(key))}</small>`).join('') || '<small>All channels refused</small>'}<small>Review by ${date(record.expiresAt)}</small></td><td>${status(record.status)}</td><td>${record.status !== 'WITHDRAWN' ? button('withdraw-consent', 'Record withdrawal', record.id, true) : record.withdrawal.externalChannels.length && !record.withdrawal.externalRemovalConfirmedAt ? button('confirm-removal', 'Confirm external removal', record.id) : status('Removal recorded')}${record.withdrawal ? `<small>Deadline ${date(record.withdrawal.removalDeadline)}</small>` : ''}</td></tr>`)) : card('Media consent register', empty('Consent is specific, not assumed.', 'Upload confidential signed evidence, verify guardian authority, then record a separate choice for each channel.', 'shield'));
+    const requests = card('Private requests & safeguarding concerns', data.requests.length ? data.requests.map(record => `<details class="p-details"><summary><div><h3>${esc(record.type)}</h3><p>${esc(record.reference)} · ${date(record.createdAt)}</p></div>${status(record.status)}</summary>${facts(record.data)}<p class="p-small">Verify identity and authority before disclosing or changing records.</p>${button('privacy-status', 'Record response / status', record.id)}</details>`).join('') : empty('No private requests to review.', 'Verified privacy and safeguarding reports are kept out of the general enquiries inbox.', 'lock'));
+    const incidents = card('Incident register', data.incidents.length ? data.incidents.map(record => `<details class="p-details"><summary><div><h3>${esc(record.title)}</h3><p>${esc(record.severity)} · ${date(record.createdAt)}</p></div>${status(record.status)}</summary><div class="p-prose">${esc(record.description)}</div>${record.actions.map(item => `<p class="p-small">${date(item.at)} · ${esc(item.comment)}</p>`).join('')}${button('incident-status', 'Log incident action', record.id, true)}</details>`).join('') : empty('No incidents recorded.', 'Document containment, follow-up and any legally required notifications in the school’s response procedure.', 'shield'));
+    return toolbar('Restricted privacy records. Guardians must be verified before consent or data rights are actioned.', button('new-consent', '+ Record consent') + button('new-incident', 'Log an incident', '', true)) + info('Withdrawal immediately blocks website media. External posts and printed materials require human follow-up within 48 hours. This tooling is not a legal compliance certification.', true) + `<div class="p-stack">${consents}${requests}${incidents}</div>`;
+  }
+  async function renderMedia() {
+    const records = await api('/api/media'); state.rows = records;
+    return toolbar('Only independently approved, consented school media can become public.', has('media.create') ? button('new-media', '+ Upload for review', '', false, !state.meta.binaryUploadsEnabled ? 'disabled title="Configure malware scanning first"' : '') : '') + info(state.meta.binaryUploadsEnabled ? 'Images are scanned, re-encoded to remove metadata, and held privately during review. Identify every depicted child using a private consent reference — never in a public caption.' : 'Photo uploads are disabled until malware scanning is configured. No legacy child photos are published. Ask ICT to complete the upload-scanner setup.', !state.meta.binaryUploadsEnabled) + (records.length ? table(['Media', 'Consent', 'Workflow', 'Actions'], records.map(record => `<tr><td><strong>${esc(record.title)}</strong><small>${esc(record.alt)}</small><small>${esc(record.id)}</small></td><td>${status(record.consentCurrent ? 'Current' : 'Missing / expired')}</td><td>${status(record.status)}</td><td><div class="p-row-actions">${downloadButton('media', record.id, 'Review image')}${record.createdBy === context.user.id && ['DRAFT', 'RETURNED'].includes(record.status) ? button('submit-media', 'Submit', record.id) : ''}${has('media.publish') && record.status === 'APPROVED' ? button('publish-media', 'Publish', record.id) : ''}${has('media.publish') ? button('archive-media', 'Archive', record.id, true) : ''}</div></td></tr>`)) : card('Media library', empty('School moments, shared responsibly.', 'New media stays private until it passes consent, privacy and publication review.', 'camera')));
+  }
+  async function renderAudit() {
+    const data = await api('/api/audit'); state.extra.audit = data;
+    return toolbar('Append-only security and decision history. Record bodies, passwords and uploaded file contents are never logged.') + info(`<strong>${data.integrityValid ? 'Audit chain verified.' : 'Warning: audit-chain integrity failed. Investigate immediately.'}</strong> Showing the latest ${data.records.length} of ${data.total} authorised events.${data.limitedToAssignedScopes ? ' Your auditor account sees only resource types explicitly assigned by management.' : ''}`, !data.integrityValid) + (data.records.length ? table(['Time', 'Actor', 'Action', 'Resource', 'Result'], data.records.map(record => `<tr><td>${esc(new Date(record.at).toLocaleString('en-GB'))}</td><td><code>${esc(record.userId)}</code></td><td>${esc(record.action)}</td><td><small>${esc(record.resourceType)}</small><code>${esc(record.resourceId)}</code></td><td>${status(record.result)}</td></tr>`)) : card('Audit trail', empty('No events in your assigned scope.', 'Auditors need explicit resource scopes from management. Nothing is exposed by default.', 'eye')));
+  }
+  async function renderReports() {
+    const data = await api('/api/reports'); state.extra.report = data;
+    return toolbar('Live operational counts based only on records you’re authorised to report on.', button('export-report', 'Export authorised report', '', true)) + `<div class="p-record-grid">${Object.entries(data).map(([name, report]) => `<article class="admin-card p-record-card"><span class="p-eyebrow">${esc(pretty(name))}</span><h2>${esc(pretty(name))} overview</h2>${facts(Object.fromEntries(Object.entries(report).filter(([, value]) => typeof value !== 'object').map(([key, value]) => [pretty(key.replace(/([A-Z])/g, ' $1')), typeof value === 'boolean' ? value ? 'Yes' : 'No' : value])))}${report.statuses ? '<div class="p-code">' + Object.entries(report.statuses).map(([key, count]) => esc(pretty(key)) + ': ' + count).join('\n') + '</div>' : ''}${report.expiringContracts ? `<p class="p-small" style="margin-top:18px">${report.expiringContracts.length} authorised contracts expire within 90 days.</p>` : ''}</article>`).join('')}</div>` + info('Admissions counts represent stored enquiries, visit requests and enrolment decisions — not an attributed marketing funnel. No visitor tracking, payment reconciliation or attendance analytics is enabled.');
+  }
+  async function renderSystem() {
+    const data = await api('/api/system'); state.rows = data.outbox;
+    return toolbar('Technical operations only. Business records remain outside this workspace.') + card('Service configuration', `<div class="p-card-body">${facts({ Environment: data.environment, Database: data.database, 'Office alerts': data.officeAlertsConfigured ? 'Configured' : 'Provider not configured', 'Malware scanner': data.scannerConfigured ? 'Configured' : 'Binary uploads disabled', 'Last maintenance run': data.maintenance?.lastSuccessAt ? new Date(data.maintenance.lastSuccessAt).toLocaleString() : 'Not run yet', 'Session policy': '30-minute idle / 8-hour maximum' })}</div>`) + `<div style="margin-top:24px">${data.outbox.length ? table(['Delivery job', 'Created', 'Status', 'Attempts', 'Actions'], data.outbox.slice().reverse().map(record => `<tr><td><code>${esc(record.id.slice(0, 17))}…</code></td><td>${date(record.createdAt)}</td><td>${status(record.status)}${record.lastStatus ? '<small>HTTP ' + record.lastStatus + '</small>' : ''}</td><td>${record.attempts} / 8</td><td>${['PENDING', 'RETRY', 'FAILED'].includes(record.status) ? button('retry-alert', 'Retry delivery', record.id, true) : '—'}</td></tr>`)) : card('Office alert queue', empty('No messages in the queue.', 'Public forms create durable, signed alert jobs. Failed deliveries retry with backoff.', 'mail'))}</div>` + info('The system never claims an alert was delivered until the configured provider returns success. Verify actual email/SMS/WhatsApp receipt, backups and recovery in staging before launch.');
+  }
+  async function renderSearch() {
+    const params = new URLSearchParams(window.location.search);
+    const q = params.get('q') || '';
+    const records = q.length >= 2 ? await api('/api/search?' + params) : [];
+    return `<form class="p-search-form" action="/portal/search" method="get"><input name="q" aria-label="Search terms" placeholder="Search documents, notices, people…" value="${esc(q)}" minlength="2" maxlength="150" required><select name="classification" aria-label="Classification"><option value="">All classifications</option>${state.meta.classifications.map(item => `<option ${params.get('classification') === item ? 'selected' : ''}>${item}</option>`).join('')}</select><button class="p-btn p-btn-primary" type="submit">${icon('eye')} Search</button></form>` + info('Search returns only authorised records. Public results do not reveal draft text or confidential metadata.') + (records.length ? card('Search results', records.map(record => `<a class="p-search-result" href="${esc(record.url)}">${status(record.type)}<h2>${esc(record.title)}</h2><p>${esc(record.summary)}</p></a>`).join('')) : card('Search the platform', empty(q ? 'No authorised results match that search.' : 'Find the right information.', 'Search by title, document number, notice text or an authorised staff name.', 'eye')));
+  }
+  async function renderHelp() {
+    return `<div class="p-columns"><div class="p-stack">${card('A safe, useful school workspace', `<div class="p-card-body"><h3>Work within your responsibilities</h3><p class="p-small">Your access comes from your role and the specific record. Technical administrator does not mean HR officer or business approver. If something is missing, ask the responsible school manager — do not share accounts.</p><h3>Keep documents in the right place</h3><p class="p-small">Use the controlled library, not public file URLs. Download links are tied to your session, expire after 60 seconds, and work once. Keep downloaded records on approved devices only.</p><h3>Corrections and approvals</h3><p class="p-small">Return requests for correction rather than silently changing approved records. Published documents are versioned and archived. Every decision is recorded.</p><h3>Need human help?</h3><p class="p-small">Contact your supervisor or HR for employment records, the privacy officer for personal-data concerns, and ICT for account and service issues. Passwords are never requested in chat or by this help page.</p><p><a class="p-text-btn" href="/privacy">Read the privacy notice →</a></p></div>`)}${card('Change your password', `<form id="security-password" class="p-card-body">${field('currentPassword', 'Current password', '', 'password')}${field('password', 'New password', '', 'password')}${field('confirmPassword', 'Confirm new password', '', 'password')}<p class="p-form-status" role="alert" hidden></p><button class="p-btn p-btn-primary" type="submit">Update password</button></form>`)}</div><div class="p-stack">${info('Sessions expire after 30 minutes of inactivity, and at most eight hours after sign-in. Sign out on shared devices. Private records are not available offline.')}${card('Rollout boundaries', `<div class="p-card-body"><p class="p-small">This release includes the public website, staff workspace, reviewed publishing, leave, contracts, controlled documents, notices, admissions review and privacy registers.</p><p class="p-small">Verified family portals, fees and payments, attendance and results, external messaging delivery and native mobile apps require their own approved rollout. No unbuilt academic service is presented as live.</p></div>`)}</div></div>`;
+  }
+  const renderers = { dashboard: renderDashboard, profile: renderProfile, leave: renderLeave, contracts: renderContracts, documents: renderDocuments, notices: renderNotices, calendar: renderCalendar, approvals: () => renderApprovals(false), requests: () => renderApprovals(true), cms: renderCms, admissions: () => renderAdmissions(false), enquiries: () => renderAdmissions(true), staff: renderStaff, users: renderUsers, notifications: renderNotifications, workflows: renderWorkflows, privacy: renderPrivacy, media: renderMedia, audit: renderAudit, reports: renderReports, system: renderSystem, search: renderSearch, help: renderHelp };
+  async function loadPage() {
+    const target = document.getElementById('page-content');
+    try {
+      state.meta = await api('/api/meta');
+      target.innerHTML = await (renderers[context.section] || renderDashboard)();
+      document.querySelectorAll('[data-notice]').forEach(details => details.addEventListener('toggle', async () => {
+        if (!details.open) return;
+        const record = state.rows.find(item => item.id === details.dataset.notice);
+        if (record?.status === 'PUBLISHED') try { await api(`/api/notices/${record.id}/acknowledge`, 'POST', { version: record.version, acknowledge: false }); } catch { /* A publisher viewing an off-audience draft does not create a receipt. */ }
+      }));
+      const securityForm = document.getElementById('security-password');
+      if (securityForm) securityForm.addEventListener('submit', async event => { event.preventDefault(); const submit = securityForm.querySelector('button'); submit.disabled = true; try { await api('/api/auth/password', 'POST', Object.fromEntries(new FormData(securityForm))); window.location.assign('/portal'); } catch (error) { formError(securityForm, error); submit.disabled = false; } });
+    } catch (error) { target.innerHTML = `<div class="p-error"><h2>We couldn’t open this workspace.</h2><p>${esc(error.message)}</p>${button('refresh', 'Try again', '', true)} <a class="p-btn p-btn-secondary" href="/portal">Back to overview</a></div>`; }
+  }
+  function audienceFields(record = {}) {
+    const audience = record.audience || {};
+    return select('audienceType', 'Audience', ['ALL_STAFF', 'SELECTED'], audience.type || 'ALL_STAFF') + group(field('audienceRoles', 'Role keys (comma-separated)', (audience.roles || []).join(', '), 'text', false, 'For selected audiences, e.g. teacher, head_of_department'), field('audienceDepartments', 'Department IDs (comma-separated)', (audience.departmentIds || []).join(', '), 'text', false)) + field('audienceUsers', 'Named user IDs (comma-separated)', (audience.userIds || []).join(', '), 'text', false);
+  }
+  function contentFields(record = {}) {
+    return group(select('kind', 'Content type', ['news', 'page', 'event', 'vacancy', 'faq', 'banner'], record.kind || 'news'), select('language', 'Language', [{ id: 'en', name: 'English' }, { id: 'sw', name: 'Kiswahili' }], record.language || 'en')) + field('title', 'Title', record.title) + group(field('slug', 'Permanent URL slug', record.slug || '', 'text', false), field('category', 'Category', record.category || 'School News')) + area('excerpt', 'Short summary', record.excerpt) + area('body', 'Content (plain text)', record.body, true, 'Separate paragraphs with a blank line. HTML and scripts are not rendered.') + group(field('eventDate', 'Event date (required for events)', record.eventDate || '', 'date', false), field('mediaId', 'Approved media ID', record.mediaId || '', 'text', false)) + field('seoTitle', 'SEO title (up to 70 characters)', record.seoTitle || '', 'text', false) + field('seoDescription', 'SEO description (up to 170 characters)', record.seoDescription || '', 'text', false);
+  }
+  function leaveFields(record = {}) {
+    return select('typeId', 'Leave type', state.meta.leaveTypes.filter(type => type.enabled).map(type => ({ id: type.id, name: type.name })), record.typeId || 'annual') + group(field('startDate', 'First day away', record.startDate || '', 'date'), field('returnDate', 'Return to work', record.returnDate || '', 'date')) + area('reason', 'Reason for leave', record.reason || '') + group(field('handover', 'Handover employee', record.handover || ''), field('emergencyContact', 'Emergency contact', record.emergencyContact || '', 'tel')) + (!record.id ? uploadHint() + field('file', 'Supporting attachment', '', 'file', false) + check('saveDraft', 'Save as a draft; do not submit yet') : '');
+  }
+  function schoolDetails(record) {
+    const settings = state.meta.publicSettings;
+    const value = record ? JSON.parse(record.body) : { officePhone: settings.phones[0].number, headPhone: settings.phones[1].number, whatsappPhone: settings.whatsapp.number, email: settings.email, box: settings.address.box, locationText: settings.locationText, officeHours: settings.officeHours, centreCode: settings.centreCode, mapUrl: settings.mapUrl || '' };
+    return openDialog('school-details', 'Prepare verified school contact details', info('These settings use the same independent editorial, approval and publication process as school news. Never enter a personal home address or an unverified social account.') + group(field('officePhone', 'School office telephone', value.officePhone, 'tel'), field('headPhone', 'Head’s office telephone', value.headPhone, 'tel')) + group(field('whatsappPhone', 'Official WhatsApp telephone', value.whatsappPhone, 'tel'), field('email', 'Verified school email', value.email, 'email')) + group(field('box', 'Postal address', value.box), field('centreCode', 'Examination centre code', value.centreCode)) + field('locationText', 'Public school location', value.locationText) + area('officeHours', 'Office hours and contact guidance', value.officeHours) + field('mapUrl', 'Verified Google Maps link', value.mapUrl || '', 'url', false) + field('facebookUrl', 'Official Facebook page', value.facebookUrl || '', 'url', false) + field('instagramUrl', 'Official Instagram account', value.instagramUrl || '', 'url', false) + field('youtubeUrl', 'Official YouTube channel', value.youtubeUrl || '', 'url', false) + check('detailsVerified', 'The school has verified these contact details and every link.', false, true), record);
+  }
+  async function openForm(action, id) {
+    const record = state.rows.find(item => item.id === id);
+    switch (action) {
+      case 'new-leave': return openDialog('leave', 'Plan your time away', leaveFields());
+      case 'edit-leave': return openDialog('leave-edit', 'Correct your leave request', leaveFields(record), record);
+      case 'view-leave':
+        openDialog('view', 'Leave request details', facts({ Reference: record.reference, Staff: record.staffId, Type: pretty(record.typeId), Days: record.days, Start: date(record.startDate), Return: date(record.returnDate), Handover: record.handover, 'Emergency contact': record.emergencyContact }) + `<div class="p-code">${esc(record.reason)}</div>${record.file ? downloadButton('leave', record.id) : ''}`, record);
+        document.querySelector('#record-form button[type=submit]').hidden = true;
+        return;
+      case 'new-content': return openDialog('content', 'A new story starts here', contentFields());
+      case 'edit-content': if (record.kind === 'settings') return schoolDetails(record); return openDialog('content', 'Prepare a content revision', contentFields(record), record);
+      case 'school-details': return schoolDetails(state.rows.find(item => item.kind === 'settings' && item.slug === 'school-contact'));
+      case 'publish-content': return openDialog('publish-content', 'Publish approved content', info('This revision has completed independent review. Publish now or choose a future publication time. A media consent withdrawal will prevent scheduled publication.') + field('publishAt', 'Publication time (leave empty to publish now)', '', 'datetime-local', false), record);
+      case 'new-notice': case 'edit-notice': {
+        const item = record || {};
+        return openDialog('notice', record ? 'Revise a staff notice' : 'Share an update', field('title', 'Notice title', item.title) + area('message', 'Message', item.message) + group(select('category', 'Category', ['General', 'Academic', 'HR', 'Administration', 'ICT', 'Meetings', 'Training', 'Events', 'Emergency', 'Deadlines'], item.category || 'General'), select('priority', 'Priority', ['Urgent', 'Important', 'Information', 'General'], item.priority || 'Information')) + field('expiresAt', 'Expiry date', item.expiresAt || '', 'date', false) + audienceFields(item) + check('acknowledgementRequired', 'Require “I have read and understood” acknowledgement', item.acknowledgementRequired), record);
+      }
+      case 'new-event': return openDialog('event', 'Add a school-work calendar date', field('title', 'Event title') + group(field('date', 'Date', '', 'date'), select('category', 'Category', ['School', 'Meeting', 'Training', 'Examination', 'Worship', 'Deadline', 'Holiday', 'Sports'], 'School')) + area('description', 'Details', '', false) + audienceFields());
+      case 'new-user': {
+        const roles = has('role.grant') ? Object.entries(state.meta.roles).filter(([key]) => !['system_admin', 'ict_officer', 'parent', 'student'].includes(key)).map(([id, name]) => ({ id, name })) : [{ id: 'supporting_staff', name: 'Ordinary staff — management grants additional roles' }];
+        return openDialog('user', 'Provision a school account', info('Use an individual account and a unique temporary password. Deliver credentials in person or via an approved secure channel. Never put them in a public document.') + field('name', 'Full name') + field('username', 'Username', '', 'text', true, '3–64 lowercase letters, numbers, dots or hyphens.') + select('role', 'Initial role', roles, 'supporting_staff') + field('password', 'Unique temporary password', '', 'password'));
+      }
+      case 'edit-roles': return openDialog('roles', 'Grant institutional responsibilities', info('Management approval is recorded. All existing sessions are revoked; MFA is required before the new privileged role can be used.') + area('roles', 'Role keys (comma-separated)', record.roles.join(', '), true, Object.keys(state.meta.roles).filter(role => !['system_admin', 'ict_officer'].includes(role)).join(', ')) + field('auditScopes', 'Auditor resource scopes', (record.auditScopes || []).join(', '), 'text', false, 'Auditors see nothing by default. Example: document_version, notice, user'), record);
+      case 'new-profile': case 'edit-profile': {
+        const users = state.extra.users || await api('/api/users'); state.extra.users = users;
+        const item = record || {};
+        const employees = users.filter(user => user.permissions.includes('staff.view_self'));
+        const supervisors = users.filter(user => user.permissions.includes('leave.review') && user.id !== item.id);
+        return openDialog('profile', record ? 'Update staff profile' : 'Connect a staff profile', select('userId', 'Staff account', employees, item.id) + group(field('staffId', 'Staff ID', item.staffId), field('position', 'Position', item.position)) + group(select('departmentId', 'Department', state.meta.departments, item.departmentId), select('employmentType', 'Employment type', ['Permanent', 'Contract', 'Temporary'], item.employmentType || 'Permanent')) + group(field('employmentDate', 'Employment date', item.employmentDate || '', 'date'), select('supervisorId', 'Supervisor', supervisors, item.supervisorId, false)) + group(field('email', 'Official email', item.email || '', 'email', false), field('phone', 'Official telephone', item.phone || '', 'tel', false)), record);
+      }
+      case 'balance': return openDialog('balance', 'Record an approved leave entitlement', info('Only approved entitlements belong here. Used and reserved days are calculated by the system and cannot be edited in this form.') + select('userId', 'Staff member', state.rows, '') + group(select('typeId', 'Leave type', state.meta.leaveTypes.map(type => ({ id: type.id, name: type.name })), 'annual'), field('year', 'Year', new Date().getFullYear(), 'number')) + field('entitledDays', 'Approved entitlement (days)', '', 'number'));
+      case 'new-contract': case 'renew-contract': case 'edit-contract': {
+        const profiles = await api('/api/staff');
+        const item = record || {};
+        return openDialog(action === 'edit-contract' ? 'contract-edit' : 'contract', action === 'renew-contract' ? 'Draft a contract renewal' : action === 'edit-contract' ? 'Revise a returned contract' : 'Draft a private contract', uploadHint() + select('ownerId', 'Employee', profiles, item.ownerId || '') + field('title', 'Contract / employment document title', item.title || '') + group(field('startDate', 'Start date', action === 'edit-contract' ? item.startDate : '', 'date'), field('endDate', 'Expiry date', action === 'edit-contract' ? item.endDate : '', 'date')) + check('financialReview', 'Financial terms require a Finance Officer review', item.financialReview) + field('file', 'Contract document', '', 'file') + (action === 'renew-contract' ? info('This creates a new controlled contract. The previous contract remains available and is superseded only after the renewal becomes active.') : ''), record);
+      }
+      case 'new-document': case 'version-document': {
+        const item = record || {};
+        const base = record ? info(`<strong>${esc(item.documentNumber)} · ${esc(item.title)}</strong><br>Classification remains ${esc(pretty(item.classification))}. The issued version stays available during review.`) : group(field('documentNumber', 'Document number', '', 'text', true, 'Example: ALPHA-HR-POL-001'), select('classification', 'Classification', state.meta.classifications.filter(level => level !== 'CONFIDENTIAL' || has('document.confidential')).filter(level => level !== 'HIGHLY_CONFIDENTIAL' || has('document.high_confidential')), 'INTERNAL')) + field('title', 'Document title') + select('category', 'Category', ['Admissions', 'Parents', 'Academic', 'Careers', 'Public policies', 'HR', 'Administration', 'ICT', 'Child protection', 'Safety'], 'Administration') + area('description', 'Description', '', false) + group(field('accessRoles', 'Allowed role keys', '', 'text', false, 'Required for confidential reviewers, e.g. hr_officer, head_teacher'), field('accessDepartments', 'Allowed department IDs', '', 'text', false, 'Restricted documents only.')) + field('accessUsers', 'Named user IDs', '', 'text', false);
+        return openDialog('document', record ? 'Create a controlled version' : 'Prepare a school document', uploadHint() + base + group(field('effectiveDate', 'Effective date', '', 'date', false), field('reviewDate', 'Review date', '', 'date', false)) + field('expiryDate', 'Expiry date', '', 'date', false) + area('changeSummary', 'Version / change summary') + field('file', 'Document file', '', 'file'), record);
+      }
+      case 'approve': case 'return': case 'reject': case 'comment': case 'escalate': {
+        const decision = { approve: 'APPROVE', return: 'RETURN', reject: 'REJECT', comment: 'COMMENT', escalate: 'ESCALATE' }[action];
+        const step = record.steps[record.stepIndex];
+        return openDialog('decision', `${pretty(decision)} · ${step.label}`, info(`${esc(record.resource.title || record.resource.reference)}<br>The decision will be recorded against the current stage and your session. ${step.permission === 'contract.sign' || step.selector === 'owner' ? 'Enter your full name and acknowledgement in the comment as an attestation.' : ''}`) + `<input type="hidden" name="decision" value="${decision}">` + area('comment', 'Decision comment / attestation'), record);
+      }
+      case 'enquiry-status': {
+        const transitions = context.section === 'admissions' ? { SUBMITTED: ['DOCUMENTS_REQUIRED', 'UNDER_REVIEW'], DOCUMENTS_REQUIRED: ['UNDER_REVIEW', 'DECLINED'], UNDER_REVIEW: ['DOCUMENTS_REQUIRED', 'ASSESSMENT', 'ACCEPTED', 'WAITLISTED', 'DECLINED'], ASSESSMENT: ['DOCUMENTS_REQUIRED', 'ACCEPTED', 'WAITLISTED', 'DECLINED'], ACCEPTED: ['ENROLLED', 'DECLINED'], WAITLISTED: ['UNDER_REVIEW', 'ACCEPTED', 'DECLINED'], DECLINED: [], ENROLLED: [] } : { NEW: ['IN_PROGRESS', 'CLOSED'], IN_PROGRESS: ['CLOSED'], CLOSED: ['IN_PROGRESS'] };
+        const choices = transitions[record.status] || [];
+        if (!choices.length) return toast('This request is in its final state. Contact management about corrections.');
+        return openDialog('enquiry-status', 'Record the next admissions / office step', info(`${esc(record.reference)} · Current status: ${esc(pretty(record.status))}`) + select('status', 'Next status', choices, choices[0]) + area('comment', 'Office note / reason'), record);
+      }
+      case 'new-workflow': case 'edit-workflow': {
+        const item = record || state.rows[0];
+        return openDialog('workflow', record ? 'Configure a new route version' : 'Define an approval route', info('Existing requests retain their route snapshot. Mandatory review, final authority, author separation and employee acknowledgement cannot be bypassed.') + (!record ? field('id', 'Unique route ID', '', 'text', true, 'Lowercase words and hyphens, e.g. leave-emergency') + select('kind', 'Process', ['LEAVE_REQUEST', 'EMPLOYMENT_CONTRACT', 'CONTROLLED_DOCUMENT', 'CMS_PUBLICATION', 'MEDIA_PUBLICATION'], item.kind) : '') + field('name', 'Route name', record?.name || '') + area('steps', 'Ordered workflow steps (JSON)', JSON.stringify(item.steps, null, 2), true, 'Selectors: role, supervisor, department, owner. Use the permissions shown in the route reference.'), record);
+      }
+      case 'leave-type': return openDialog('leave-type', 'Configure a leave policy', select('typeId', 'Leave type', state.meta.leaveTypes.map(item => ({ id: item.id, name: item.name })), 'annual') + select('workflowId', 'Approval route', state.rows.filter(item => item.kind === 'LEAVE_REQUEST').map(item => ({ id: item.id, name: item.name })), 'leave-standard') + field('nonWorkingDays', 'Nonworking weekdays', '0, 6', 'text', false, '0 = Sunday, 1 = Monday, …, 6 = Saturday. This is school policy, not legal advice.') + check('deductsBalance', 'Deduct days from a recorded entitlement', true) + check('enabled', 'Enable this leave type', true));
+      case 'new-consent': {
+        const documents = await api('/api/documents');
+        const evidence = documents.flatMap(item => [item.current, item.draft].filter(Boolean)).filter(item => ['CONFIDENTIAL', 'HIGHLY_CONFIDENTIAL'].includes(item.classification)).map(item => ({ id: item.id, name: `${item.documentNumber} · v${item.version}.0 · ${item.title}` }));
+        return openDialog('consent', 'Record verified guardian consent', info('First upload signed evidence as a confidential document in the Document library. Use a private pupil reference here — never a child’s name in public media.') + group(field('studentRef', 'Private pupil reference'), field('guardianName', 'Guardian name')) + select('relationship', 'Verified relationship', ['Parent', 'Legal guardian'], 'Parent') + select('evidenceVersionId', 'Signed consent evidence', evidence) + group(field('grantedAt', 'Date granted', new Date().toISOString().slice(0, 10), 'date'), field('expiresAt', 'Review / expiry date (within one year)', '', 'date')) + `<div class="p-checks">${[['website', 'Website'], ['facebook', 'Facebook'], ['instagram', 'Instagram'], ['youtube', 'YouTube'], ['print', 'Printed materials'], ['externalPromotion', 'External promotion']].map(([key, label]) => check(key, 'Grant: ' + label)).join('')}</div>` + info('Unchecked channels are recorded as refused. Each grant is specific to that channel.') + check('authorityVerified', 'I have verified this guardian’s authority and the signed evidence.', false, true));
+      }
+      case 'withdraw-consent': return openDialog('withdraw-consent', 'Withdraw verified media consent', info('Website media for this child is immediately blocked. Confirm removal from external channels within 48 hours. Verify the requesting guardian before proceeding.', true) + area('reason', 'Verified withdrawal reason'), record);
+      case 'confirm-removal': return openDialog('confirm-removal', 'Confirm external media removal', info('Confirm that authorised staff removed every affected external post or promotional use. This is an accountable human attestation, not an automated provider deletion.') + area('comment', 'Removal evidence / follow-up note'), record);
+      case 'privacy-status': return openDialog('privacy-status', 'Update private request', select('status', 'Status', ['UNDER_REVIEW', 'VERIFICATION_REQUIRED', 'RESOLVED'], 'UNDER_REVIEW') + area('comment', 'Restricted response / verification note'), record);
+      case 'new-incident': return openDialog('incident', 'Record a privacy incident', field('title', 'Incident title') + select('severity', 'Severity', ['Low', 'Medium', 'High', 'Critical'], 'Medium') + area('description', 'Known facts and immediate response'));
+      case 'incident-status': return openDialog('incident-status', 'Log an incident response action', select('status', 'Status', ['OPEN', 'INVESTIGATING', 'CONTAINED', 'CLOSED'], record.status) + area('comment', 'Action taken, authority and follow-up'), record);
+      case 'new-media': return openDialog('media', 'Prepare a school photograph for review', field('title', 'Public activity caption') + field('alt', 'Accessible image description') + field('category', 'Gallery category') + field('file', 'JPEG / PNG image', '', 'file').replace('accept=".txt,.pdf"', 'accept=".jpg,.jpeg,.png"') + check('childrenPresent', 'Children are depicted in this photograph') + field('studentRefs', 'Every depicted child’s private consent reference', '', 'text', false, 'Comma-separated. Required if children are depicted.') + check('subjectsVerified', 'I have verified every person depicted and the applicable consent.', false, true) + check('noChildNames', 'Neither the caption nor the description names any child.', false, true));
+    }
+    return false;
+  }
+  async function handleAction(element) {
+    const action = element.dataset.action, id = element.dataset.id || '';
+    const record = state.rows.find(item => item.id === id);
+    if (action === 'refresh') return loadPage();
+    if (action === 'download') {
+      const kind = element.dataset.kind;
+      const endpoint = { document: 'documents', contract: 'contracts', leave: 'leave', media: 'media' }[kind];
+      const grant = await api(`/api/${endpoint}/${encodeURIComponent(id)}/download-link`, 'POST', {});
+      const link = document.createElement('a'); link.href = grant.url; link.download = ''; document.body.append(link); link.click(); link.remove();
+      return;
+    }
+    if (action === 'export-report') {
+      const data = await api('/api/reports');
+      const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
+      const link = document.createElement('a'); link.href = url; link.download = `alpha-authorised-report-${new Date().toISOString().slice(0, 10)}.json`; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+      return toast('Report exported. Store it only on an approved school device.');
+    }
+    if (action === 'notice-report') {
+      const report = await api(`/api/notices/${id}/report`);
+      openDialog('view', 'Notice acknowledgement report', info(`${report.acknowledged} of ${report.total} recipients acknowledged version ${report.version} (${report.percentage}%).`) + table(['Staff member', 'Read', 'Acknowledged'], report.people.map(person => `<tr><td>${esc(person.name)}</td><td>${date(person.acknowledgement?.readAt)}</td><td>${date(person.acknowledgement?.acknowledgedAt)}</td></tr>`)));
+      document.querySelector('#record-form button[type=submit]').hidden = true; return;
+    }
+    let result;
+    if (action === 'submit-leave' || action === 'cancel-leave') {
+      if (action === 'cancel-leave' && !confirm('Cancel this leave request? Reserved or eligible approved days will be released.')) return;
+      result = await api(`/api/leave/${id}/action`, 'POST', { revision: record.revision, action: action === 'submit-leave' ? 'SUBMIT' : 'CANCEL' });
+    } else if (action === 'submit-contract') result = await api(`/api/contracts/${id}/submit`, 'POST', { revision: record.revision });
+    else if (['submit-document', 'publish-document', 'archive-document'].includes(action)) {
+      const document = state.rows.find(item => item.draft?.id === id || item.current?.id === id);
+      const version = document.draft?.id === id ? document.draft : document.current;
+      if (action === 'archive-document' && !confirm('Archive this controlled version? It will not be deleted.')) return;
+      result = await api(`/api/documents/${id}/action`, 'POST', { revision: version.revision, action: { 'submit-document': 'SUBMIT', 'publish-document': 'PUBLISH', 'archive-document': 'ARCHIVE' }[action] });
+    } else if (action === 'publish-notice') result = await api(`/api/notices/${id}/publish`, 'POST', { revision: record.revision });
+    else if (action === 'acknowledge-notice') result = await api(`/api/notices/${id}/acknowledge`, 'POST', { version: record.version, acknowledge: true });
+    else if (action === 'read-notification') result = await api(`/api/notifications/${id}/read`, 'POST', {});
+    else if (action === 'toggle-user') {
+      if (!confirm(`${record.active ? 'Disable' : 'Enable'} this account? Existing sessions will be invalidated.`)) return;
+      result = await api(`/api/users/${id}`, 'PATCH', { revision: record.revision, active: !record.active });
+    } else if (action === 'submit-content' || action === 'archive-content') {
+      if (action === 'archive-content' && !confirm('Archive this item and remove it from the public website?')) return;
+      result = await api(`/api/cms/${id}/action`, 'POST', { revision: record.revision, action: action === 'submit-content' ? 'SUBMIT' : 'ARCHIVE' });
+    } else if (['submit-media', 'publish-media', 'archive-media'].includes(action)) result = await api(`/api/media/${id}/action`, 'POST', { revision: record.revision, action: { 'submit-media': 'SUBMIT', 'publish-media': 'PUBLISH', 'archive-media': 'ARCHIVE' }[action] });
+    else if (action === 'retry-alert') result = await api(`/api/system/alerts/${id}/retry`, 'POST', {});
+    else return openForm(action, id);
+    if (result) { await loadPage(); toast('Saved. The current record and audit trail have been updated.'); }
+  }
+  async function saveDialog(form) {
+    const fd = new FormData(form), raw = Object.fromEntries(fd);
+    const { kind, record } = dialogState;
+    const base = { ...raw, ...(record ? { revision: record.revision } : {}) };
+    delete base.file;
+    const file = await fileValue(fd.get('file'));
+    if (file) base.file = file;
+    const audience = { type: raw.audienceType, roles: comma(raw.audienceRoles), departmentIds: comma(raw.audienceDepartments), userIds: comma(raw.audienceUsers) };
+    const id = record?.id;
+    if (kind === 'leave') return api('/api/leave', 'POST', { ...base, submit: !fd.has('saveDraft') });
+    if (kind === 'leave-edit') return api('/api/leave/' + id, 'PUT', base);
+    if (kind === 'school-details') return api(id ? '/api/cms/' + id : '/api/cms', id ? 'PUT' : 'POST', { revision: record?.revision, kind: 'settings', language: 'en', slug: 'school-contact', title: 'School contact details', excerpt: 'Verified school contact information and official links.', body: JSON.stringify({ ...raw, detailsVerified: fd.has('detailsVerified') }) });
+    if (kind === 'content') return api(id ? '/api/cms/' + id : '/api/cms', id ? 'PUT' : 'POST', base);
+    if (kind === 'publish-content') return api(`/api/cms/${id}/action`, 'POST', { ...base, action: 'PUBLISH', publishAt: raw.publishAt ? new Date(raw.publishAt).toISOString() : '' });
+    if (kind === 'notice') return api(id ? '/api/notices/' + id : '/api/notices', id ? 'PUT' : 'POST', { ...base, audience, acknowledgementRequired: fd.has('acknowledgementRequired') });
+    if (kind === 'event') return api('/api/calendar', 'POST', { ...base, audience });
+    if (kind === 'user') return api('/api/users', 'POST', { ...base, roles: [raw.role] });
+    if (kind === 'roles') return api('/api/users/' + id, 'PATCH', { ...base, roles: comma(raw.roles), auditScopes: comma(raw.auditScopes) });
+    if (kind === 'profile') {
+      if (record && raw.userId !== record.id) throw new Error('A profile revision must keep the same staff account.');
+      return api('/api/staff/' + raw.userId, 'PUT', base);
+    }
+    if (kind === 'balance') {
+      const old = state.extra.balances.find(item => item.userId === raw.userId && item.year === Number(raw.year) && item.typeId === raw.typeId);
+      return api('/api/leave/balances', 'POST', { ...base, year: Number(raw.year), entitledDays: Number(raw.entitledDays), ...(old ? { revision: old.revision } : {}) });
+    }
+    if (kind === 'contract') return api('/api/contracts', 'POST', { ...base, financialReview: fd.has('financialReview'), replacesId: record?.id || '' });
+    if (kind === 'contract-edit') return api('/api/contracts/' + id, 'PUT', { ...base, financialReview: fd.has('financialReview') });
+    if (kind === 'document') return api(record ? `/api/documents/${id}/versions` : '/api/documents', 'POST', { ...base, access: { roles: comma(raw.accessRoles), departmentIds: comma(raw.accessDepartments), userIds: comma(raw.accessUsers) } });
+    if (kind === 'decision') return api(`/api/approvals/${id}/decision`, 'POST', base);
+    if (kind === 'enquiry-status') return api(`/api/${context.section === 'admissions' ? 'admissions' : 'submissions'}/${id}`, 'PATCH', base);
+    if (kind === 'workflow') {
+      let steps; try { steps = JSON.parse(raw.steps); } catch { throw new Error('Workflow steps must be valid JSON.'); }
+      return api(id ? '/api/workflows/' + id : '/api/workflows', id ? 'PUT' : 'POST', { ...base, steps });
+    }
+    if (kind === 'leave-type') {
+      const old = state.meta.leaveTypes.find(item => item.id === raw.typeId);
+      return api('/api/leave/types/' + raw.typeId, 'PUT', { ...base, revision: old.revision, deductsBalance: fd.has('deductsBalance'), enabled: fd.has('enabled'), nonWorkingDays: comma(raw.nonWorkingDays).map(Number) });
+    }
+    if (kind === 'consent') return api('/api/privacy/consents', 'POST', { ...base, channels: Object.fromEntries(['website', 'facebook', 'instagram', 'youtube', 'print', 'externalPromotion'].map(channel => [channel, fd.has(channel)])), authorityVerified: fd.has('authorityVerified') });
+    if (kind === 'withdraw-consent') return api(`/api/privacy/consents/${id}/withdraw`, 'POST', base);
+    if (kind === 'confirm-removal') return api(`/api/privacy/consents/${id}/removal`, 'POST', base);
+    if (kind === 'privacy-status') return api(`/api/privacy/requests/${id}`, 'PATCH', base);
+    if (kind === 'incident') return api('/api/privacy/incidents', 'POST', base);
+    if (kind === 'incident-status') return api(`/api/privacy/incidents/${id}`, 'PATCH', base);
+    if (kind === 'media') return api('/api/media', 'POST', { ...base, studentRefs: comma(raw.studentRefs), childrenPresent: fd.has('childrenPresent'), subjectsVerified: fd.has('subjectsVerified'), noChildNames: fd.has('noChildNames') });
+  }
+  document.addEventListener('click', async event => {
+    const logout = event.target.closest('[data-logout]');
+    if (logout) {
+      logout.disabled = true;
+      try { await api('/api/auth/logout', 'POST', {}); document.getElementById('page-content')?.replaceChildren(); window.location.replace('/portal/login'); }
+      catch (error) { logout.disabled = false; alert(error.message); }
+      return;
+    }
+    const menu = event.target.closest('[data-menu]');
+    if (menu) { const navigation = document.getElementById('portal-navigation'); navigation.classList.toggle('is-open'); menu.setAttribute('aria-expanded', String(navigation.classList.contains('is-open'))); return; }
+    if (event.target.closest('[data-close-dialog]')) { document.getElementById('record-dialog').close(); return; }
+    const action = event.target.closest('[data-action]');
+    if (action) {
+      action.disabled = true;
+      try { await handleAction(action); } catch (error) { const dialog = document.getElementById('record-dialog'); if (dialog.open) formError(document.getElementById('record-form'), error); else toast(error.message); }
+      finally { action.disabled = false; }
+    }
+  });
+  document.addEventListener('keydown', event => { if (event.key === 'Escape') { document.getElementById('portal-navigation')?.classList.remove('is-open'); document.querySelector('[data-menu]')?.setAttribute('aria-expanded', 'false'); } });
+  const authForm = document.getElementById('auth-form');
+  if (authForm) {
+    const frameHelp = document.querySelector('[data-framed-login]');
+    if (frameHelp) frameHelp.hidden = window.self === window.top;
+    authForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      if (!authForm.reportValidity()) return;
+      const submit = authForm.querySelector('button[type=submit]'); submit.disabled = true;
+      authForm.querySelector('.p-form-status').hidden = true;
+      try {
+        const body = Object.fromEntries(new FormData(authForm));
+        const route = { login: 'login', password: 'password', mfa: 'mfa/confirm' }[context.mode];
+        const result = await api('/api/auth/' + route, 'POST', body);
+        if (context.mode === 'login' && result.requiresMfaCode) {
+          authForm.querySelector('[data-login-credentials]').hidden = true;
+          const verification = authForm.querySelector('[data-login-verification]');
+          verification.hidden = false;
+          verification.innerHTML = '<p class="p-small">This account already has two-step verification. Open the authenticator app you previously set up for Alpha and enter its current six-digit code. If you just used a code, wait for the next one.</p><div class="p-field"><label for="sign-in-code">Six-digit verification code</label><input id="sign-in-code" name="mfa_code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6" maxlength="6" required></div><button class="p-text-btn" type="button" data-change-login>Use a different account</button>';
+          submit.textContent = 'Verify & sign in'; submit.disabled = false;
+          verification.querySelector('input').focus();
+          verification.querySelector('[data-change-login]').addEventListener('click', () => {
+            authForm.reset(); verification.replaceChildren(); verification.hidden = true;
+            authForm.querySelector('[data-login-credentials]').hidden = false;
+            authForm.querySelector('.p-form-status').hidden = true;
+            submit.textContent = 'Sign in to workspace'; authForm.elements.username.focus();
+          });
+          return;
+        }
+        authForm.reset();
+        window.location.assign('/portal');
+      } catch (error) { formError(authForm, error); submit.disabled = false; }
+    });
+    document.querySelector('[data-setup-mfa]')?.addEventListener('click', async event => {
+      const button = event.currentTarget; button.disabled = true;
+      try { const result = await api('/api/auth/mfa/setup', 'POST', {}); const panel = document.getElementById('mfa-secret'); panel.querySelector('code').textContent = result.secret; panel.hidden = false; button.textContent = 'Setup key generated'; }
+      catch (error) { formError(authForm, error); button.disabled = false; }
+    });
+  }
+  const recordForm = document.getElementById('record-form');
+  if (recordForm) recordForm.addEventListener('submit', async event => {
+    event.preventDefault();
+    if (!recordForm.reportValidity()) return;
+    const submit = recordForm.querySelector('button[type=submit]'); submit.disabled = true;
+    try { await saveDialog(recordForm); document.getElementById('record-dialog').close(); await loadPage(); toast('Saved securely. Your workspace is up to date.'); }
+    catch (error) { formError(recordForm, error); }
+    finally { submit.disabled = false; }
+  });
+  if (context.mode === 'app') loadPage();
+  window.addEventListener('pageshow', event => { if (event.persisted) { document.body.replaceChildren(); window.location.reload(); } });
+  if ('serviceWorker' in navigator && window.isSecureContext) navigator.serviceWorker.register('/service-worker.js').catch(() => {});
+})();

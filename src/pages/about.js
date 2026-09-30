@@ -6,7 +6,7 @@ const { icon, pic, btn, sectionHead } = X;
 
 function phero(ctx, kicker, title, text, img) {
   return `
-  <section class="phero" style="--ph-img:url('/img/${img}-1600.jpg')">
+  <section class="phero">
     <div class="container">
       <nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a>${icon('chevron')}<span aria-current="page">${esc(kicker)}</span></nav>
       <h1>${esc(title)}</h1>
