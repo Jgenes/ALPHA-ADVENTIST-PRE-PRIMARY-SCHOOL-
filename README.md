@@ -72,6 +72,8 @@ Use separate databases, storage, keys, origins and alert recipients for each env
 
 The public site at **https://alpha-adventist-pre-primary-school.onrender.com** was reachable during a read-only check on **30 September 2026**. The similarly spelled hostname without the hyphen between `alpha` and `adventist` returned “Not Found.” The reachable URL is the development fallback only; production still requires an explicit `BASE_URL`, and the school must confirm its long-term official domain. No live deployment was performed in this implementation session.
 
+For a **free, read-only public preview**, create a separate Render service and set `NODE_ENV=staging`, `PUBLIC_PREVIEW=true`, `BASE_URL` to that service's HTTPS origin, and `DATA_DIR=/tmp/alpha-school-preview`. Do not copy MongoDB environment variables into this service; preview uses temporary SQLite and generated local keys. It displays a preview notice, rejects all `/api` and `/portal` requests, removes public submission forms and staff links, and returns `noindex`. Its database and temporary files can disappear on restart. This mode is not for real submissions, staff work or school records. Keep the live service in strict production mode with its approved MongoDB, persistent storage and alert configuration.
+
 `render.yaml` is a **single-instance deployment template**, with a persistent disk, readiness probe and automatic deployment disabled. MongoDB is not a substitute for file storage. A scanner-enabled host/image is needed for PDF and image uploads; without a working scanner these uploads fail closed. The template does not install ClamAV or configure a messaging provider, database, backups, DNS, analytics or Search Console on your behalf.
 
 ## Notifications

@@ -204,11 +204,11 @@ ${heroSection(ctx)}
         <p>School Board documentation includes professional growth for staff. Alpha is progressively strengthening digital skills for teachers and workers — email, electronic filing, records and cyber-safety awareness.</p>
         <p style="margin-top:10px">${btn('/computer-learning#staff', 'Staff ICT Development', 'outline-light')}</p>
       </div>
-      <div class="techcard rv">
+      ${ctx.config?.publicPreview ? '' : `<div class="techcard rv">
         <h3>${icon('lock')} Staff Portal <span class="badge-now">Available</span></h3>
         <p>A secure workspace for authorised staff — leave requests, approved documents, notices and school workflows.</p>
         <p style="margin-top:10px">${btn('/portal', 'Portal Login', 'gold')}</p>
-      </div>
+      </div>`}
     </div>
     <p style="margin-top:30px">${btn('/computer-learning', 'Explore Computer Learning', 'light', 'arrow')}</p>
   </div>

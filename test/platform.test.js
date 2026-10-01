@@ -2,6 +2,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
+const os = require('node:os');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const L = require('../src/lib');
@@ -491,4 +492,30 @@ test('ADSP security, persistence and institutional workflows', { timeout: 120000
     assert.equal(verifyAudit(records, f.config.auditKey, await f.app.store.run(tx => tx.get('system_settings', 'audit-head'))), true);
   });
 });
+
+test('staging public preview is isolated and read-only', { timeout: 15000 }, async t => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'alpha-preview-'));
+  const config = createConfig({ NODE_ENV: 'staging', PUBLIC_PREVIEW: 'true', DATA_DIR: dir, BASE_URL: 'https://preview.example.test', PORT: '0' });
+  const app = await createApplication(config, { jobs: false });
+  await new Promise(resolve => app.server.listen(0, '127.0.0.1', resolve));
+  t.after(async () => { await app.close(); await fs.rm(dir, { recursive: true, force: true }); });
+  const base = `http://127.0.0.1:${app.server.address().port}`;
+  assert.equal(config.publicPreview, true);
+  assert.equal(app.store.kind, 'sqlite');
+  for (const route of ['/', '/contact', '/admissions', '/sw/contact', '/computer-learning', '/privacy', '/safeguarding']) {
+    const response = await fetch(base + route);
+    const html = await response.text();
+    assert.equal(response.status, 200, route);
+    assert.match(html, /Public preview only|Onyesho la umma/);
+    assert.doesNotMatch(html, /<form\b[^>]*data-endpoint=/i, route);
+    assert.doesNotMatch(html, /href="\/portal"/i, route);
+    assert.match(response.headers.get('x-robots-tag'), /noindex/);
+  }
+  assert.equal((await fetch(base + '/api/contact', { method: 'POST' })).status, 404);
+  assert.equal((await fetch(base + '/api/auth/session')).status, 404);
+  assert.equal((await fetch(base + '/portal')).status, 404);
+  assert.match(await (await fetch(base + '/robots.txt')).text(), /Disallow: \/\n/);
+  assert.throws(() => createConfig({ NODE_ENV: 'production', PUBLIC_PREVIEW: 'true', DATA_DIR: dir, BASE_URL: 'https://preview.example.test' }), /MongoDB/);
+});
+
 function prettyPosition(value) { return 'Synthetic ' + value; }

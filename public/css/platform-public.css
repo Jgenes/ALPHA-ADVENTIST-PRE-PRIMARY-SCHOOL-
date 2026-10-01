@@ -2,6 +2,9 @@
    homepage components live in main.css; do not introduce another visual theme. */
 :root{--gold-700:#825c0d;--faint:#65718a}
 body{overflow-wrap:anywhere}
+.public-preview-banner{padding:10px 16px;background:var(--navy);color:#fff;text-align:center;font-size:.9rem;font-weight:700}
+.public-preview-banner p{margin:0}
+.preview-form-disabled{border-left:4px solid var(--gold);margin-block:20px}
 .language-switch{display:flex;align-items:center;gap:6px;font:700 .76rem var(--sans);white-space:nowrap;color:var(--muted)}
 .language-switch a{padding:5px;color:var(--navy);text-decoration:none}
 .language-switch a[aria-current]{border-bottom:2px solid var(--gold)}

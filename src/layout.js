@@ -110,7 +110,8 @@ function header(ctx) {
   const sw = ctx.lang === 'sw';
   const isActive = href => (href === '/' ? path === '/' : path === href || path.startsWith(href + '/'));
   const navItem = n => `<li><a href="${localPath(ctx, n.href)}" ${isActive(n.href) ? 'aria-current="page"' : ''}>${esc(sw ? n.sw : n.label)}</a></li>`;
-  const links = NAV.map(navItem).join('');
+  const visibleNav = ctx.config?.publicPreview ? NAV.filter(item => item.href !== '/portal') : NAV;
+  const links = visibleNav.map(navItem).join('');
   const mlinks = links;
   const alternate = ['/', '/admissions', '/contact'].includes(path) ? path : '/';
   const languageSwitch = `<div class="language-switch" aria-label="Language"><a href="${alternate}" lang="en" ${!sw ? 'aria-current="true"' : ''}>EN</a><span>/</span><a href="/sw${alternate === '/' ? '' : alternate}" lang="sw" ${sw ? 'aria-current="true"' : ''}>SW</a></div>`;
@@ -140,7 +141,7 @@ function header(ctx) {
       <ul>${links}</ul>
     </nav>
     <div class="site-head__actions">
-      ${languageSwitch}<a class="btn btn--primary btn--sm" href="${localPath(ctx, '/admissions')}#apply">${sw ? 'Omba Nafasi' : 'Apply for Admission'}</a>
+      ${languageSwitch}${ctx.config?.publicPreview ? '' : `<a class="btn btn--primary btn--sm" href="${localPath(ctx, '/admissions')}#apply">${sw ? 'Omba Nafasi' : 'Apply for Admission'}</a>`}
       <button class="navtoggle" type="button" aria-expanded="false" aria-controls="mobileNav" data-navtoggle>
         ${icon('menu')}<span class="sr-only">Open menu</span>
       </button>
@@ -150,8 +151,7 @@ function header(ctx) {
     <nav aria-label="Mobile navigation">
       <ul>${mlinks}</ul>
       <div class="mobilenav__ctas">
-        <a class="btn btn--primary" href="${localPath(ctx, '/admissions')}#apply">${sw ? 'Omba Nafasi' : 'Apply for Admission'}</a>
-        <a class="btn btn--gold" href="/computer-learning#join">Join Computer Class</a>
+        ${ctx.config?.publicPreview ? '' : `<a class="btn btn--primary" href="${localPath(ctx, '/admissions')}#apply">${sw ? 'Omba Nafasi' : 'Apply for Admission'}</a><a class="btn btn--gold" href="/computer-learning#join">Join Computer Class</a>`}
         <a class="btn btn--ghost" href="/contact">Contact Us</a>
       </div>
     </nav>
@@ -160,7 +160,7 @@ function header(ctx) {
 <div class="quickbar" role="navigation" aria-label="Quick contact actions">
   <a href="${esc(wa)}" target="_blank" rel="noopener">${icon('whatsapp')}<span>WhatsApp</span></a>
   <a href="tel:${esc(s.phones[0].href)}">${icon('phone')}<span>${esc(s.phones[0].number)}</span></a>
-  <a href="${localPath(ctx, '/admissions')}#apply">${icon('pencil')}<span>${sw ? 'Omba Nafasi' : 'Apply'}</span></a>
+  ${ctx.config?.publicPreview ? '' : `<a href="${localPath(ctx, '/admissions')}#apply">${icon('pencil')}<span>${sw ? 'Omba Nafasi' : 'Apply'}</span></a>`}
 </div>
 <div class="floating-contact" aria-label="Contact Alpha Adventist School">
   <a class="floating-contact__link floating-contact__link--whatsapp" href="${esc(wa)}" target="_blank" rel="noopener" aria-label="Chat with the school on WhatsApp" title="Chat with us on WhatsApp">
@@ -204,7 +204,7 @@ function footer(ctx) {
   <div class="footer__bottom">
     <div class="container footer__bottom-in">
       <p>© ${year} Alpha Adventist Pre &amp; Primary School. All rights reserved.</p>
-      <p class="footer__links"><a href="/privacy">Website Privacy &amp; Child Safeguarding Notice</a> <span>•</span> <a href="/portal">Staff portal</a> <span>•</span> <a href="/downloads">Downloads</a> <span>•</span> <a href="/safeguarding">Report a concern</a></p>
+      <p class="footer__links"><a href="/privacy">Website Privacy &amp; Child Safeguarding Notice</a> <span>•</span> ${ctx.config?.publicPreview ? '' : '<a href="/portal">Staff portal</a> <span>•</span> '}<a href="/downloads">Downloads</a> <span>•</span> <a href="/safeguarding">Report a concern</a></p>
     </div>
   </div>
 </footer>`;
@@ -220,6 +220,9 @@ function page(ctx, body, meta = {}) {
   const bilingualPath = ctx.path.replace(/^\/sw(?=\/|$)/, '') || '/';
   const alternateTags = ['/', '/admissions', '/contact'].includes(bilingualPath) ? `<link rel="alternate" hreflang="en" href="${esc(BASE_URL + bilingualPath)}"><link rel="alternate" hreflang="sw" href="${esc(BASE_URL + '/sw' + (bilingualPath === '/' ? '' : bilingualPath))}"><link rel="alternate" hreflang="x-default" href="${esc(BASE_URL + bilingualPath)}">` : '';
   const jsonld = meta.jsonld ? `<script type="application/ld+json" nonce="${esc(ctx.nonce)}">${JSON.stringify(meta.jsonld).replace(/</g, '\\u003c')}</script>` : '';
+  const preview = ctx.config?.publicPreview;
+  const previewBody = preview ? body.replace(/<form\b(?=[^>]*\bdata-endpoint=)[^>]*>[\s\S]*?<\/form>/gi, `<div class="card form preview-form-disabled"><h3>${ctx.lang === 'sw' ? 'Fomu hazipokelewi kwenye onyesho hili' : 'Forms are disabled in this preview'}</h3><p>${ctx.lang === 'sw' ? 'Tovuti hii ni ya kuonyesha tu. Tafadhali wasiliana na ofisi ya shule kwa simu au WhatsApp.' : 'This is a public preview only. Contact the school office by phone or WhatsApp instead.'}</p></div>`) : body;
+  const bodyClass = [meta.bodyClass, preview ? 'public-preview' : ''].filter(Boolean).join(' ');
   return `<!DOCTYPE html>
 <html lang="${ctx.lang === 'sw' ? 'sw' : 'en'}">
 <head>
@@ -247,9 +250,10 @@ ${alternateTags}
 <link rel="stylesheet" href="/fonts/fonts.css">
 <link rel="stylesheet" href="/css/main.css?v=5"><link rel="stylesheet" href="/css/platform-public.css?v=3">
 ${jsonld}</head>
-<body class="${meta.bodyClass || ''}">
+<body class="${bodyClass}">
 ${ctx.path === '/students' ? `<header class="kids-safe-head"><a href="/students"><img src="/img/logo-96.png" alt="School crest" width="38" height="38"> Alpha Kids Zone</a><a href="/">School home</a></header>` : header(ctx)}
-<main id="main">${body}</main>
+${preview ? `<aside class="public-preview-banner" role="status"><p>${ctx.lang === 'sw' ? 'Onyesho la umma: maombi na portal ya watumishi hazitumiki.' : 'Public preview only: submissions and staff access are disabled.'}</p></aside>` : ''}
+<main id="main">${previewBody}</main>
 ${ctx.path === '/students' ? '<footer class="kids-safe-footer">Learn safely. Ask a trusted adult for help. No ads, chat, accounts or saved scores.</footer>' : footer(ctx)}
 <script src="/js/main.js?v=5" defer></script>
 </body>

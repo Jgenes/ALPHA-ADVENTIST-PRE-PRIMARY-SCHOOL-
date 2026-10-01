@@ -72,6 +72,7 @@ async function createApplication(config = createConfig(), options = {}) {
       const route = url.pathname;
       if (route.startsWith('/api/')) {
         res.setHeader('Cache-Control', 'no-store');
+        if (config.publicPreview) return json(res, 404, { ok: false, code: 'PREVIEW_READ_ONLY', message: 'Public preview does not accept submissions or provide staff access.' });
         return await handleApi(req, res, url, platform, auth);
       }
       if (route === '/admin' || route.startsWith('/admin/')) {
@@ -80,6 +81,7 @@ async function createApplication(config = createConfig(), options = {}) {
       }
       if (route === '/portal' || route.startsWith('/portal/')) {
         if (req.method !== 'GET') throw new L.HttpError(405, 'Use the authenticated API.');
+        if (config.publicPreview) return send(res, 404, '<!doctype html><html lang="en"><meta name="robots" content="noindex,nofollow"><title>Unavailable in preview</title><body><h1>Staff access is unavailable in this public preview.</h1><a href="/">Return to the school website</a></body></html>', { 'X-Robots-Tag': 'noindex, nofollow' });
         const actor = await auth.actor(req, res, true);
         return send(res, 200, portal({ section: route.split('/')[2] || 'dashboard', nonce }, actor, config), { 'Cache-Control': 'private, no-store, max-age=0', 'X-Robots-Tag': 'noindex, nofollow', 'Referrer-Policy': 'no-referrer' });
       }
@@ -99,7 +101,8 @@ async function createApplication(config = createConfig(), options = {}) {
       if (route === '/offline') return send(res, 200, await fs.readFile(path.join(PUBLIC_DIR, 'offline.html'), 'utf8'), { 'Cache-Control': 'public, max-age=3600' });
       if (route === '/site.webmanifest') {
         res.writeHead(200, { 'Content-Type': 'application/manifest+json', 'Cache-Control': 'no-cache' });
-        return res.end(JSON.stringify({ id: '/', name: 'Alpha Adventist Digital School', short_name: 'Alpha School', lang: 'en', start_url: '/', scope: '/', display: 'standalone', background_color: '#f8f6f0', theme_color: '#0A1E59', description: 'Alpha Adventist school information and secure, online staff workspace.', icons: [{ src: '/img/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' }, { src: '/img/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' }], shortcuts: [{ name: 'Staff workspace', url: '/portal' }, { name: 'Admissions', url: '/admissions' }, { name: 'Kiswahili', url: '/sw' }] }));
+        const shortcuts = [{ name: 'Staff workspace', url: '/portal' }, { name: 'Admissions', url: '/admissions' }, { name: 'Kiswahili', url: '/sw' }].filter(item => !config.publicPreview || item.url !== '/portal');
+        return res.end(JSON.stringify({ id: '/', name: 'Alpha Adventist Digital School', short_name: 'Alpha School', lang: 'en', start_url: '/', scope: '/', display: 'standalone', background_color: '#f8f6f0', theme_color: '#0A1E59', description: 'Alpha Adventist school information and secure, online staff workspace.', icons: [{ src: '/img/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' }, { src: '/img/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' }], shortcuts }));
       }
       if (route === '/robots.txt') {
         res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-cache' });
