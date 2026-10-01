@@ -1,6 +1,6 @@
 # Deployment template, not proof of production readiness. Complete the release
 # gates in docs/operations-template.md and rehearse with isolated staging first.
-# This single-instance design requires both MongoDB AND persistent file storage.
+# Use MongoDB plus either this persistent disk or a private Supabase S3 bucket.
 services:
   - type: web
     name: alpha-adventist-school
@@ -25,6 +25,16 @@ services:
         sync: false
       - key: MONGODB_DB_NAME
         sync: false
+      - key: SUPABASE_S3_ENDPOINT
+        sync: false
+      - key: SUPABASE_S3_REGION
+        sync: false
+      - key: SUPABASE_S3_ACCESS_KEY_ID
+        sync: false
+      - key: SUPABASE_S3_SECRET_ACCESS_KEY
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        sync: false
       - key: MFA_ENCRYPTION_KEY
         sync: false
       - key: STORAGE_ENCRYPTION_KEY
@@ -34,6 +44,14 @@ services:
       - key: OFFICE_ALERT_WEBHOOK_URL
         sync: false
       - key: OFFICE_ALERT_WEBHOOK_SECRET
+        sync: false
+      - key: GMAIL_SMTP_USER
+        sync: false
+      - key: GMAIL_SMTP_APP_PASSWORD
+        sync: false
+      - key: OFFICE_ALERT_EMAIL
+        sync: false
+      - key: PRIVACY_ALERT_EMAIL
         sync: false
       - key: FORM_RETENTION_DAYS
         sync: false

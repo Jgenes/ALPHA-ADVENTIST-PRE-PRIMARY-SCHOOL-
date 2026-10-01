@@ -5,13 +5,27 @@ const crypto = require('node:crypto');
 const { execFile } = require('node:child_process');
 const { promisify, TextDecoder } = require('node:util');
 const { HttpError, encrypt, decrypt, sha256 } = require('../lib');
+const { createSupabaseStorage } = require('./supabase-storage');
 const execute = promisify(execFile);
 class Files {
-  constructor(config) { this.config = config; this.root = path.join(config.dataDir, 'storage'); }
-  async init() { for (const area of ['private', 'public', 'quarantine']) await fs.mkdir(path.join(this.root, area), { recursive: true, mode: 0o700 }); }
+  constructor(config, objectStorage) { this.config = config; this.root = path.join(config.dataDir, 'storage'); this.objectStorage = objectStorage || createSupabaseStorage(config.supabaseStorage); }
+  async init() {
+    await fs.mkdir(path.join(this.root, 'quarantine'), { recursive: true, mode: 0o700 });
+    if (this.objectStorage) await this.objectStorage.check();
+    else for (const area of ['private', 'public']) await fs.mkdir(path.join(this.root, area), { recursive: true, mode: 0o700 });
+  }
   keyPath(area, key) {
     if (!['private', 'public', 'quarantine'].includes(area) || !/^[a-f0-9]{48}$/.test(key)) throw new Error('Invalid storage key.');
     return path.join(this.root, area, key);
+  }
+  async readStored(area, key) { return this.objectStorage ? this.objectStorage.get(area, key) : fs.readFile(this.keyPath(area, key)); }
+  async writeStored(area, key, bytes) {
+    if (this.objectStorage) return this.objectStorage.put(area, key, bytes);
+    await fs.writeFile(this.keyPath(area, key), bytes, { mode: 0o600, flag: 'wx' });
+  }
+  async removeStored(area, key) {
+    if (this.objectStorage) return this.objectStorage.remove(area, key);
+    await fs.rm(this.keyPath(area, key), { force: true });
   }
   async scan(buffer) {
     if (!this.config.scanCommand) throw new HttpError(503, 'Binary uploads are disabled until the school configures its malware scanner. Plain-text documents are supported.', 'SCANNER_REQUIRED');
@@ -55,21 +69,22 @@ class Files {
       await this.scan(buffer); mime = 'application/pdf'; scanStatus = 'CLEAN';
     } else throw new HttpError(415, imageOnly ? 'Use a JPEG or PNG image.' : 'Use a plain-text (.txt) or scanned PDF document.');
     const storageKey = crypto.randomBytes(24).toString('hex');
-    await fs.writeFile(this.keyPath('private', storageKey), encrypt(buffer, this.config.storageKey), { mode: 0o600, flag: 'wx' });
+    await this.writeStored('private', storageKey, encrypt(buffer, this.config.storageKey));
     return { storageKey, name, mime, size: buffer.length, checksum: sha256(buffer), scanStatus };
   }
   async read(file, area = 'private') {
-    const data = await fs.readFile(this.keyPath(area, file.storageKey));
+    const data = await this.readStored(area, file.storageKey);
     const buffer = area === 'private' ? decrypt(data, this.config.storageKey) : data;
     if (sha256(buffer) !== file.checksum) throw new Error('File integrity check failed.');
     return buffer;
   }
   async publish(file) {
     const buffer = await this.read(file);
-    await fs.writeFile(this.keyPath('public', file.storageKey), buffer, { mode: 0o600, flag: 'wx' }).catch(error => { if (error.code !== 'EEXIST') throw error; });
+    try { await this.writeStored('public', file.storageKey, buffer); }
+    catch (error) { if (error.code !== 'EEXIST') throw error; }
   }
-  async unpublish(file) { if (file?.storageKey) await fs.rm(this.keyPath('public', file.storageKey), { force: true }); }
-  async discard(file) { if (file?.storageKey) await fs.rm(this.keyPath('private', file.storageKey), { force: true }); }
+  async unpublish(file) { if (file?.storageKey) await this.removeStored('public', file.storageKey); }
+  async discard(file) { if (file?.storageKey) await this.removeStored('private', file.storageKey); }
 }
 function publicFileMetadata(file) { return file ? { name: file.name, mime: file.mime, size: file.size, checksum: file.checksum, scanStatus: file.scanStatus } : null; }
 module.exports = { Files, publicFileMetadata };

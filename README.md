@@ -66,29 +66,29 @@ npm run test:ui           # isolated browser workflow, mobile and accessibility 
 Use separate databases, storage, keys, origins and alert recipients for each environment. Outside development, startup requires:
 
 - An explicitly configured, verified HTTPS `BASE_URL`.
-- A transaction-capable MongoDB replica set/Atlas database and persistent `DATA_DIR` for files.
+- A transaction-capable MongoDB replica set/Atlas database and either persistent `DATA_DIR` storage or a private Supabase S3 bucket for files. `DATA_DIR` is still required for temporary quarantine; with Supabase Storage it may be ephemeral.
 - Three distinct, separately escrowed 32-byte keys: MFA, private storage and audit HMAC.
-- A signed office-alert endpoint/secret, an explicitly approved retention schedule, and a named safeguarding contact.
+- A signed office-alert endpoint/secret or configured Gmail SMTP delivery with approved office and privacy recipients, an explicitly approved retention schedule, and a named safeguarding contact.
 
 The public site at **https://alpha-adventist-pre-primary-school.onrender.com** was reachable during a read-only check on **30 September 2026**. The similarly spelled hostname without the hyphen between `alpha` and `adventist` returned “Not Found.” The reachable URL is the development fallback only; production still requires an explicit `BASE_URL`, and the school must confirm its long-term official domain. No live deployment was performed in this implementation session.
 
 For a **free, read-only public preview**, create a separate Render service and set `NODE_ENV=staging`, `PUBLIC_PREVIEW=true`, `BASE_URL` to that service's HTTPS origin, and `DATA_DIR=/tmp/alpha-school-preview`. Do not copy MongoDB environment variables into this service; preview uses temporary SQLite and generated local keys. It displays a preview notice, rejects all `/api` and `/portal` requests, removes public submission forms and staff links, and returns `noindex`. Its database and temporary files can disappear on restart. This mode is not for real submissions, staff work or school records. Keep the live service in strict production mode with its approved MongoDB, persistent storage and alert configuration.
 
-`render.yaml` is a **single-instance deployment template**, with a persistent disk, readiness probe and automatic deployment disabled. MongoDB is not a substitute for file storage. A scanner-enabled host/image is needed for PDF and image uploads; without a working scanner these uploads fail closed. The template does not install ClamAV or configure a messaging provider, database, backups, DNS, analytics or Search Console on your behalf.
+`render.yaml` is a **single-instance deployment template**, with a persistent disk, readiness probe and automatic deployment disabled. To use external files, create a private Supabase Storage bucket, enable S3 access in Supabase Storage settings, and configure all `SUPABASE_S3_*` and `SUPABASE_STORAGE_BUCKET` values from `.env.example`. Supabase S3 keys are server-only and have broad project storage access; use a dedicated Supabase project and never expose them to browsers. Files are streamed through the app's authorization and consent checks; do not make the bucket public. A scanner-enabled host/image is still needed for PDF and image uploads; without a working scanner these uploads fail closed. The template does not install ClamAV or configure a messaging provider, database, backups, DNS, analytics or Search Console on your behalf.
 
 ## Notifications
 
-Public forms are saved transactionally with an in-app notice and durable outbox entry. A configured HTTPS integration receives a reference, request type and secure office link, signed with HMAC-SHA256. It must perform the approved email/SMS/WhatsApp delivery. No child/guardian form body is sent to that endpoint.
+Public forms are saved transactionally with an in-app notice and durable outbox entry. Alerts can go to a configured HTTPS integration, signed with HMAC-SHA256, or directly through Gmail SMTP. Emails contain only the request type, reference, received time and secure portal link; submitted form details are not emailed. Safeguarding and privacy alerts use the separately configured privacy recipient.
 
-Unconfigured jobs remain **PENDING**; non-success responses retry with backoff, then become **FAILED**. A 2xx response means the integration accepted the job—not proof that an SMS or email reached its recipient. Provider acknowledgements, parent-channel messaging and bulk campaigns need further integration.
+Unconfigured jobs remain **PENDING**; non-success responses retry with backoff, then become **FAILED**. SMTP acceptance confirms that Gmail accepted the message, not that a person read it. Provider delivery callbacks, parent-channel messaging and bulk campaigns need further integration.
 
 ## Backups and legacy migration
 
-- `npm run backup:mongodb` creates an encrypted, bounded database-and-private-file archive during a confirmed maintenance window.
-- `npm run restore:mongodb -- /protected/path/archive.ejson.enc` restores only to an explicitly approved, empty isolated database ending in `_restore_test`; it never overwrites production.
+- `npm run backup:mongodb` creates an encrypted, bounded database-and-private-file archive during a confirmed maintenance window. With Supabase Storage configured it captures referenced encrypted objects from the private bucket.
+- `npm run restore:mongodb -- /protected/path/archive.ejson.enc` restores only to an explicitly approved, empty isolated database ending in `_restore_test`; Supabase archives also require `SUPABASE_RESTORE_BUCKET` to name a separate empty bucket, never the source or live bucket.
 - `npm run migrate:mongodb` imports supported legacy text and form fields from a fresh encrypted backup, without importing old passwords, accounts or unverified photographs. Public imports become reviewable drafts; unrecognised schemas need a reviewed mapping.
 
-See the operations template before using these commands. The tests rehearse an actual isolated SQLite/file restore and archive-integrity checks. **Live Mongo transactions, Mongo restore/migration, external-provider delivery and production recovery have not been verified in this workspace.**
+See the operations template before using these commands. Tests cover isolated local file recovery, mocked Supabase object capture/restore, and mocked SMTP message routing; live Supabase credentials, bucket permissions, real Gmail SMTP delivery, Mongo restore/migration and production recovery have not been verified in this workspace.
 
 ## Repository and child-data safety
 

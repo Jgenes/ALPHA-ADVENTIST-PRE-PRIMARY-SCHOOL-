@@ -66,9 +66,9 @@ async function maintenance(platform) {
     if (old) await tx.update('system_settings', { ...old, ...record }); else await tx.insert('system_settings', record);
   });
 }
-async function deliverAlerts(platform, fetcher = fetch) {
+async function deliverAlerts(platform, fetcher = fetch, mailer = null) {
   const { store, config } = platform;
-  if (!config.alertUrl) return; // Persisted pending state is visible to operators.
+  if (!config.alertUrl && !mailer) return; // Persisted pending state is visible to operators.
   for (let index = 0; index < 10; index++) {
     const alert = await store.run(async tx => {
       const record = (await tx.list('outbox')).find(item => (['PENDING', 'RETRY'].includes(item.status) && item.nextAttemptAt <= Date.now()) || item.status === 'SENDING' && item.lockedUntil <= Date.now());
@@ -78,12 +78,32 @@ async function deliverAlerts(platform, fetcher = fetch) {
     if (!alert) break;
     let delivered = false, httpStatus = 0;
     try {
-      const timestamp = String(Date.now());
-      const payload = JSON.stringify({ id: alert.id, school: 'Alpha Adventist Pre & Primary School', reference: alert.reference, type: alert.type, receivedAt: alert.createdAt, officeUrl: config.baseUrl + alert.href });
-      const signature = crypto.createHmac('sha256', config.alertSecret).update(timestamp + '.' + payload).digest('hex');
-      const response = await fetcher(config.alertUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': alert.id, 'X-Alpha-Timestamp': timestamp, 'X-Alpha-Signature': 'sha256=' + signature }, body: payload, signal: AbortSignal.timeout(5000), redirect: 'error' });
-      httpStatus = response.status; delivered = response.ok;
-      if (response.body?.cancel) await response.body.cancel();
+      if (config.alertUrl) {
+        const timestamp = String(Date.now());
+        const payload = JSON.stringify({ id: alert.id, school: 'Alpha Adventist Pre & Primary School', reference: alert.reference, type: alert.type, receivedAt: alert.createdAt, officeUrl: config.baseUrl + alert.href });
+        const signature = crypto.createHmac('sha256', config.alertSecret).update(timestamp + '.' + payload).digest('hex');
+        const response = await fetcher(config.alertUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': alert.id, 'X-Alpha-Timestamp': timestamp, 'X-Alpha-Signature': 'sha256=' + signature }, body: payload, signal: AbortSignal.timeout(5000), redirect: 'error' });
+        httpStatus = response.status; delivered = response.ok;
+        if (response.body?.cancel) await response.body.cancel();
+      } else {
+        const privateAlert = ['Safeguarding concern', 'Privacy request'].includes(alert.type);
+        const recipient = privateAlert ? config.smtp.privacyEmail : config.smtp.officeEmail;
+        const result = await mailer.sendMail({
+          from: config.smtp.from,
+          to: recipient,
+          subject: `[Alpha school alert] ${alert.type} ${alert.reference}`,
+          text: [
+            'An authorised school team member should review this new request.',
+            `Type: ${alert.type}`,
+            `Reference: ${alert.reference}`,
+            `Received: ${alert.createdAt}`,
+            `Open the secure record: ${config.baseUrl + alert.href}`,
+            'The request details are not included in this email.'
+          ].join('\n')
+        });
+        delivered = (result.accepted || []).some(address => String(address).toLowerCase() === recipient.toLowerCase());
+        httpStatus = delivered ? 250 : 550;
+      }
     } catch { /* No response body, secret, child or parent details are logged. */ }
     await store.run(async tx => {
       const current = await tx.get('outbox', alert.id);
@@ -95,11 +115,16 @@ async function deliverAlerts(platform, fetcher = fetch) {
 }
 function startJobs(platform) {
   let pending = null, stopped = false;
+  const mailer = platform.config.smtp ? require('nodemailer').createTransport({
+    host: 'smtp.gmail.com', port: 465, secure: true,
+    auth: { user: platform.config.smtp.user, pass: platform.config.smtp.password },
+    connectionTimeout: 5000, greetingTimeout: 5000, socketTimeout: 10000
+  }) : null;
   const run = () => {
     if (stopped) return Promise.resolve();
     if (pending) return pending;
     pending = (async () => {
-      try { await maintenance(platform); await deliverAlerts(platform); }
+      try { await maintenance(platform); await deliverAlerts(platform, fetch, mailer); }
       catch (error) { console.error('[maintenance] job failed; review health and storage access.', error.name); }
     })().finally(() => { pending = null; });
     return pending;

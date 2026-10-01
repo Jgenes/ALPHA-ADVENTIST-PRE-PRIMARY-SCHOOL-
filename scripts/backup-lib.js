@@ -46,15 +46,19 @@ function fileReferences(collections) {
   for (const collection of collections) visit(collection.documents);
   return [...keys];
 }
-async function captureFiles(dataDir, collections) {
+async function captureFiles(dataDir, collections, objectStorage = null) {
   const files = []; let size = 0;
   for (const key of fileReferences(collections)) {
-    const name = path.join(dataDir, 'storage', 'private', key);
-    const stat = await fs.lstat(name);
-    if (!stat.isFile() || stat.isSymbolicLink()) throw new Error('Referenced private storage must be a regular file.');
-    size += stat.size;
+    let bytes;
+    if (objectStorage) bytes = await objectStorage.get('private', key);
+    else {
+      const name = path.join(dataDir, 'storage', 'private', key);
+      const stat = await fs.lstat(name);
+      if (!stat.isFile() || stat.isSymbolicLink()) throw new Error('Referenced private storage must be a regular file.');
+      bytes = await fs.readFile(name);
+    }
+    size += bytes.length;
     if (size > MAX_ARCHIVE_BYTES / 2) throw new Error('Use managed storage snapshots for large libraries.');
-    const bytes = await fs.readFile(name);
     files.push({ key, size: bytes.length, sha256: crypto.createHash('sha256').update(bytes).digest('hex'), content: bytes.toString('base64') });
   }
   return files;
@@ -69,8 +73,13 @@ function validateFiles(files = []) {
   }
   return files;
 }
-async function restoreFiles(dataDir, files = []) {
+async function restoreFiles(dataDir, files = [], objectStorage = null) {
   validateFiles(files);
+  if (objectStorage) {
+    if (!await objectStorage.isEmpty()) throw new Error('Restore bucket must be empty.');
+    for (const item of files) await objectStorage.put('private', item.key, Buffer.from(item.content, 'base64'));
+    return;
+  }
   const privateDir = path.join(dataDir, 'storage', 'private');
   await fs.mkdir(privateDir, { recursive: true, mode: 0o700 });
   if ((await fs.readdir(privateDir)).length) throw new Error('Restore storage must be empty.');

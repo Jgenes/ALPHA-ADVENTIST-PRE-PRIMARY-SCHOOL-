@@ -8,6 +8,8 @@ const crypto = require('node:crypto');
 const { createApplication } = require('../server');
 const { createConfig } = require('../src/config');
 const { COLLECTIONS } = require('../src/platform/store');
+const { Files } = require('../src/platform/files');
+const { supabaseStorageConfig, createSupabaseStorage } = require('../src/platform/supabase-storage');
 const { verifyAudit } = require('../src/platform/audit');
 const { bootstrapUser } = require('../scripts/bootstrap');
 const { legacyRecords, importLegacy } = require('../scripts/migrate-mongodb');
@@ -23,6 +25,52 @@ test('operator safeguards and an actual isolated SQLite/file recovery rehearsal'
   t.after(async () => { if (!closed) await app.close(); await fs.rm(root, { recursive: true, force: true }); });
   let encryptedFile, backup, archivePath;
   const key = crypto.randomBytes(32);
+  await t.test('Supabase S3 configuration and encrypted file operations stay server-side', async () => {
+    const storageConfig = supabaseStorageConfig({
+      SUPABASE_S3_ENDPOINT: 'https://project.storage.supabase.co/storage/v1/s3',
+      SUPABASE_S3_REGION: 'us-east-1', SUPABASE_S3_ACCESS_KEY_ID: 'synthetic-access',
+      SUPABASE_S3_SECRET_ACCESS_KEY: 'synthetic-secret', SUPABASE_STORAGE_BUCKET: 'alpha-private'
+    });
+    assert.equal(storageConfig.bucket, 'alpha-private');
+    assert.throws(() => supabaseStorageConfig({ SUPABASE_S3_ENDPOINT: storageConfig.endpoint }), /all Supabase S3/);
+    assert.throws(() => supabaseStorageConfig({
+      SUPABASE_S3_ENDPOINT: 'http://unsafe.example', SUPABASE_S3_REGION: storageConfig.region,
+      SUPABASE_S3_ACCESS_KEY_ID: storageConfig.accessKeyId, SUPABASE_S3_SECRET_ACCESS_KEY: storageConfig.secretAccessKey,
+      SUPABASE_STORAGE_BUCKET: storageConfig.bucket
+    }), /trusted HTTPS endpoint/);
+    const commands = [];
+    const sdk = createSupabaseStorage(storageConfig, { async send(command) {
+      commands.push(command);
+      if (command.constructor.name === 'GetObjectCommand') return { Body: { transformToByteArray: async () => Buffer.from('stored-ciphertext') } };
+      if (command.constructor.name === 'ListObjectsV2Command') return { KeyCount: 0 };
+      return {};
+    } });
+    await sdk.check();
+    assert.equal((await sdk.get('private', 'a'.repeat(48))).toString(), 'stored-ciphertext');
+    await sdk.put('private', 'b'.repeat(48), Buffer.from('ciphertext'));
+    await sdk.remove('private', 'b'.repeat(48));
+    assert.equal(await sdk.isEmpty(), true);
+    assert.deepEqual(commands.map(command => command.constructor.name), ['HeadBucketCommand', 'GetObjectCommand', 'PutObjectCommand', 'DeleteObjectCommand', 'ListObjectsV2Command']);
+    assert.equal(commands[1].input.Key, 'private/' + 'a'.repeat(48));
+    await assert.rejects(sdk.get('private', '../unsafe'), /Invalid object storage key/);
+
+    const objects = new Map();
+    const remote = {
+      bucket: 'alpha-private', check: async () => {}, isEmpty: async () => objects.size === 0,
+      get: async (area, fileKey) => { const value = objects.get(`${area}/${fileKey}`); if (!value) throw new Error('missing'); return Buffer.from(value); },
+      put: async (area, fileKey, value) => { objects.set(`${area}/${fileKey}`, Buffer.from(value)); },
+      remove: async (area, fileKey) => { objects.delete(`${area}/${fileKey}`); }
+    };
+    const remoteFiles = new Files({ ...config, supabaseStorage: storageConfig }, remote);
+    await remoteFiles.init();
+    const file = await remoteFiles.prepare(textFile('REMOTE SYNTHETIC CONTENT'));
+    assert.ok(!objects.get('private/' + file.storageKey).includes(Buffer.from('REMOTE SYNTHETIC CONTENT')));
+    assert.equal((await remoteFiles.read(file)).toString(), 'REMOTE SYNTHETIC CONTENT');
+    await remoteFiles.publish(file);
+    assert.equal(objects.get('public/' + file.storageKey).toString(), 'REMOTE SYNTHETIC CONTENT');
+    await remoteFiles.unpublish(file); await remoteFiles.discard(file);
+    assert.equal(objects.size, 0);
+  });
   await t.test('bootstrap creates no default account and cannot repeat or grant unapproved authority', async () => {
     assert.equal((await app.store.run(tx => tx.list('users'))).length, 0);
     const input = { username: 'synthetic.operator', name: 'Synthetic operator', role: 'system_admin', password: crypto.randomBytes(24).toString('base64url') + 'aA1!', approved: true, approvalReference: 'SYNTHETIC-DECISION' };
@@ -45,6 +93,20 @@ test('operator safeguards and an actual isolated SQLite/file recovery rehearsal'
     const collections = await app.store.run(async tx => { const rows = []; for (const name of COLLECTIONS) rows.push({ name: 'adsp_' + name, documents: await tx.list(name), indexes: [], options: {} }); return rows; });
     const files = await B.captureFiles(config.dataDir, collections);
     assert.equal(files.length, 1);
+    const sourceBytes = await fs.readFile(app.platform.files.keyPath('private', encryptedFile.storageKey));
+    const remoteObjects = new Map([['private/' + encryptedFile.storageKey, sourceBytes]]);
+    const remoteSource = { get: async (area, fileKey) => Buffer.from(remoteObjects.get(`${area}/${fileKey}`)) };
+    const remoteFiles = await B.captureFiles(config.dataDir, collections, remoteSource);
+    assert.deepEqual(remoteFiles, files);
+    const restoredObjects = new Map();
+    const remoteTarget = {
+      isEmpty: async () => restoredObjects.size === 0,
+      put: async (area, fileKey, value) => { restoredObjects.set(`${area}/${fileKey}`, Buffer.from(value)); }
+    };
+    const remoteRestoreDir = path.join(root, 'supabase-restore');
+    await B.restoreFiles(remoteRestoreDir, remoteFiles, remoteTarget);
+    assert.deepEqual(restoredObjects.get('private/' + encryptedFile.storageKey), sourceBytes);
+    await assert.rejects(B.restoreFiles(remoteRestoreDir, remoteFiles, remoteTarget), /bucket must be empty/);
     await app.close(); closed = true;
     const sqlite = (await fs.readFile(path.join(config.dataDir, 'adsp.sqlite'))).toString('base64');
     const snapshot = { version: 2, database: 'synthetic_source', exportedAt: new Date(), collections, files, sqlite };
@@ -72,6 +134,11 @@ test('operator safeguards and an actual isolated SQLite/file recovery rehearsal'
     assert.throws(() => validateRestore(backup, { ...env, RESTORE_APPROVED: 'false' }));
     assert.throws(() => validateRestore(backup, { ...env, MONGODB_RESTORE_DB_NAME: backup.database }));
     assert.throws(() => validateRestore(backup, { ...env, DATA_DIR: env.RESTORE_DATA_DIR }));
+    const remoteBackup = { ...backup, storage: { provider: 'supabase-s3', bucket: 'source-private' } };
+    const remoteEnv = { ...env, SUPABASE_STORAGE_BUCKET: 'production-private', SUPABASE_RESTORE_BUCKET: 'restore-private' };
+    assert.equal(validateRestore(remoteBackup, remoteEnv), 'synthetic_restore_test');
+    assert.throws(() => validateRestore(remoteBackup, { ...remoteEnv, SUPABASE_RESTORE_BUCKET: 'source-private' }), /separate empty Supabase/);
+    assert.throws(() => validateRestore(remoteBackup, { ...remoteEnv, SUPABASE_RESTORE_BUCKET: 'production-private' }), /separate empty Supabase/);
   });
   await t.test('restored SQLite starts, preserves audit integrity and decrypts the original controlled file', async () => {
     const restoredDir = path.join(root, 'restore');

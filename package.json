@@ -14,8 +14,10 @@
     "test:ui": "node scripts/ui-smoke.js && node scripts/auth-ui-smoke.js"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1144.0",
     "dotenv": "^16.4.7",
     "mongodb": "^7.7.0",
+    "nodemailer": "^10.0.13",
     "sharp": "^0.35.5"
   },
   "name": "alpha-adventist-digital-school-platform",

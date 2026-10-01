@@ -23,6 +23,29 @@ test('ADSP security, persistence and institutional workflows', { timeout: 120000
   await t.test('production configuration fails closed and has no default credentials', async () => {
     assert.throws(() => createConfig({ NODE_ENV: 'production', DATA_DIR: f.dir, BASE_URL: 'https://school.example.test' }), /MongoDB/);
     assert.throws(() => createConfig({ NODE_ENV: 'production', DATA_DIR: f.dir, BASE_URL: 'http://school.example.test' }), /HTTPS/);
+    const remoteConfig = createConfig({
+      NODE_ENV: 'production', DATA_DIR: path.join(f.dir, 'remote-runtime'), BASE_URL: 'https://school.example.test',
+      MONGODB_URI: 'mongodb://database.example.test', MONGODB_DB_NAME: 'alpha_production',
+      SUPABASE_S3_ENDPOINT: 'https://project.storage.supabase.co/storage/v1/s3', SUPABASE_S3_REGION: 'us-east-1',
+      SUPABASE_S3_ACCESS_KEY_ID: 'synthetic-access', SUPABASE_S3_SECRET_ACCESS_KEY: 'synthetic-secret', SUPABASE_STORAGE_BUCKET: 'alpha-private',
+      MFA_ENCRYPTION_KEY: '1'.repeat(64), STORAGE_ENCRYPTION_KEY: '2'.repeat(64), AUDIT_HMAC_KEY: '3'.repeat(64),
+      FORM_RETENTION_DAYS: '90', ADMISSION_RETENTION_DAYS: '365', RETENTION_POLICY_APPROVED: 'true',
+      OFFICE_ALERT_WEBHOOK_URL: 'https://alerts.example.test/receiver', OFFICE_ALERT_WEBHOOK_SECRET: 'synthetic-webhook-secret-at-least-32-characters',
+      SAFEGUARDING_NAME: 'Synthetic safeguarding lead', SAFEGUARDING_PHONE: '+255700000000'
+    });
+    assert.equal(remoteConfig.supabaseStorage.bucket, 'alpha-private');
+    assert.equal(remoteConfig.dataDir, path.join(f.dir, 'remote-runtime'));
+    const gmailConfig = createConfig({
+      NODE_ENV: 'production', DATA_DIR: path.join(f.dir, 'gmail-runtime'), BASE_URL: 'https://school.example.test',
+      MONGODB_URI: 'mongodb://database.example.test', MONGODB_DB_NAME: 'alpha_production',
+      MFA_ENCRYPTION_KEY: '4'.repeat(64), STORAGE_ENCRYPTION_KEY: '5'.repeat(64), AUDIT_HMAC_KEY: '6'.repeat(64),
+      FORM_RETENTION_DAYS: '90', ADMISSION_RETENTION_DAYS: '365', RETENTION_POLICY_APPROVED: 'true',
+      GMAIL_SMTP_USER: 'sender@example.test', GMAIL_SMTP_APP_PASSWORD: 'abcd efgh ijkl mnop',
+      OFFICE_ALERT_EMAIL: 'office@example.test', PRIVACY_ALERT_EMAIL: 'privacy@example.test',
+      SAFEGUARDING_NAME: 'Synthetic safeguarding lead', SAFEGUARDING_PHONE: '+255700000000'
+    });
+    assert.equal(gmailConfig.smtp.password, 'abcdefghijklmnop');
+    assert.throws(() => createConfig({ NODE_ENV: 'development', DATA_DIR: f.dir, BASE_URL: 'https://school.example.test', GMAIL_SMTP_USER: 'sender@example.test' }), /Gmail SMTP credentials/);
     assert.equal(f.config.adminPassword, undefined);
     assert.equal(L.isStrongPassword('short'), false);
     assert.equal(L.isStrongPassword('a'.repeat(200)), false);
@@ -147,6 +170,31 @@ test('ADSP security, persistence and institutional workflows', { timeout: 120000
     const after = await app.store.run(tx => tx.list('outbox'));
     assert.ok(after.every(job => job.status === 'DELIVERED' && job.attempts === 2));
     f.config.alertUrl = '';
+  });
+  await t.test('Gmail SMTP sends reference-only alerts to office or privacy recipient', async () => {
+    await anonymous.ok('POST', '/api/privacy-request', { name: 'Synthetic private reporter', email: 'private@example.test', request_type: 'access', message: 'PRIVATE BODY MUST NOT BE EMAILED', privacy_consent: 'yes' });
+    await anonymous.ok('POST', '/api/safeguarding', { name: 'Synthetic safeguarding reporter', phone: '+255700000099', message: 'SAFEGUARDING BODY MUST NOT BE EMAILED', privacy_consent: 'yes' });
+    await app.store.run(async tx => {
+      for (const item of await tx.list('outbox')) await tx.update('outbox', { ...item, status: 'PENDING', attempts: 0, nextAttemptAt: 0, lockedUntil: 0 });
+    });
+    f.config.smtp = { from: 'sender@example.test', officeEmail: 'office@example.test', privacyEmail: 'privacy@example.test' };
+    const sent = [];
+    await deliverAlerts(app.platform, undefined, { async sendMail(message) { sent.push(message); return { accepted: [message.to] }; } });
+    assert.equal(sent.length, 7);
+    for (const message of sent) {
+      assert.ok(message.text.includes('Reference: ALPHA-'));
+      assert.ok(message.text.includes('Open the secure record: https://school.example.test/portal/'));
+      assert.ok(!message.text.includes('PRIVATE BODY MUST NOT BE EMAILED'));
+      assert.ok(!message.text.includes('SAFEGUARDING BODY MUST NOT BE EMAILED'));
+      assert.ok(!message.text.includes('private@example.test'));
+    }
+    const privateAlerts = sent.filter(message => message.subject.includes('Privacy request') || message.subject.includes('Safeguarding concern'));
+    assert.equal(privateAlerts.length, 2);
+    assert.ok(privateAlerts.every(message => message.to === 'privacy@example.test'));
+    assert.ok(sent.filter(message => !privateAlerts.includes(message)).every(message => message.to === 'office@example.test'));
+    const jobs = await app.store.run(tx => tx.list('outbox'));
+    assert.ok(jobs.every(job => job.status === 'DELIVERED'));
+    f.config.smtp = null;
   });
   await t.test('HR sets staff profiles, while teachers can view only self/authorised department', async () => {
     for (const key of ['head', 'hr', 'hod', 'teacher', 'other']) {
