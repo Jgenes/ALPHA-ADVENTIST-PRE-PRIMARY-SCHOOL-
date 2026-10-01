@@ -23,6 +23,20 @@ test('ADSP security, persistence and institutional workflows', { timeout: 120000
   await t.test('production configuration fails closed and has no default credentials', async () => {
     assert.throws(() => createConfig({ NODE_ENV: 'production', DATA_DIR: f.dir, BASE_URL: 'https://school.example.test' }), /MongoDB/);
     assert.throws(() => createConfig({ NODE_ENV: 'production', DATA_DIR: f.dir, BASE_URL: 'http://school.example.test' }), /HTTPS/);
+    const generatedKeyDir = path.join(f.dir, 'generated-key-runtime');
+    const generatedEnv = {
+      NODE_ENV: 'production', DATA_DIR: generatedKeyDir, BASE_URL: 'https://school.example.test',
+      MONGODB_URI: 'mongodb://database.example.test', MONGODB_DB_NAME: 'alpha_generated_keys',
+      FORM_RETENTION_DAYS: '90', ADMISSION_RETENTION_DAYS: '365', RETENTION_POLICY_APPROVED: 'true',
+      OFFICE_ALERT_WEBHOOK_URL: 'https://alerts.example.test/receiver', OFFICE_ALERT_WEBHOOK_SECRET: 'synthetic-webhook-secret-at-least-32-characters'
+    };
+    const generatedConfig = createConfig(generatedEnv);
+    assert.equal(generatedConfig.mfaKey.length, 32);
+    assert.equal(new Set([generatedConfig.mfaKey, generatedConfig.storageKey, generatedConfig.auditKey].map(key => key.toString('hex'))).size, 3);
+    const restartedConfig = createConfig(generatedEnv);
+    assert.equal(restartedConfig.mfaKey.toString('hex'), generatedConfig.mfaKey.toString('hex'));
+    assert.equal(restartedConfig.storageKey.toString('hex'), generatedConfig.storageKey.toString('hex'));
+    assert.equal(restartedConfig.auditKey.toString('hex'), generatedConfig.auditKey.toString('hex'));
     const remoteConfig = createConfig({
       NODE_ENV: 'production', DATA_DIR: path.join(f.dir, 'remote-runtime'), BASE_URL: 'https://school.example.test',
       MONGODB_URI: 'mongodb://database.example.test', MONGODB_DB_NAME: 'alpha_production',

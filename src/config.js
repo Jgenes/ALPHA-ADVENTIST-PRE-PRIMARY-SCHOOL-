@@ -32,10 +32,36 @@ function createConfig(env = process.env) {
       for (const key of ['MFA_ENCRYPTION_KEY', 'STORAGE_ENCRYPTION_KEY', 'AUDIT_HMAC_KEY']) localKeys[key] = crypto.randomBytes(32).toString('hex');
       fs.writeFileSync(keyFile, JSON.stringify(localKeys), { flag: 'wx', mode: 0o600 });
     }
+  } else {
+    // Render's deployment template mounts DATA_DIR on its persistent disk.
+    // Generate once there so key values need not be placed in source or env vars.
+    const productionKeyFile = path.join(dataDir, 'application-keys.json');
+    if (fs.existsSync(productionKeyFile)) {
+      try { localKeys = JSON.parse(fs.readFileSync(productionKeyFile, 'utf8')); }
+      catch { throw new Error('The persistent application key file is unreadable; restore its separately escrowed copy.'); }
+      for (const key of ['MFA_ENCRYPTION_KEY', 'STORAGE_ENCRYPTION_KEY', 'AUDIT_HMAC_KEY']) {
+        if (!/^[a-f0-9]{64}$/i.test(localKeys[key] || '')) throw new Error(`The persistent application key file is missing a valid ${key}; restore its separately escrowed copy.`);
+      }
+    } else {
+      const initialKeys = {};
+      for (const key of ['MFA_ENCRYPTION_KEY', 'STORAGE_ENCRYPTION_KEY', 'AUDIT_HMAC_KEY']) {
+        const configured = env[key] || (env[key + '_FILE'] && fs.readFileSync(env[key + '_FILE'], 'utf8').trim());
+        if (configured && !/^[a-f0-9]{64}$/i.test(configured)) throw new Error(`${key} must contain exactly 64 hexadecimal characters.`);
+        initialKeys[key] = configured || crypto.randomBytes(32).toString('hex');
+      }
+      if (new Set(Object.values(initialKeys).map(value => value.toLowerCase())).size !== 3) throw new Error('MFA, storage and audit keys must be different.');
+      try { fs.writeFileSync(productionKeyFile, JSON.stringify(initialKeys), { flag: 'wx', mode: 0o600 }); localKeys = initialKeys; }
+      catch (error) {
+        if (error.code !== 'EEXIST') throw error;
+        try { localKeys = JSON.parse(fs.readFileSync(productionKeyFile, 'utf8')); }
+        catch { throw new Error('The persistent application key file could not be read after initialization.'); }
+      }
+    }
+    fs.chmodSync(productionKeyFile, 0o600);
   }
   function secret(name) {
     const value = env[name] || (env[name + '_FILE'] && fs.readFileSync(env[name + '_FILE'], 'utf8').trim()) || localKeys[name];
-    if (!/^[a-f0-9]{64}$/i.test(value || '')) throw new Error(`${name} must be a separately managed 32-byte hexadecimal key.`);
+    if (!/^[a-f0-9]{64}$/i.test(value || '')) throw new Error(`${name} is missing or invalid. Set ${name} (or ${name}_FILE) to exactly 64 hexadecimal characters representing 32 random bytes; do not use a placeholder.`);
     return Buffer.from(value, 'hex');
   }
   const mongoUri = env.MONGODB_URI || env.MONGO_URI;

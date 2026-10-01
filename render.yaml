@@ -1,6 +1,7 @@
 # Deployment template, not proof of production readiness. Complete the release
 # gates in docs/operations-template.md and rehearse with isolated staging first.
-# Use MongoDB plus either this persistent disk or a private Supabase S3 bucket.
+# Use MongoDB plus this persistent disk (for runtime quarantine and application keys)
+# or a private Supabase S3 bucket (for durable files).
 services:
   - type: web
     name: alpha-adventist-school
