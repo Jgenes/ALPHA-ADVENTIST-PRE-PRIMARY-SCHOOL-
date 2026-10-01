@@ -95,7 +95,10 @@ async function openStore(config) {
         async health() { await db.command({ ping: 1 }); return true; },
         async close() { await client.close(); }
       };
-    } catch (error) { await client.close(); throw error; }
+    } catch (error) {
+      await client.close();
+      throw new Error(`MongoDB startup connection/check failed: ${error.message}`, { cause: error });
+    }
   }
   const { DatabaseSync } = require('node:sqlite');
   const file = path.join(config.dataDir, 'adsp.sqlite');

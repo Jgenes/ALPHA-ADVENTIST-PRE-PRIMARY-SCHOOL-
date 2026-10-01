@@ -11,7 +11,10 @@ class Files {
   constructor(config, objectStorage) { this.config = config; this.root = path.join(config.dataDir, 'storage'); this.objectStorage = objectStorage || createSupabaseStorage(config.supabaseStorage); }
   async init() {
     await fs.mkdir(path.join(this.root, 'quarantine'), { recursive: true, mode: 0o700 });
-    if (this.objectStorage) await this.objectStorage.check();
+    if (this.objectStorage) {
+      try { await this.objectStorage.check(); }
+      catch (error) { throw new Error(`Supabase S3 startup connection check failed: ${error.message}`, { cause: error }); }
+    }
     else for (const area of ['private', 'public']) await fs.mkdir(path.join(this.root, area), { recursive: true, mode: 0o700 });
   }
   keyPath(area, key) {
