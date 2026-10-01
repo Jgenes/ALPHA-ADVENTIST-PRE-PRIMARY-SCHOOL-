@@ -10,7 +10,8 @@ const KEY_PATTERN = /^[a-f0-9]{48}$/;
 function supabaseStorageConfig(env = process.env) {
   const values = ENV_KEYS.map(key => env[key] || '');
   if (!values.some(Boolean)) return null;
-  if (values.some(value => !value)) throw new Error('Configure all Supabase S3 endpoint, region, access key, secret key and bucket settings.');
+  const missing = ENV_KEYS.filter(key => !env[key]);
+  if (missing.length) throw new Error(`Configure all Supabase S3 settings; missing: ${missing.join(', ')}. Set all five values or clear all five to use local storage.`);
   let endpoint;
   try { endpoint = new URL(env.SUPABASE_S3_ENDPOINT); } catch { throw new Error('SUPABASE_S3_ENDPOINT must be a valid HTTPS URL.'); }
   if (endpoint.protocol !== 'https:' || endpoint.username || endpoint.password || endpoint.search || endpoint.hash) throw new Error('SUPABASE_S3_ENDPOINT must be a trusted HTTPS endpoint without credentials or query parameters.');

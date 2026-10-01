@@ -68,7 +68,7 @@ Use separate databases, storage, keys, origins and alert recipients for each env
 - An explicitly configured, verified HTTPS `BASE_URL`.
 - A transaction-capable MongoDB replica set/Atlas database and either persistent `DATA_DIR` storage or a private Supabase S3 bucket for files. `DATA_DIR` is still required for temporary quarantine; with Supabase Storage it may be ephemeral.
 - Three distinct, separately escrowed 32-byte keys: MFA, private storage and audit HMAC.
-- A signed office-alert endpoint/secret or configured Gmail SMTP delivery with approved office and privacy recipients, an explicitly approved retention schedule, and a named safeguarding contact.
+- A signed office-alert endpoint/secret or configured Gmail SMTP delivery with approved office and privacy recipients, and an explicitly approved retention schedule. The safeguarding contact is managed dynamically through the portal’s independently reviewed and published school-contact settings; until configured, the site directs people to the Head of School’s office.
 
 The public site at **https://alpha-adventist-pre-primary-school.onrender.com** was reachable during a read-only check on **30 September 2026**. The similarly spelled hostname without the hyphen between `alpha` and `adventist` returned “Not Found.” The reachable URL is the development fallback only; production still requires an explicit `BASE_URL`, and the school must confirm its long-term official domain. No live deployment was performed in this implementation session.
 

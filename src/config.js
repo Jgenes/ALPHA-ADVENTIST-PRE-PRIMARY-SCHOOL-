@@ -44,7 +44,8 @@ function createConfig(env = process.env) {
   if (production && !publicPreview && (!mongoUri || !mongoDb)) throw new Error('An isolated MongoDB replica-set database is required outside development.');
   if (production && !publicPreview && (!env.FORM_RETENTION_DAYS || !env.ADMISSION_RETENTION_DAYS || env.RETENTION_POLICY_APPROVED !== 'true')) throw new Error('Configure and approve the retention schedule before production/staging startup.');
   const webhookConfigured = Boolean(env.OFFICE_ALERT_WEBHOOK_URL || env.OFFICE_ALERT_WEBHOOK_SECRET);
-  if (webhookConfigured && (!env.OFFICE_ALERT_WEBHOOK_URL || !env.OFFICE_ALERT_WEBHOOK_SECRET)) throw new Error('Configure both signed office-alert webhook settings.');
+  const missingWebhookSettings = ['OFFICE_ALERT_WEBHOOK_URL', 'OFFICE_ALERT_WEBHOOK_SECRET'].filter(name => !env[name]);
+  if (webhookConfigured && missingWebhookSettings.length) throw new Error(`Signed office-alert setup is incomplete; missing: ${missingWebhookSettings.join(', ')}. Set both webhook values or clear both to use Gmail SMTP.`);
   if (env.OFFICE_ALERT_WEBHOOK_URL) {
     const endpoint = new URL(env.OFFICE_ALERT_WEBHOOK_URL);
     if (endpoint.protocol !== 'https:' || endpoint.username || endpoint.password) throw new Error('Office alerts require a trusted HTTPS endpoint.');
@@ -60,7 +61,6 @@ function createConfig(env = process.env) {
     smtp = { user: env.GMAIL_SMTP_USER, password, from: env.GMAIL_SMTP_USER, officeEmail: env.OFFICE_ALERT_EMAIL, privacyEmail: env.PRIVACY_ALERT_EMAIL };
   }
   if (production && !publicPreview && !webhookConfigured && !smtp) throw new Error('Configure the signed office-alert integration or approved Gmail SMTP delivery before production/staging startup.');
-  if (production && !publicPreview && (!env.SAFEGUARDING_NAME || !env.SAFEGUARDING_PHONE)) throw new Error('Confirm the named safeguarding contact before production/staging startup.');
   const keys = { mfaKey: secret('MFA_ENCRYPTION_KEY'), storageKey: secret('STORAGE_ENCRYPTION_KEY'), auditKey: secret('AUDIT_HMAC_KEY') };
   if (new Set(Object.values(keys).map(value => value.toString('hex'))).size !== 3) throw new Error('MFA, storage and audit keys must be different.');
   const port = Number(env.PORT || 3000);
@@ -73,7 +73,6 @@ function createConfig(env = process.env) {
     proxyHops, sessionIdleMs: 30 * 60 * 1000, sessionAbsoluteMs: 8 * 60 * 60 * 1000,
     formRetentionDays: positive(env.FORM_RETENTION_DAYS, 90), admissionRetentionDays: positive(env.ADMISSION_RETENTION_DAYS, 365),
     alertUrl: env.OFFICE_ALERT_WEBHOOK_URL || '', alertSecret: env.OFFICE_ALERT_WEBHOOK_SECRET || '', smtp,
-    safeguardingName: env.SAFEGUARDING_NAME || '', safeguardingPhone: env.SAFEGUARDING_PHONE || '',
     scanCommand: env.UPLOAD_SCAN_COMMAND || '', maxUploadBytes: 5 * 1024 * 1024,
     adminUsername: env.ADMIN_USERNAME || 'system-admin', adminName: env.ADMIN_NAME || 'System Administrator', adminPassword: env.ADMIN_PASSWORD,
     policyVersion: 'privacy-2026-09-30-v2'

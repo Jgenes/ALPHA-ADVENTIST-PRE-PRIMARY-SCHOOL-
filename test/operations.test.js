@@ -32,7 +32,7 @@ test('operator safeguards and an actual isolated SQLite/file recovery rehearsal'
       SUPABASE_S3_SECRET_ACCESS_KEY: 'synthetic-secret', SUPABASE_STORAGE_BUCKET: 'alpha-private'
     });
     assert.equal(storageConfig.bucket, 'alpha-private');
-    assert.throws(() => supabaseStorageConfig({ SUPABASE_S3_ENDPOINT: storageConfig.endpoint }), /all Supabase S3/);
+    assert.throws(() => supabaseStorageConfig({ SUPABASE_S3_ENDPOINT: storageConfig.endpoint }), /missing: SUPABASE_S3_REGION, SUPABASE_S3_ACCESS_KEY_ID, SUPABASE_S3_SECRET_ACCESS_KEY, SUPABASE_STORAGE_BUCKET/);
     assert.throws(() => supabaseStorageConfig({
       SUPABASE_S3_ENDPOINT: 'http://unsafe.example', SUPABASE_S3_REGION: storageConfig.region,
       SUPABASE_S3_ACCESS_KEY_ID: storageConfig.accessKeyId, SUPABASE_S3_SECRET_ACCESS_KEY: storageConfig.secretAccessKey,

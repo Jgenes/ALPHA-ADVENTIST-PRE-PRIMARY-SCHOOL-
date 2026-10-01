@@ -31,10 +31,10 @@ test('ADSP security, persistence and institutional workflows', { timeout: 120000
       MFA_ENCRYPTION_KEY: '1'.repeat(64), STORAGE_ENCRYPTION_KEY: '2'.repeat(64), AUDIT_HMAC_KEY: '3'.repeat(64),
       FORM_RETENTION_DAYS: '90', ADMISSION_RETENTION_DAYS: '365', RETENTION_POLICY_APPROVED: 'true',
       OFFICE_ALERT_WEBHOOK_URL: 'https://alerts.example.test/receiver', OFFICE_ALERT_WEBHOOK_SECRET: 'synthetic-webhook-secret-at-least-32-characters',
-      SAFEGUARDING_NAME: 'Synthetic safeguarding lead', SAFEGUARDING_PHONE: '+255700000000'
     });
     assert.equal(remoteConfig.supabaseStorage.bucket, 'alpha-private');
     assert.equal(remoteConfig.dataDir, path.join(f.dir, 'remote-runtime'));
+    assert.throws(() => createConfig({ NODE_ENV: 'development', DATA_DIR: f.dir, BASE_URL: 'https://school.example.test', OFFICE_ALERT_WEBHOOK_URL: 'https://alerts.example.test/receiver' }), /missing: OFFICE_ALERT_WEBHOOK_SECRET/);
     const gmailConfig = createConfig({
       NODE_ENV: 'production', DATA_DIR: path.join(f.dir, 'gmail-runtime'), BASE_URL: 'https://school.example.test',
       MONGODB_URI: 'mongodb://database.example.test', MONGODB_DB_NAME: 'alpha_production',
@@ -42,7 +42,6 @@ test('ADSP security, persistence and institutional workflows', { timeout: 120000
       FORM_RETENTION_DAYS: '90', ADMISSION_RETENTION_DAYS: '365', RETENTION_POLICY_APPROVED: 'true',
       GMAIL_SMTP_USER: 'sender@example.test', GMAIL_SMTP_APP_PASSWORD: 'abcd efgh ijkl mnop',
       OFFICE_ALERT_EMAIL: 'office@example.test', PRIVACY_ALERT_EMAIL: 'privacy@example.test',
-      SAFEGUARDING_NAME: 'Synthetic safeguarding lead', SAFEGUARDING_PHONE: '+255700000000'
     });
     assert.equal(gmailConfig.smtp.password, 'abcdefghijklmnop');
     assert.throws(() => createConfig({ NODE_ENV: 'development', DATA_DIR: f.dir, BASE_URL: 'https://school.example.test', GMAIL_SMTP_USER: 'sender@example.test' }), /Gmail SMTP credentials/);
@@ -421,7 +420,7 @@ test('ADSP security, persistence and institutional workflows', { timeout: 120000
     });
   });
   await t.test('school contact settings remain private drafts until independent scheduled publication', async () => {
-    const details = { officePhone: '+255700000021', headPhone: '+255700000022', whatsappPhone: '+255700000022', email: 'office@example.test', box: 'Synthetic postal box', locationText: 'Synthetic test location', officeHours: 'Synthetic test hours', centreCode: 'SYN001', mapUrl: '', facebookUrl: '', instagramUrl: '', youtubeUrl: '', detailsVerified: true };
+    const details = { officePhone: '+255700000021', headPhone: '+255700000022', whatsappPhone: '+255700000022', safeguardingName: 'Synthetic safeguarding officer', safeguardingPhone: '+255700000023', email: 'office@example.test', box: 'Synthetic postal box', locationText: 'Synthetic test location', officeHours: 'Synthetic test hours', centreCode: 'SYN001', mapUrl: '', facebookUrl: '', instagramUrl: '', youtubeUrl: '', detailsVerified: true };
     let settings = await u.author.ok('POST', '/api/cms', { kind: 'settings', slug: 'school-contact', title: 'School contact details', excerpt: 'Verified synthetic contact details', body: JSON.stringify(details) });
     assert.ok(!(await anonymous.request('GET', '/contact')).text.includes('office@example.test'));
     settings = await u.author.ok('POST', '/api/cms/' + settings.id + '/action', { revision: settings.revision, action: 'SUBMIT' });
@@ -435,6 +434,10 @@ test('ADSP security, persistence and institutional workflows', { timeout: 120000
     await maintenance(app.platform);
     assert.ok((await anonymous.request('GET', '/contact')).text.includes('office@example.test'));
     assert.ok((await anonymous.request('GET', '/sw/contact')).text.includes('office@example.test'));
+    const safeguardingPage = (await anonymous.request('GET', '/safeguarding')).text;
+    assert.ok(safeguardingPage.includes('Synthetic safeguarding officer'));
+    assert.ok(safeguardingPage.includes('+255700000023'));
+    assert.ok((await anonymous.request('GET', '/privacy')).text.includes('Synthetic safeguarding officer'));
     assert.equal((await anonymous.request('GET', '/pages/school-contact')).status, 404);
     assert.equal((await u.author.request('POST', '/api/cms', { kind: 'settings', slug: 'school-contact', title: 'Unsafe setting', excerpt: 'Test', body: JSON.stringify({ ...details, facebookUrl: 'javascript:alert(1)' }) })).status, 400);
   });
