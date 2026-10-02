@@ -62,6 +62,16 @@ services:
         sync: false
       - key: UPLOAD_SCAN_COMMAND
         sync: false
+      - key: HEAD_TEACHER_USERNAME
+        sync: false
+      - key: HEAD_TEACHER_NAME
+        sync: false
+      - key: HEAD_TEACHER_PASSWORD
+        sync: false
+      - key: HEAD_TEACHER_APPROVED
+        sync: false
+      - key: HEAD_TEACHER_APPROVAL_REFERENCE
+        sync: false
     disk:
       name: alpha-school-private-files
       mountPath: /var/data

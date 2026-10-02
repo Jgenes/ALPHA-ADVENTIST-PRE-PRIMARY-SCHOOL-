@@ -46,6 +46,8 @@ npm run bootstrap -- --username ANOTHER_NAMED_USERNAME --name "Authorised school
 
 Replace the uppercase command placeholders with chosen lowercase usernames; they are not credentials. Each invocation requires `BOOTSTRAP_APPROVED=true`, a private `BOOTSTRAP_APPROVAL_REFERENCE`, and `BOOTSTRAP_PASSWORD_FILE` in the operator environment. No password belongs in the command line or this README. The first sign-in requires a password change and authenticator enrolment. Bootstrap refuses to repeat an existing initial authority.
 
+For a host without an operator shell, the first `head_teacher` account can instead be provisioned once at startup using `HEAD_TEACHER_USERNAME`, `HEAD_TEACHER_NAME`, `HEAD_TEACHER_PASSWORD`, `HEAD_TEACHER_APPROVED=true`, and `HEAD_TEACHER_APPROVAL_REFERENCE`. Set these temporarily in the host's private environment settings, deploy, confirm the account was created, then remove all five values. This path refuses to create the account without explicit approval and will not update an existing head-teacher account. Do not put the password or approval reference in source control. Management can then create ordinary staff accounts and assign business roles through the portal.
+
 Management can then appoint HR, departmental approvers, CMS authors/editors/publishers and the privacy officer. HR records staff IDs, departments, supervisors and entitlements. ICT accounts **do not inherit HR/contract/financial access or business approvals**.
 
 ## Checks

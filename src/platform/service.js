@@ -40,6 +40,20 @@ class Platform {
         });
       }
     }
+    const headTeacherConfig = this.config;
+    const hasHeadTeacherBootstrap = headTeacherConfig.headTeacherUsername || headTeacherConfig.headTeacherName || headTeacherConfig.headTeacherPassword || headTeacherConfig.headTeacherApproved || headTeacherConfig.headTeacherApprovalReference;
+    if (hasHeadTeacherBootstrap) {
+      const exists = await this.store.run(async tx => (await tx.list('users')).some(user => user.roles.includes('head_teacher')));
+      if (!exists) {
+        if (!headTeacherConfig.headTeacherUsername || !headTeacherConfig.headTeacherName || !headTeacherConfig.headTeacherPassword || !headTeacherConfig.headTeacherApproved || !headTeacherConfig.headTeacherApprovalReference) throw new Error('Head-teacher environment provisioning requires complete account details and explicit owner approval.');
+        const user = await createUserRecord(headTeacherConfig.headTeacherUsername.toLowerCase(), headTeacherConfig.headTeacherName, ['head_teacher'], headTeacherConfig.headTeacherPassword);
+        await this.store.run(async tx => {
+          if ((await tx.list('users')).some(item => item.roles.includes('head_teacher'))) return;
+          await tx.insert('users', user);
+          await audit(tx, this.config, { userId: 'owner-approved-bootstrap' }, 'user.bootstrap', 'user', user.id, 'success', { role: 'head_teacher', approvalReference: String(headTeacherConfig.headTeacherApprovalReference).slice(0, 120) });
+        });
+      }
+    }
   }
   run(actor, fn) {
     return this.store.run(async tx => {

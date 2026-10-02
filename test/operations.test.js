@@ -81,6 +81,41 @@ test('operator safeguards and an actual isolated SQLite/file recovery rehearsal'
     assert.equal(user.mustChangePassword, true); assert.equal(user.mfaEnabled, false); assert.deepEqual(user.roles, ['system_admin']);
     await assert.rejects(bootstrapUser(app.store, config, { ...input, username: 'another.operator' }), /already exists/);
   });
+  await t.test('Render head-teacher environment bootstrap requires approval and provisions only once', async () => {
+    const headTeacherDataDir = path.join(root, 'head-teacher');
+    const headTeacherConfig = createConfig({
+      NODE_ENV: 'test', DATA_DIR: headTeacherDataDir, BASE_URL: 'https://school.example.test',
+      HEAD_TEACHER_USERNAME: 'kato', HEAD_TEACHER_NAME: 'Kato Morandi',
+      HEAD_TEACHER_PASSWORD: crypto.randomBytes(24).toString('base64url') + 'aA1!',
+      HEAD_TEACHER_APPROVED: 'true', HEAD_TEACHER_APPROVAL_REFERENCE: 'SYNTHETIC-OWNER-DECISION'
+    });
+    const headTeacherApp = await createApplication(headTeacherConfig, { jobs: false });
+    const users = await headTeacherApp.store.run(tx => tx.list('users'));
+    assert.equal(users.length, 1);
+    assert.equal(users[0].username, 'kato');
+    assert.deepEqual(users[0].roles, ['head_teacher']);
+    assert.equal(users[0].mustChangePassword, true);
+    await headTeacherApp.close();
+
+    const changedBootstrapConfig = {
+      ...headTeacherConfig, headTeacherUsername: 'replacement', headTeacherName: 'Replacement',
+      headTeacherPassword: crypto.randomBytes(24).toString('base64url') + 'aA1!'
+    };
+    const restartedApp = await createApplication(changedBootstrapConfig, { jobs: false });
+    try {
+      const afterRestart = await restartedApp.store.run(tx => tx.list('users'));
+      assert.equal(afterRestart.length, 1);
+      assert.equal(afterRestart[0].username, 'kato');
+      assert.equal(afterRestart[0].name, 'Kato Morandi');
+    } finally { await restartedApp.close(); }
+
+    const unapprovedConfig = createConfig({
+      NODE_ENV: 'test', DATA_DIR: path.join(root, 'unapproved-head-teacher'), BASE_URL: 'https://school.example.test',
+      HEAD_TEACHER_USERNAME: 'kato', HEAD_TEACHER_NAME: 'Kato Morandi',
+      HEAD_TEACHER_PASSWORD: crypto.randomBytes(24).toString('base64url') + 'aA1!'
+    });
+    await assert.rejects(createApplication(unapprovedConfig, { jobs: false }), /explicit owner approval/);
+  });
   await t.test('anonymous session creation is bounded per source without inventing a default account', async () => {
     const request = { headers: {}, socket: { remoteAddress: '192.0.2.77' } };
     for (let i = 0; i < 60; i++) await app.auth.actor(request, { setHeader() {} }, true);

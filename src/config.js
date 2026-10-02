@@ -101,6 +101,8 @@ function createConfig(env = process.env) {
     alertUrl: env.OFFICE_ALERT_WEBHOOK_URL || '', alertSecret: env.OFFICE_ALERT_WEBHOOK_SECRET || '', smtp,
     scanCommand: env.UPLOAD_SCAN_COMMAND || '', maxUploadBytes: 5 * 1024 * 1024,
     adminUsername: env.ADMIN_USERNAME || 'system-admin', adminName: env.ADMIN_NAME || 'System Administrator', adminPassword: env.ADMIN_PASSWORD,
+    headTeacherUsername: env.HEAD_TEACHER_USERNAME || '', headTeacherName: env.HEAD_TEACHER_NAME || '', headTeacherPassword: env.HEAD_TEACHER_PASSWORD,
+    headTeacherApproved: env.HEAD_TEACHER_APPROVED === 'true', headTeacherApprovalReference: env.HEAD_TEACHER_APPROVAL_REFERENCE || '',
     policyVersion: 'privacy-2026-09-30-v2'
   };
 }
