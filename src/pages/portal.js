@@ -21,7 +21,7 @@ const NAV = [
   ['privacy', 'shield', 'Privacy & consent', 'privacy.manage'],
   ['reports', 'growth', 'Reports', ['report.read', 'report.hr', 'system.read', 'cms.publish']],
   ['workflows', 'link', 'Approval routes', 'workflow.read', 'GOVERNANCE'],
-  ['users', 'lock', 'Accounts & roles', ['user.create', 'role.grant']],
+  ['users', 'lock', 'Users', ['user.create', 'role.grant']],
   ['audit', 'eye', 'Audit trail', 'audit.read'],
   ['system', 'chip', 'System health', 'system.read'],
   ['help', 'heart', 'Help & security', null]
