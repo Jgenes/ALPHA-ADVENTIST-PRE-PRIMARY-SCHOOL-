@@ -90,28 +90,42 @@ function sectionHead(kicker, title, text, opts = {}) {
 /* ============ NAV ============ */
 const NAV = [
   { href: '/', label: 'Home', sw: 'Mwanzo' },
-  { href: '/about', label: 'About Us', sw: 'Kuhusu Shule' },
-  { href: '/academics', label: 'Academics', sw: 'Taaluma' },
+  { href: '/about', label: 'About Us', sw: 'Kuhusu Shule', group: 'school' },
+  { href: '/academics', label: 'Academics', sw: 'Taaluma', group: 'school' },
   { href: '/admissions', label: 'Admissions', sw: 'Uandikishaji' },
-  { href: '/computer-learning', label: 'Computer Learning', sw: 'TEHAMA' },
-  { href: '/school-life', label: 'School Life', sw: 'Maisha ya Shule' },
-  { href: '/parents', label: 'Parents', sw: 'Wazazi' },
-  { href: '/students', label: 'Students', sw: 'Wanafunzi' },
-  { href: '/news', label: 'News & Events', sw: 'Habari' },
-  { href: '/gallery', label: 'Gallery', sw: 'Picha' },
+  { href: '/computer-learning', label: 'Computer Learning', sw: 'TEHAMA', group: 'community' },
+  { href: '/school-life', label: 'School Life', sw: 'Maisha ya Shule', group: 'school' },
+  { href: '/parents', label: 'Parents', sw: 'Wazazi', group: 'community' },
+  { href: '/students', label: 'Students', sw: 'Wanafunzi', group: 'community' },
+  { href: '/news', label: 'News & Events', sw: 'Habari', group: 'school' },
+  { href: '/gallery', label: 'Gallery', sw: 'Picha', group: 'school' },
   { href: '/contact', label: 'Contact', sw: 'Wasiliana' },
-  { href: '/downloads', label: 'Downloads', sw: 'Nyaraka' },
+  { href: '/downloads', label: 'Downloads', sw: 'Nyaraka', group: 'resources' },
   { href: '/portal', label: 'Portal Login', sw: 'Ingia Portal' }
 ];
+const NAV_GROUPS = {
+  school: { label: 'Our School', sw: 'Shule Yetu' },
+  community: { label: 'Families & Learning', sw: 'Familia na Masomo' },
+  resources: { label: 'Resources', sw: 'Rasilimali' }
+};
 
 function header(ctx) {
   const s = ctx.db.settings;
   const path = ctx.path.replace(/^\/sw(?=\/|$)/, '') || '/';
   const sw = ctx.lang === 'sw';
   const isActive = href => (href === '/' ? path === '/' : path === href || path.startsWith(href + '/'));
-  const navItem = n => `<li><a href="${localPath(ctx, n.href)}" ${isActive(n.href) ? 'aria-current="page"' : ''}>${esc(sw ? n.sw : n.label)}</a></li>`;
   const visibleNav = ctx.config?.publicPreview ? NAV.filter(item => item.href !== '/portal') : NAV;
-  const links = visibleNav.map(navItem).join('');
+  const navItem = n => `<li><a href="${localPath(ctx, n.href)}" ${isActive(n.href) ? 'aria-current="page"' : ''}>${esc(sw ? n.sw : n.label)}</a></li>`;
+  const renderedGroups = new Set();
+  const links = visibleNav.map(item => {
+    if (!item.group) return navItem(item);
+    if (renderedGroups.has(item.group)) return '';
+    renderedGroups.add(item.group);
+    const group = NAV_GROUPS[item.group];
+    const items = visibleNav.filter(link => link.group === item.group);
+    const current = items.some(link => isActive(link.href));
+    return `<li class="nav-dropdown"><details${current ? ' data-current="true"' : ''}><summary>${esc(sw ? group.sw : group.label)}</summary><ul class="nav-dropdown__menu">${items.map(navItem).join('')}</ul></details></li>`;
+  }).join('');
   const mlinks = links;
   const alternate = ['/', '/admissions', '/contact'].includes(path) ? path : '/';
   const languageSwitch = `<div class="language-switch" aria-label="Language"><a href="${alternate}" lang="en" ${!sw ? 'aria-current="true"' : ''}>EN</a><span>/</span><a href="/sw${alternate === '/' ? '' : alternate}" lang="sw" ${sw ? 'aria-current="true"' : ''}>SW</a></div>`;

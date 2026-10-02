@@ -4,30 +4,38 @@ const { icon } = require('../layout');
 const { safeUser, needsMfa } = require('../platform/auth');
 const { has, ROLE_LABELS } = require('../platform/access');
 const NAV = [
-  ['dashboard', 'grid', 'Overview', null, 'WORKSPACE'],
-  ['profile', 'users', 'My profile', 'staff.view_self'],
-  ['leave', 'calendar', 'Leave', 'leave.create'],
-  ['contracts', 'clipboard', 'My contracts', 'contract.view_self'],
-  ['documents', 'book', 'Document library', 'document.read'],
-  ['notices', 'mega', 'Notice board', 'notice.read'],
-  ['calendar', 'calendar', 'Calendar & training', 'calendar.read'],
-  ['requests', 'clock', 'My requests', 'request.read'],
-  ['approvals', 'check', 'Approval inbox', ['leave.review', 'leave.approve', 'contract.review', 'contract.view_self', 'document.review', 'cms.review', 'cms.approve', 'media.review']],
-  ['staff', 'users', 'People & HR', 'staff.manage', 'MANAGEMENT'],
-  ['cms', 'pencil', 'Website content', ['cms.create', 'cms.review', 'cms.approve', 'cms.publish']],
-  ['media', 'camera', 'Media library', ['media.create', 'media.review', 'media.publish']],
-  ['admissions', 'badge', 'Admissions', 'admission.read'],
-  ['enquiries', 'mail', 'Enquiry desk', 'submission.read'],
-  ['privacy', 'shield', 'Privacy & consent', 'privacy.manage'],
-  ['reports', 'growth', 'Reports', ['report.read', 'report.hr', 'system.read', 'cms.publish']],
-  ['workflows', 'link', 'Approval routes', 'workflow.read', 'GOVERNANCE'],
-  ['users', 'lock', 'Users', ['user.create', 'role.grant']],
-  ['audit', 'eye', 'Audit trail', 'audit.read'],
-  ['system', 'chip', 'System health', 'system.read'],
-  ['help', 'heart', 'Help & security', null]
+  ['dashboard', 'grid', 'Overview', null, 'Workspace'],
+  ['profile', 'users', 'My profile', 'staff.view_self', 'My work'],
+  ['leave', 'calendar', 'Leave', 'leave.create', 'My work'],
+  ['contracts', 'clipboard', 'My contracts', 'contract.view_self', 'My work'],
+  ['documents', 'book', 'Document library', 'document.read', 'My work'],
+  ['notices', 'mega', 'Notice board', 'notice.read', 'My work'],
+  ['calendar', 'calendar', 'Calendar & training', 'calendar.read', 'My work'],
+  ['requests', 'clock', 'My requests', 'request.read', 'My work'],
+  ['approvals', 'check', 'Approval inbox', ['leave.review', 'leave.approve', 'contract.review', 'contract.view_self', 'document.review', 'cms.review', 'cms.approve', 'media.review'], 'My work'],
+  ['notifications', 'mega', 'Notifications', null, 'My work'],
+  ['search', 'eye', 'Search the platform', 'search', 'My work'],
+  ['staff', 'users', 'People & HR', 'staff.manage', 'People & access'],
+  ['users', 'lock', 'Users', ['user.create', 'role.grant'], 'People & access'],
+  ['admissions', 'badge', 'Admissions', 'admission.read', 'Admissions'],
+  ['enquiries', 'mail', 'Enquiry desk', 'submission.read', 'Admissions'],
+  ['cms', 'pencil', 'Website content', ['cms.create', 'cms.review', 'cms.approve', 'cms.publish'], 'Website & safeguarding'],
+  ['media', 'camera', 'Media library', ['media.create', 'media.review', 'media.publish'], 'Website & safeguarding'],
+  ['privacy', 'shield', 'Privacy & consent', 'privacy.manage', 'Website & safeguarding'],
+  ['reports', 'growth', 'Reports', ['report.read', 'report.hr', 'system.read', 'cms.publish'], 'Governance & system'],
+  ['workflows', 'link', 'Approval routes', 'workflow.read', 'Governance & system'],
+  ['audit', 'eye', 'Audit trail', 'audit.read', 'Governance & system'],
+  ['system', 'chip', 'System health', 'system.read', 'Governance & system'],
+  ['help', 'heart', 'Help & security', null, 'Support']
 ];
 function navigation(user, section) {
-  return NAV.filter(([, , , permission]) => !permission || (Array.isArray(permission) ? permission.some(p => has(user, p)) : has(user, permission))).map(([key, ic, label, permission, group]) => `${group ? `<span class="p-nav-group">${group}</span>` : ''}<a href="/portal/${key === 'dashboard' ? '' : key}" ${section === key ? 'aria-current="page"' : ''}>${icon(ic)}<span>${label}</span>${key === 'approvals' ? '<span class="p-nav-count" data-approval-count hidden></span>' : ''}</a>`).join('');
+  const visible = NAV.filter(([, , , permission]) => !permission || (Array.isArray(permission) ? permission.some(p => has(user, p)) : has(user, permission)));
+  const groups = [...new Set(visible.map(([, , , , group]) => group))];
+  return groups.map(group => {
+    const items = visible.filter(([, , , , itemGroup]) => itemGroup === group);
+    const links = items.map(([key, ic, label]) => `<a href="/portal/${key === 'dashboard' ? '' : key}" ${section === key ? 'aria-current="page"' : ''}>${icon(ic)}<span>${label}</span>${key === 'approvals' ? '<span class="p-nav-count" data-approval-count hidden></span>' : ''}</a>`).join('');
+    return `<details class="p-nav-group"${items.some(([key]) => key === section) ? ' open' : ''}><summary>${group}</summary><div class="p-nav-group__items">${links}</div></details>`;
+  }).join('');
 }
 function portal(ctx, actor, config) {
   const user = actor.user;
@@ -65,7 +73,7 @@ ${mode !== 'app' ? `
 </main>` : `
 <header class="site-head portal-header"><div class="container site-head__in"><a class="brand" href="/portal"><img class="brand__logo" src="/img/logo-96.png" alt="School crest" width="52" height="51"><span class="brand__text"><strong>Alpha School Portal</strong><small>${esc(user.roles.map(role => ROLE_LABELS[role] || role).join(' · '))}</small></span></a><div class="site-head__actions"><a class="btn btn--ghost btn--sm" href="/">View website</a><a class="p-icon-btn" href="/portal/notifications" aria-label="Notifications">${icon('mega')}<i data-notification-dot hidden></i></a><button class="btn btn--primary btn--sm" type="button" data-logout>Sign out</button></div></div></header>
 <div class="admin-wrap">
-  <nav class="admin-side p-sidebar" id="portal-navigation" aria-label="Workspace navigation">${navigation(user, section)}<a href="/portal/notifications">${icon('mega')} Notifications</a>${has(user, 'search') ? `<a href="/portal/search">${icon('eye')} Search the platform</a>` : ''}</nav>
+  <nav class="admin-side p-sidebar" id="portal-navigation" aria-label="Workspace navigation">${navigation(user, section)}</nav>
   <main class="admin-main p-workspace" id="workspace" tabindex="-1"><div class="p-page-heading"><div><h1>${esc(title)}</h1><p class="p-small">${esc(user.name)} · ${esc(user.roles.map(role => ROLE_LABELS[role] || role).join(' · '))}</p></div><span class="p-date">${icon('calendar')} ${esc(new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Africa/Dar_es_Salaam' }))}</span></div><div id="page-content" aria-live="polite"><div class="p-loading">${icon('clock')} Loading your authorised workspace…</div></div></main>
 </div>
 <dialog class="p-dialog" id="record-dialog"><div class="p-dialog-head"><h2 id="dialog-title"></h2><button type="button" class="p-icon-btn" data-close-dialog aria-label="Close">${icon('close')}</button></div><form id="record-form"><div id="dialog-fields"></div><p class="p-form-status" role="alert" hidden></p><div class="p-dialog-actions"><button type="button" class="p-btn p-btn-secondary" data-close-dialog>Cancel</button><button type="submit" class="p-btn p-btn-primary">Save & continue ${icon('arrow')}</button></div></form></dialog>
