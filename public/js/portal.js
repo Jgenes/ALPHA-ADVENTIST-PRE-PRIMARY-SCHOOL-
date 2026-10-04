@@ -153,7 +153,7 @@
   }
   async function renderUsers() {
     const records = await api('/api/users'); state.rows = records;
-    return toolbar('Identity administration is separate from institutional authority. No account includes a built-in password.', has('user.create') ? button('new-user', '+ Create account') : '') + info('New accounts must change their initial password. Privileged users must then enrol MFA. Technical administrators can provision ordinary accounts, but only management can grant business roles. Role changes invalidate existing sessions.') + table(['Account', 'Roles', 'MFA', 'Status', 'Actions'], records.map(record => `<tr><td><strong>${esc(record.name)}</strong><small>${esc(record.username)}</small></td><td>${record.roles.map(role => `<small>${esc(pretty(role))}</small>`).join('')}</td><td>${status(record.mfaEnabled ? 'Enabled' : 'Not enrolled')}</td><td>${status(record.active ? 'Active' : 'Disabled')}</td><td><div class="p-row-actions">${record.id !== context.user.id && has('role.grant') && !record.roles.some(role => ['system_admin', 'ict_officer'].includes(role)) ? button('edit-roles', 'Assign roles', record.id, true) : ''}${record.id !== context.user.id && has('user.manage') ? button('toggle-user', record.active ? 'Disable' : 'Enable', record.id, true) : ''}</div></td></tr>`));
+    return toolbar('Identity administration is separate from institutional authority. No account includes a built-in password.', has('user.create') ? button('new-user', '+ Create account') : '') + info('New accounts must change their initial password. Privileged users must then enrol MFA. Technical administrators can provision ordinary accounts, but only management can grant business roles. Role changes invalidate existing sessions.') + table(['Account', 'Roles', 'MFA', 'Status', 'Actions'], records.map(record => `<tr><td><strong>${esc(record.name)}</strong><small>${esc(record.username)}</small></td><td>${record.roles.map(role => `<small>${esc(pretty(role))}</small>`).join('')}</td><td>${status(record.mfaEnabled ? 'Enabled' : record.mfaResetRequired ? 'Pending' : 'Not enrolled')}</td><td>${status(record.active ? 'Active' : 'Disabled')}</td><td><div class="p-row-actions">${record.id !== context.user.id && has('role.grant') && !record.roles.some(role => ['system_admin', 'ict_officer'].includes(role)) ? button('edit-roles', 'Assign roles', record.id, true) : ''}${record.id !== context.user.id && has('user.manage') ? button('toggle-user', record.active ? 'Disable' : 'Enable', record.id, true) : ''}${record.id !== context.user.id && record.mfaEnabled && has('user.manage') ? button('reset-user-mfa', 'Reset MFA', record.id, true) : ''}</div></td></tr>`));
   }
   async function renderNotifications() {
     const records = await api('/api/notifications'); state.rows = records;
@@ -334,6 +334,9 @@
     else if (action === 'toggle-user') {
       if (!confirm(`${record.active ? 'Disable' : 'Enable'} this account? Existing sessions will be invalidated.`)) return;
       result = await api(`/api/users/${id}`, 'PATCH', { revision: record.revision, active: !record.active });
+    } else if (action === 'reset-user-mfa') {
+      if (!confirm(`Reset MFA for ${record.name}? Their sessions will end and they must enroll a new authenticator before accessing the portal.`)) return;
+      result = await api(`/api/users/${id}/mfa-reset`, 'POST', { revision: record.revision });
     } else if (action === 'submit-content' || action === 'archive-content') {
       if (action === 'archive-content' && !confirm('Archive this item and remove it from the public website?')) return;
       result = await api(`/api/cms/${id}/action`, 'POST', { revision: record.revision, action: action === 'submit-content' ? 'SUBMIT' : 'ARCHIVE' });

@@ -17,7 +17,7 @@ function requestIp(req, config) {
 }
 function safeUser(user) {
   if (!user) return null;
-  return { id: user.id, username: user.username, name: user.name, roles: user.roles, departmentId: user.departmentId || '', permissions: Access.permissions(user), mfaEnabled: !!user.mfaEnabled, active: user.active, auditScopes: user.auditScopes || [], revision: user.revision };
+  return { id: user.id, username: user.username, name: user.name, roles: user.roles, departmentId: user.departmentId || '', permissions: Access.permissions(user), mfaEnabled: !!user.mfaEnabled, mfaResetRequired: !!user.mfaResetRequired, active: user.active, auditScopes: user.auditScopes || [], revision: user.revision };
 }
 function secureCookie(req, config) {
   return config.production || !!req.socket.encrypted || (config.proxyHops > 0 && String(req.headers['x-forwarded-proto'] || '').split(',').pop().trim() === 'https');
@@ -68,7 +68,7 @@ async function liveActor(tx, actor, config) {
   if (!session || !user?.active || session.userId !== user.id || session.authVersion !== user.authVersion || session.expiresAt <= Date.now() || Date.now() - session.lastSeen > config.sessionIdleMs) throw new HttpError(403, 'Please sign in again.', 'AUTH_REQUIRED');
   return { ...actor, user, session };
 }
-function needsMfa(user) { return !!user && Access.requiresMfa(user) && !user.mfaEnabled; }
+function needsMfa(user) { return !!user && (!!user.mfaResetRequired || Access.requiresMfa(user) && !user.mfaEnabled); }
 function requireReady(actor) {
   if (!actor.user) throw new HttpError(403, 'Please sign in.', 'AUTH_REQUIRED');
   if (actor.user.mustChangePassword) throw new HttpError(403, 'Change your initial password before continuing.', 'PASSWORD_REQUIRED');
@@ -205,7 +205,7 @@ class Auth {
         await audit(tx, this.config, actor, 'auth.mfa_enroll', 'user', user.id, 'failure');
         return { error: new HttpError(400, 'Authenticator code is incorrect or expired.') };
       }
-      const updated = await tx.update('users', { ...user, mfaEnabled: true, mfaSecretEnc: session.mfaSetupEnc, lastTotpStep: step, authVersion: user.authVersion + 1 });
+      const updated = await tx.update('users', { ...user, mfaEnabled: true, mfaResetRequired: false, mfaSecretEnc: session.mfaSetupEnc, lastTotpStep: step, authVersion: user.authVersion + 1 });
       for (const item of await tx.list('sessions')) if (item.userId === user.id) await tx.remove('sessions', item.id);
       const rotated = await rotate(tx, null, updated, this.config);
       await audit(tx, this.config, actor, 'auth.mfa_enroll', 'user', user.id);

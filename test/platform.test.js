@@ -141,6 +141,32 @@ test('ADSP security, persistence and institutional workflows', { timeout: 120000
     for (const route of ['/api/admissions', '/api/contracts', '/api/staff', '/api/privacy']) assert.equal((await u.tech.request('GET', route)).status, 403, route);
     assert.equal((await u.publisher.request('GET', '/api/submissions')).status, 403);
   });
+  await t.test('MFA recovery resets one account, revokes sessions and requires re-enrollment', async () => {
+    const target = await createUserRecord('mfa.reset.target', 'Synthetic recovery target', ['head_teacher'], f.password);
+    target.mustChangePassword = false;
+    target.mfaEnabled = true;
+    const secret = L.createTotpSecret();
+    target.mfaSecretEnc = L.encrypt(Buffer.from(secret), f.config.mfaKey).toString('base64');
+    const stored = await app.store.run(tx => tx.insert('users', target));
+    const targetAgent = new Agent(f.base);
+    await targetAgent.login(stored, f.password, secret);
+    assert.equal((await targetAgent.request('GET', '/api/dashboard')).status, 200);
+    assert.equal((await u.tech.request('POST', `/api/users/${users.tech.id}/mfa-reset`, { revision: users.tech.revision })).status, 403);
+    assert.equal((await u.teacher.request('POST', `/api/users/${stored.id}/mfa-reset`, { revision: stored.revision })).status, 403);
+
+    const reset = await u.tech.ok('POST', `/api/users/${stored.id}/mfa-reset`, { revision: stored.revision });
+    assert.equal(reset.mfaEnabled, false);
+    assert.equal(reset.mfaResetRequired, true);
+    assert.equal((await targetAgent.request('GET', '/api/dashboard')).json.code, 'AUTH_REQUIRED');
+    assert.equal(await app.store.run(async tx => (await tx.list('sessions')).some(session => session.userId === stored.id)), false);
+    assert.ok(await app.store.run(async tx => (await tx.list('audit_logs')).some(entry => entry.action === 'auth.mfa_reset' && entry.resourceId === stored.id && entry.userId === users.tech.id)));
+
+    await targetAgent.login(stored, f.password);
+    assert.equal((await targetAgent.request('GET', '/api/dashboard')).json.code, 'MFA_REQUIRED');
+    const setup = await targetAgent.ok('POST', '/api/auth/mfa/setup', {});
+    const enrolled = await targetAgent.ok('POST', '/api/auth/mfa/confirm', { code: L.totp(setup.secret) });
+    assert.equal(enrolled.needsMfa, false);
+  });
   await t.test('all five public forms require consent, whitelist fields, return durable references and alerts', async () => {
     const missing = await anonymous.request('POST', '/api/apply', { child_name: 'Synthetic pupil', guardian_name: 'Synthetic guardian', phone: '+255700000000', level: 'KG I', arrangement: 'Day' });
     assert.equal(missing.status, 400);

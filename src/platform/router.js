@@ -70,6 +70,7 @@ async function handleApi(req, res, url, platform, auth) {
   else if (route === '/api/roles' && verb === 'GET') { A.requirePermission(actor.user, 'role.grant'); result = A.ROLE_PERMISSIONS; }
   else if (route === '/api/users' && verb === 'GET') result = await platform.users(actor);
   else if (route === '/api/users' && verb === 'POST') result = await platform.createUser(actor, body);
+  else if (/^\/api\/users\/[^/]+\/mfa-reset$/.test(route) && verb === 'POST') result = await platform.resetUserMfa(actor, id, body);
   else if (/^\/api\/users\/[^/]+$/.test(route) && verb === 'PATCH') result = await platform.changeUser(actor, id, body);
   else if (route === '/api/staff' && verb === 'GET') result = await platform.staff(actor);
   else if (route === '/api/staff/directory' && verb === 'GET') result = await platform.staff(actor, true);
