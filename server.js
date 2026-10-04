@@ -33,6 +33,16 @@ function send(res, status, html, headers = {}) {
   res.writeHead(status, { 'Content-Type': 'text/html; charset=utf-8', 'Content-Length': body.length, 'Cache-Control': 'no-cache', ...headers });
   res.end(body);
 }
+function safeErrorMessage(error) {
+  return String(error?.message || error?.name || 'Unknown error')
+    .replace(/mongodb(?:\+srv)?:\/\/[^\s"'`]+/gi, '[redacted MongoDB URI]')
+    .replace(/\b(password|passwd|secret|token|authorization|api[_-]?key)\s*[:=]\s*("[^"]*"|'[^']*'|[^\s,;]+)/gi, '$1=[redacted]')
+    .replace(/[\r\n\t]+/g, ' ')
+    .slice(0, 500);
+}
+function safeErrorLocation(error) {
+  return String(error?.stack || '').split('\n').slice(1, 4).join(' ').replace(/\s+/g, ' ').slice(0, 500);
+}
 function redirect(res, target, status = 303) { res.writeHead(status, { Location: target, 'Cache-Control': 'no-store' }); res.end(); }
 function headers(req, res, config, nonce) {
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -137,7 +147,7 @@ async function createApplication(config = createConfig(), options = {}) {
         try { await store.run(tx => audit(tx, config, req.actor || { ip: requestIp(req, config) }, status === 403 ? 'api.access_denied' : 'api.request_failed', 'api', url.pathname.replace(/\/api\/downloads\/.*/, '/api/downloads/[redacted]'), status === 403 ? 'denied' : 'failure', { method: req.method, status })); }
         catch { console.error('[audit] recording failed; investigate database availability.'); }
       }
-      if (status >= 500) console.error('[request] failed', error.name, error.code || '');
+      if (status >= 500) console.error('[request] failed', error.name, error.code || '', safeErrorMessage(error), safeErrorLocation(error));
       const message = status < 500 ? error.message : error instanceof L.HttpError ? error.message : 'The service is temporarily unavailable. Please try again or contact the school.';
       if (!res.headersSent) {
         if (url?.pathname.startsWith('/api/')) return json(res, status, { ok: false, code: error.code || 'REQUEST_FAILED', message });
