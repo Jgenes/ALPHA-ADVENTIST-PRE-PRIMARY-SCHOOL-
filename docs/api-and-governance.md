@@ -11,7 +11,7 @@ The vanilla-JS portal calls the same server-authorised APIs a separate client wo
 5. Updates/decisions include the record’s numeric `revision`; stale writes return 409. Reload instead of blindly repeating an approval.
 6. Check both action permission and returned resource scope. An ID/reference, role label, client-submitted owner or browser button is not authorisation.
 
-Business responses use `{ ok: true, data: ... }`; authentication/public-form responses have top-level fields. Failures use `{ ok: false, code, message }`. Authentication/authorisation failures are generally 403, invalid sign-in is 401, conflicts 409, rate limits 429, oversized bodies 413. A missing scanner returns 503; binary upload is not silently accepted. Private responses use `no-store`.
+Business responses use `{ ok: true, data: ... }`; authentication/public-form responses have top-level fields. Failures use `{ ok: false, code, message }`. Authentication/authorisation failures are generally 403, invalid sign-in is 401, conflicts 409, rate limits 429, oversized bodies 413. Private responses use `no-store`.
 
 No client bearer token is saved in local/session storage. The opaque session cookie is HttpOnly/SameSite=Lax and Secure outside development. Only development requests on the HTTPS `port-sandbox.e2b.app` preview host use Secure, SameSite=None, Partitioned cookies so an embedded preview can retain its session. Origin and CSRF checks still apply. Login retries a CSRF failure once after refreshing the session; business mutations are never automatically retried. The service re-reads the active session and user authority in the same transaction as business actions.
 
@@ -42,7 +42,7 @@ The exact dispatcher is `src/platform/router.js`; there are no wildcard model en
 
 Public forms use purpose-specific whitelisted fields, a privacy acknowledgement and optional client-generated `submissionKey` for deduplication. They do not need a staff login. A confirmation is a saved office reference, not an admission offer or proof of external message delivery. The per-source form limit is eight/hour. Public uploads and anonymous reference-to-private-record lookup are not exposed.
 
-Files are bounded base64 JSON (`file: { name, content }`), decoded size at most 5 MB. Only safe UTF-8 text or scanned PDFs are accepted for documents/contracts; media accepts scanned and re-encoded JPEG/PNG. Office/HTML/SVG uploads are not supported. Original filenames never become storage paths. Quarantine is private; approved public copies have their own storage area.
+Files are bounded base64 JSON (`file: { name, content }`), decoded size at most 5 MB. Documents/contracts accept UTF-8 text or PDFs; media accepts JPEG/PNG, which are re-encoded to remove metadata. Files are **not malware-scanned**; PDF active-content checks, file-type checks, encryption, authorization and review workflows do not guarantee a file is safe. Upload only files from trusted sources. Office/HTML/SVG uploads are not supported. Original filenames never become storage paths; approved public copies have their own storage area.
 
 ## Workflow configuration
 

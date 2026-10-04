@@ -2,15 +2,12 @@
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const crypto = require('node:crypto');
-const { execFile } = require('node:child_process');
-const { promisify, TextDecoder } = require('node:util');
+const { TextDecoder } = require('node:util');
 const { HttpError, encrypt, decrypt, sha256 } = require('../lib');
 const { createSupabaseStorage } = require('./supabase-storage');
-const execute = promisify(execFile);
 class Files {
   constructor(config, objectStorage) { this.config = config; this.root = path.join(config.dataDir, 'storage'); this.objectStorage = objectStorage || createSupabaseStorage(config.supabaseStorage); }
   async init() {
-    await fs.mkdir(path.join(this.root, 'quarantine'), { recursive: true, mode: 0o700 });
     if (this.objectStorage) {
       try { await this.objectStorage.check(); }
       catch (error) { throw new Error(`Supabase S3 startup connection check failed: ${error.message}`, { cause: error }); }
@@ -18,7 +15,7 @@ class Files {
     else for (const area of ['private', 'public']) await fs.mkdir(path.join(this.root, area), { recursive: true, mode: 0o700 });
   }
   keyPath(area, key) {
-    if (!['private', 'public', 'quarantine'].includes(area) || !/^[a-f0-9]{48}$/.test(key)) throw new Error('Invalid storage key.');
+    if (!['private', 'public'].includes(area) || !/^[a-f0-9]{48}$/.test(key)) throw new Error('Invalid storage key.');
     return path.join(this.root, area, key);
   }
   async readStored(area, key) { return this.objectStorage ? this.objectStorage.get(area, key) : fs.readFile(this.keyPath(area, key)); }
@@ -29,18 +26,6 @@ class Files {
   async removeStored(area, key) {
     if (this.objectStorage) return this.objectStorage.remove(area, key);
     await fs.rm(this.keyPath(area, key), { force: true });
-  }
-  async scan(buffer) {
-    if (!this.config.scanCommand) throw new HttpError(503, 'Binary uploads are disabled until the school configures its malware scanner. Plain-text documents are supported.', 'SCANNER_REQUIRED');
-    const key = crypto.randomBytes(24).toString('hex');
-    const file = this.keyPath('quarantine', key);
-    try {
-      await fs.writeFile(file, buffer, { mode: 0o600, flag: 'wx' });
-      // Only an operator-configured executable, never a client command or URL.
-      await execute(this.config.scanCommand, ['--no-summary', file], { timeout: 30000, maxBuffer: 64000, windowsHide: true });
-    } catch (error) {
-      throw new HttpError(422, 'The file could not be verified as safe. It was not accepted.', 'SCAN_FAILED');
-    } finally { await fs.rm(file, { force: true }); }
   }
   async prepare(input, imageOnly = false) {
     if (!input || typeof input.content !== 'string' || typeof input.name !== 'string') throw new HttpError(400, 'Choose a file.');
@@ -55,12 +40,11 @@ class Files {
       const png = buffer.subarray(0, 8).equals(Buffer.from('89504e470d0a1a0a', 'hex'));
       const jpeg = buffer.subarray(0, 3).equals(Buffer.from('ffd8ff', 'hex'));
       if (!(png && extension === '.png' || jpeg && extension !== '.png')) throw new HttpError(400, 'Image type does not match its filename.');
-      await this.scan(buffer);
       try {
         // Re-encoding drops EXIF/GPS, profiles and ancillary metadata by default.
         buffer = await require('sharp')(buffer, { limitInputPixels: 25000000, animated: false }).rotate().resize(1600, 1600, { fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 84 }).toBuffer();
       } catch { throw new HttpError(400, 'This image is invalid or too large.'); }
-      mime = 'image/jpeg'; name = 'school-activity.jpg'; scanStatus = 'CLEAN_REENCODED';
+      mime = 'image/jpeg'; name = 'school-activity.jpg'; scanStatus = 'UNSCANNED_REENCODED';
     } else if (!imageOnly && extension === '.txt') {
       let decoded;
       try { decoded = new TextDecoder('utf-8', { fatal: true }).decode(buffer); } catch { throw new HttpError(400, 'Text documents must use UTF-8.'); }
@@ -69,7 +53,7 @@ class Files {
     } else if (!imageOnly && extension === '.pdf') {
       if (!buffer.subarray(0, 5).equals(Buffer.from('%PDF-')) || !buffer.subarray(-1024).includes(Buffer.from('%%EOF'))) throw new HttpError(400, 'Invalid PDF signature.');
       if (/\/(JavaScript|JS|Launch|EmbeddedFile|OpenAction|AA|RichMedia)\b/i.test(buffer.toString('latin1'))) throw new HttpError(400, 'Active or embedded PDF content is not supported.');
-      await this.scan(buffer); mime = 'application/pdf'; scanStatus = 'CLEAN';
+      mime = 'application/pdf'; scanStatus = 'UNSCANNED';
     } else throw new HttpError(415, imageOnly ? 'Use a JPEG or PNG image.' : 'Use a plain-text (.txt) or scanned PDF document.');
     const storageKey = crypto.randomBytes(24).toString('hex');
     await this.writeStored('private', storageKey, encrypt(buffer, this.config.storageKey));

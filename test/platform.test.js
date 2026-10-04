@@ -282,17 +282,19 @@ test('ADSP security, persistence and institutional workflows', { timeout: 120000
     const search = await u.other.ok('GET', '/api/search?q=Synthetic%20review');
     assert.ok(search.every(item => item.status === 'PUBLISHED')); assert.ok(!JSON.stringify(search).includes('Private draft title'));
   });
-  await t.test('private uploads are encrypted, names and type are validated, and binary scanning fails closed', async () => {
+  await t.test('private uploads are encrypted and format-checked without malware scanning', async () => {
     assert.equal((await u.hr.request('POST', '/api/documents', { file: { name: 'fake.pdf', content: Buffer.from('not a pdf').toString('base64') } })).status, 400);
-    assert.equal((await u.hr.request('POST', '/api/documents', { file: { name: 'sample.pdf', content: Buffer.from('%PDF-1.4\n%%EOF').toString('base64') } })).status, 503);
+    assert.equal((await u.hr.request('POST', '/api/documents', { file: { name: 'active.pdf', content: Buffer.from('%PDF-1.4\n/JavaScript alert(1)\n%%EOF').toString('base64') } })).status, 400);
     assert.equal((await u.hr.request('POST', '/api/documents', { file: { name: 'unsafe.html', content: Buffer.from('<script>bad()</script>').toString('base64') } })).status, 415);
     assert.equal((await u.hr.request('POST', '/api/documents', { file: { name: 'large.txt', content: Buffer.alloc(5 * 1024 * 1024 + 1, 65).toString('base64') } })).status, 413);
+    const pdfDocument = await u.hr.ok('POST', '/api/documents', { title: 'Synthetic unscanned PDF', documentNumber: 'SYN-HR-PDF-001', description: 'Test only', classification: 'CONFIDENTIAL', category: 'HR', changeSummary: 'Initial version', access: { roles: ['hr_officer', 'dpo', 'head_teacher'] }, file: { name: 'sample.pdf', content: Buffer.from('%PDF-1.4\n%%EOF').toString('base64') } });
+    assert.equal(pdfDocument.draft.file.scanStatus, 'UNSCANNED');
     privateDocument = await u.hr.ok('POST', '/api/documents', { title: 'Synthetic confidential policy', documentNumber: 'SYN-HR-POL-001', description: 'Test only', classification: 'CONFIDENTIAL', category: 'HR', changeSummary: 'Initial version', access: { roles: ['hr_officer', 'dpo', 'head_teacher'] }, file: textFile('CONFIDENTIAL SYNTHETIC PAYLOAD') });
     assert.equal(privateDocument.draft.file.storageKey, undefined);
     const raw = await app.store.run(tx => tx.get('document_versions', privateDocument.draft.id));
     const ciphertext = await fs.readFile(app.platform.files.keyPath('private', raw.file.storageKey));
     assert.ok(!ciphertext.includes(Buffer.from('CONFIDENTIAL SYNTHETIC PAYLOAD')));
-    assert.equal((await fs.stat(app.platform.files.keyPath('private', raw.file.storageKey))).mode & 0o777, 0o600);
+    if (process.platform !== 'win32') assert.equal((await fs.stat(app.platform.files.keyPath('private', raw.file.storageKey))).mode & 0o777, 0o600);
     for (const agent of [u.other, u.teacher, u.tech]) assert.equal((await agent.request('POST', '/api/documents/' + raw.id + '/download-link', {})).status, 403);
     assert.ok(!(await u.teacher.ok('GET', '/api/documents')).some(item => item.id === privateDocument.id));
     assert.equal((await anonymous.request('GET', '/downloads/' + privateDocument.id)).status, 404);
@@ -395,11 +397,8 @@ test('ADSP security, persistence and institutional workflows', { timeout: 120000
     assert.equal((await u.media.request('GET', '/api/privacy')).status, 403);
     const png = await require('sharp')({ create: { width: 10, height: 10, channels: 3, background: '#345646' } }).png().toBuffer();
     const payload = { title: 'Synthetic test activity', alt: 'A synthetic single-colour test image', category: 'School Life', studentRefs: ['SYN-PUPIL-001'], childrenPresent: true, subjectsVerified: true, noChildNames: true, file: { name: 'synthetic.png', content: png.toString('base64') } };
-    assert.equal((await u.media.request('POST', '/api/media', payload)).status, 503, 'No real scanner means no binary upload');
-    const originalScanner = app.platform.files.scan;
-    app.platform.files.scan = async () => {}; // Test-only scanner stub; no bypass exists in runtime configuration.
-    try { media = await u.media.ok('POST', '/api/media', payload); }
-    finally { app.platform.files.scan = originalScanner; }
+    media = await u.media.ok('POST', '/api/media', payload);
+    assert.equal(media.file.scanStatus, 'UNSCANNED_REENCODED');
     assert.equal((await anonymous.request('GET', '/media/' + media.id)).status, 404);
     media = await u.media.ok('POST', '/api/media/' + media.id + '/action', { revision: media.revision, action: 'SUBMIT' });
     await approve(u.dpo, media.workflowId); await approve(u.head, media.workflowId);

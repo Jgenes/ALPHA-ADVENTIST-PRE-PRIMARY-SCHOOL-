@@ -1,6 +1,6 @@
 # Deployment template, not proof of production readiness. Complete the release
 # gates in docs/operations-template.md and rehearse with isolated staging first.
-# Use MongoDB plus this persistent disk (for runtime quarantine and application keys)
+# Use MongoDB plus this persistent disk (for application keys and local files)
 # or a private Supabase S3 bucket (for durable files).
 services:
   - type: web
@@ -57,8 +57,6 @@ services:
       - key: ADMISSION_RETENTION_DAYS
         sync: false
       - key: RETENTION_POLICY_APPROVED
-        sync: false
-      - key: UPLOAD_SCAN_COMMAND
         sync: false
       - key: HEAD_TEACHER_USERNAME
         sync: false

@@ -16,7 +16,7 @@ function createConfig(env = process.env) {
   const supabaseStorage = supabaseStorageConfig(env);
   if (publicPreview && supabaseStorage) throw new Error('Public preview must use isolated temporary storage, not Supabase Storage.');
   if (production && !env.BASE_URL) throw new Error('Set an explicitly verified BASE_URL outside development.');
-  if (production && !env.DATA_DIR) throw new Error(supabaseStorage ? 'Set DATA_DIR for temporary upload quarantine.' : 'Set DATA_DIR to persistent, protected storage.');
+  if (production && !env.DATA_DIR) throw new Error('Set DATA_DIR to persistent, protected storage.');
   const base = new URL(env.BASE_URL || LIVE_URL);
   if (!['http:', 'https:'].includes(base.protocol) || base.username || base.password || base.pathname !== '/' || base.search || base.hash) throw new Error('BASE_URL must be an origin, without a path or credentials.');
   if (production && base.protocol !== 'https:') throw new Error('BASE_URL must use HTTPS outside development.');
@@ -99,7 +99,7 @@ function createConfig(env = process.env) {
     proxyHops, sessionIdleMs: 30 * 60 * 1000, sessionAbsoluteMs: 8 * 60 * 60 * 1000,
     formRetentionDays: positive(env.FORM_RETENTION_DAYS, 90), admissionRetentionDays: positive(env.ADMISSION_RETENTION_DAYS, 365),
     alertUrl: env.OFFICE_ALERT_WEBHOOK_URL || '', alertSecret: env.OFFICE_ALERT_WEBHOOK_SECRET || '', smtp,
-    scanCommand: env.UPLOAD_SCAN_COMMAND || '', maxUploadBytes: 5 * 1024 * 1024,
+    maxUploadBytes: 5 * 1024 * 1024,
     adminUsername: env.ADMIN_USERNAME || 'system-admin', adminName: env.ADMIN_NAME || 'System Administrator', adminPassword: env.ADMIN_PASSWORD,
     headTeacherUsername: env.HEAD_TEACHER_USERNAME || '', headTeacherName: env.HEAD_TEACHER_NAME || '', headTeacherPassword: env.HEAD_TEACHER_PASSWORD,
     headTeacherApproved: env.HEAD_TEACHER_APPROVED === 'true', headTeacherApprovalReference: env.HEAD_TEACHER_APPROVAL_REFERENCE || '',

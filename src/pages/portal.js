@@ -42,7 +42,7 @@ function portal(ctx, actor, config) {
   const mode = !user ? 'login' : user.mustChangePassword ? 'password' : 'app';
   const section = ctx.section || 'dashboard';
   const title = NAV.find(item => item[0] === section)?.[2] || (section === 'notifications' ? 'Notifications' : section === 'search' ? 'Search the platform' : 'Workspace');
-  const context = { user: safeUser(user), csrf: actor.session?.csrf || '', mode, section, scannerConfigured: !!config.scanCommand, environment: config.environment };
+  const context = { user: safeUser(user), csrf: actor.session?.csrf || '', mode, section, environment: config.environment };
   const encoded = JSON.stringify(context).replace(/</g, '\\u003c');
   const fields = mode === 'login' ? `
     <div data-login-credentials><div class="p-field"><label for="username">Username</label><input id="username" name="username" autocomplete="username" required autofocus placeholder="Your school username"></div>
@@ -75,7 +75,7 @@ ${mode !== 'app' ? `
 <dialog class="p-dialog" id="record-dialog"><div class="p-dialog-head"><h2 id="dialog-title"></h2><button type="button" class="p-icon-btn" data-close-dialog aria-label="Close">${icon('close')}</button></div><form id="record-form"><div id="dialog-fields"></div><p class="p-form-status" role="alert" hidden></p><div class="p-dialog-actions"><button type="button" class="p-btn p-btn-secondary" data-close-dialog>Cancel</button><button type="submit" class="p-btn p-btn-primary">Save & continue ${icon('arrow')}</button></div></form></dialog>
 <div class="p-toast" id="toast" role="status" hidden></div>`}
 <noscript><p class="p-noscript">The secure workspace needs JavaScript. The <a href="/">public school website</a> remains available without it.</p></noscript>
-<script id="portal-context" type="application/json" nonce="${esc(ctx.nonce)}">${encoded}</script><script src="/js/portal.js?v=4" defer></script>
+<script id="portal-context" type="application/json" nonce="${esc(ctx.nonce)}">${encoded}</script><script src="/js/portal.js?v=5" defer></script>
 </body></html>`;
 
 }

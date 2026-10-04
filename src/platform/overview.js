@@ -7,7 +7,7 @@ const { audit, verifyAudit } = require('./audit');
 const { HttpError } = L;
 module.exports = {
   async metadata(actor) {
-    return this.run(actor, async (tx, actor) => ({ publicSettings: require('./school-details').applyDetails(require('../../data/seed.json').settings, (await tx.list('cms_content')).filter(item => item.published && item.status !== 'ARCHIVED').map(item => ({ kind: item.kind, ...item.published }))), departments: await tx.list('departments'), leaveTypes: A.has(actor.user, 'leave.create') ? await tx.list('leave_types') : [], roles: A.has(actor.user, 'role.grant') || A.has(actor.user, 'user.create') ? A.ROLE_LABELS : {}, classifications: A.CLASSIFICATIONS, binaryUploadsEnabled: !!this.config.scanCommand, environment: this.config.environment }));
+    return this.run(actor, async (tx, actor) => ({ publicSettings: require('./school-details').applyDetails(require('../../data/seed.json').settings, (await tx.list('cms_content')).filter(item => item.published && item.status !== 'ARCHIVED').map(item => ({ kind: item.kind, ...item.published }))), departments: await tx.list('departments'), leaveTypes: A.has(actor.user, 'leave.create') ? await tx.list('leave_types') : [], roles: A.has(actor.user, 'role.grant') || A.has(actor.user, 'user.create') ? A.ROLE_LABELS : {}, classifications: A.CLASSIFICATIONS, environment: this.config.environment }));
   },
   async dashboard(actor) {
     return this.run(actor, async (tx, actor) => {
@@ -107,7 +107,7 @@ module.exports = {
         if (safeguardingRecord) {
           try { safeguardingContactConfigured = Boolean(require('./school-details').validateDetails(safeguardingRecord.published.body).safeguardingName); } catch { /* Keep the status false if a legacy record is invalid. */ }
         }
-        output.security = { failedSignIns: logs.filter(item => item.action === 'auth.login' && item.result === 'failure').length, lockouts: logs.filter(item => item.action === 'auth.locked').length, database: this.store.kind, externalAlertsConfigured: !!this.config.alertUrl, binaryScannerConfigured: !!this.config.scanCommand, safeguardingContactConfigured };
+        output.security = { failedSignIns: logs.filter(item => item.action === 'auth.login' && item.result === 'failure').length, lockouts: logs.filter(item => item.action === 'auth.locked').length, database: this.store.kind, externalAlertsConfigured: !!this.config.alertUrl, safeguardingContactConfigured };
       }
       await audit(tx, this.config, actor, 'report.read', 'report', 'authorised');
       return output;
@@ -116,7 +116,7 @@ module.exports = {
   async systemStatus(actor) {
     return this.run(actor, async (tx, actor) => {
       A.requirePermission(actor.user, 'system.read');
-      return { database: this.store.kind, environment: this.config.environment, officeAlertsConfigured: !!this.config.alertUrl, scannerConfigured: !!this.config.scanCommand, outbox: (await tx.list('outbox')).map(({ id, status, attempts, nextAttemptAt, createdAt, deliveredAt, lastStatus }) => ({ id, status, attempts, nextAttemptAt, createdAt, deliveredAt, lastStatus })), maintenance: await tx.get('system_settings', 'maintenance') };
+      return { database: this.store.kind, environment: this.config.environment, officeAlertsConfigured: !!this.config.alertUrl, outbox: (await tx.list('outbox')).map(({ id, status, attempts, nextAttemptAt, createdAt, deliveredAt, lastStatus }) => ({ id, status, attempts, nextAttemptAt, createdAt, deliveredAt, lastStatus })), maintenance: await tx.get('system_settings', 'maintenance') };
     });
   },
   async retryAlert(actor, id) {

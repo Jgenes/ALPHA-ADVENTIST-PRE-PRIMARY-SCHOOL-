@@ -13,7 +13,7 @@
 | Staff and HR | Real account-linked profiles, departments/supervisors, greeting/balances/own contracts, HR views and entitlements, controlled attachments, scoped reports | Advanced employment cases, appraisals, attendance/payroll, bulk imports, organisation/department editor and richer staff compliance rules |
 | Leave | Eight types, working-day calculation, handover/emergency contact/attachment, balances/reservations, configurable staged review, return/reject/cancel and CAS protection | Public-holiday calendars, half-days, cross-year requests (currently split), approved local entitlement rules and bulk leave calendars |
 | Contracts | HR draft/revision/renewal, administration, optional finance, management approval, signatory attestation, employee acknowledgement, ownership restrictions and renewal supersession; reminder jobs | Real legal templates, e-signature provider/certification, real reminder delivery beyond in-app, independent production renewal acceptance |
-| Controlled documents | Five classifications, ACLs, metadata/dates, encrypted originals, scanned binary uploads, version review/issuance/supersession/archive, public metadata, expiring single-use private grants | Real antivirus runtime/signature lifecycle; more document formats; approved disposal/legal holds and external object storage. Retired unapproved drafts do not become broadly visible issued history |
+| Controlled documents | Five classifications, ACLs, metadata/dates, encrypted originals, unscanned PDF uploads with basic active-content checks, version review/issuance/supersession/archive, public metadata, expiring single-use private grants | Malware scanning; more document formats; approved disposal/legal holds and external object storage. Uploaded binaries may contain malware. Retired unapproved drafts do not become broadly visible issued history |
 | Notices/calendar | Audiences by role/department/named user, notice category/priority/expiry, independent publication, revision-specific read/ack receipts with session evidence and completion reports; private calendars | Notice file attachments, scheduled notices, recurring meetings and calendar integration. Public events use reviewed CMS |
 | Governance/RBAC | Code-owned action permission catalogue, management role assignment, fresh-session/resource/state checks, ICT separation, versioned workflow definitions/instances/decisions/comments, denial audit | Custom role/permission builder, formal delegation, automatic overdue reassignment/escalation policy and independent security review |
 | Forms/admissions | Five public forms, consent/minimisation, idempotency/reference, private queues, controlled admission stages through enrolment, in-app and durable external-alert outbox | Guardian-authenticated application drafts/tracking, secure admissions document upload, assessment scheduling, offer letters, enrolment-to-student-record conversion and family access |
@@ -36,7 +36,7 @@
 - Contract sequencing, finance’s stage-specific access, employee-only visibility, wrong-user/wrong-session/expired/replayed download grants, fresh-session revocation inside transactions.
 - All five original public forms, references/deduplication, private queues, status transitions/CAS, signed reference-only alert payloads, retry/success states and retention.
 - CMS independent review, escaped content, old-published-snapshot isolation, school-settings review and scheduled publication.
-- Encrypted files, type/size limits, fail-closed missing scanner, clean chunked-request 413 handling, controlled-version publication, approved-version visibility and retired-draft non-disclosure.
+- Encrypted files, type/size limits, explicit unscanned-file status, clean chunked-request 413 handling, controlled-version publication, approved-version visibility and retired-draft non-disclosure.
 - Scoped notices/calendar/notifications, version acknowledgement, audit integrity/tamper detection/scoped auditing.
 - Guardian channels/evidence, immediate withdrawal, deterministic consent order, missing-child denial, annual expiry checked without waiting for jobs and no automatic republication.
 - Approved one-time bootstrap, AES-GCM archive integrity/wrong-key failures, restore target/path/checksum guards, **actual isolated SQLite + private-file restoration**, intact recovered audit chain and file decryption; synthetic idempotent legacy import.
@@ -69,14 +69,14 @@ An earlier GitHub repository-access check returned HTTP 401. No visibility chang
 ## Explicitly unverified
 
 - A live Mongo replica-set transaction/concurrency run, actual Mongo backup/restore/migration, driver/index deployment and multi-instance behavior.
-- Real malware scanner operation/signature updates; the synthetic image workflow test stubs the scanner only inside the test process.
+- Malware scanning is not implemented; uploads rely on format checks, image re-encoding, encryption and review workflows, none of which detect all malicious content.
 - Real email/SMS/WhatsApp receipt, downstream delivery callbacks, production TLS/proxy/CDN settings, external uptime/backup monitors, scheduled off-site backups and disaster-recovery RPO/RTO.
 - School-approved HR/legal policies, guardian authority, real media consent, Maps pin, social identities, official-domain email, PDPC/legal compliance, independent penetration testing and production acceptance.
 
 ## Suggested next order
 
 1. Owner completes P0 release gates, GitHub reconnection/history/asset cleanup, secrets rotation and infrastructure/provider configuration.
-2. Rehearse with isolated Mongo staging, real scanner/integration test recipients, restored backups and named independent role-holders; obtain school/legal acceptance.
+2. Rehearse with isolated Mongo staging, integration test recipients, restored backups and named independent role-holders; obtain school/legal acceptance and explicitly approve the risk of unscanned uploads.
 3. Deploy the reviewed web/staff platform with monitoring and controlled rollback.
 4. Extend admissions and add verified parent/student services; only then plan native mobile delivery.
 

@@ -35,7 +35,7 @@ test('password sign-in, session recovery and cookie policy', async t => {
     assert.ok(!result.text.includes('name="mfa_code"'));
     assert.ok(!result.text.includes('Authenticator code'));
     assert.ok(result.text.includes('open the portal in a new tab'));
-    assert.ok(result.text.includes('/js/portal.js?v=4'));
+    assert.ok(result.text.includes('/js/portal.js?v=5'));
     assert.match(result.headers.get('cache-control'), /no-store/);
   });
   await t.test('only the development preview uses secure partitioned cross-site cookies', () => {
