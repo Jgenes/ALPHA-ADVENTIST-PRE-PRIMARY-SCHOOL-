@@ -10,7 +10,6 @@ const http = require('node:http');
 const { execFileSync } = require('node:child_process');
 const { chromium, expect } = require('@playwright/test');
 const { fixture } = require('../test/helpers');
-const L = require('../src/lib');
 async function main() {
   const f = await fixture();
   let browser, proxy;
@@ -67,19 +66,14 @@ async function main() {
     assert.ok(cookie); assert.equal(cookie.secure, true); assert.equal(cookie.httpOnly, true); assert.equal(cookie.sameSite, 'None'); assert.ok(cookie.partitionKey, 'Embedded session is partitioned to the parent site');
     assert.equal(await frame.evaluate(() => localStorage.length + sessionStorage.length), 0);
 
-    // Code entry exists only after password proof for an enrolled account.
-    await f.app.store.run(async tx => { const user = await tx.get('users', f.users.head.id); await tx.update('users', { ...user, lastTotpStep: -1 }); });
+    // Privileged accounts use the same password-only sign-in.
     const secondContext = await browser.newContext({ ignoreHTTPSErrors: true });
     const { frame: second } = await framedPage(secondContext);
     await second.locator('[name="username"]').fill(f.users.head.username);
     await second.locator('[name="password"]').fill(f.password);
     await second.getByRole('button', { name: 'Sign in to workspace' }).click();
-    await expect(second.locator('[name="mfa_code"]')).toBeVisible();
-    await expect(second.locator('[data-login-credentials]')).toBeHidden();
-    assert.equal(await second.evaluate(async () => (await (await fetch('/api/auth/session', { cache: 'no-store' })).json()).user), null, 'Password-only MFA step must remain unauthenticated');
-    await second.locator('[name="mfa_code"]').fill(L.totp(f.secrets.head));
-    await second.getByRole('button', { name: 'Verify & sign in', exact: true }).click();
     await expect(second.locator('#workspace h1')).toHaveText('Overview');
+    await expect(second.locator('[name="mfa_code"]')).toHaveCount(0);
 
     const blockedContext = await browser.newContext({ ignoreHTTPSErrors: true });
     const { page: blockedPage, frame: blocked } = await framedPage(blockedContext);
@@ -93,7 +87,7 @@ async function main() {
     await expect(blocked.locator('[name="username"]')).toHaveValue(f.users.teacher.username);
     assert.equal(rejected, 2, 'No unbounded retry loop');
     assert.deepEqual(errors, []);
-    console.log('Auth browser regression passed: cross-site HTTPS iframe, partitioned session, expired-tab recovery, bounded CSRF retry, initial two-field login, MFA challenge/verification and clear blocked-cookie fallback.');
+    console.log('Auth browser regression passed: cross-site HTTPS iframe, partitioned session, expired-tab recovery, bounded CSRF retry, password-only privileged login and blocked-cookie fallback.');
   } finally {
     if (browser) await browser.close();
     if (proxy?.listening) await new Promise(resolve => { proxy.close(resolve); proxy.closeAllConnections(); });

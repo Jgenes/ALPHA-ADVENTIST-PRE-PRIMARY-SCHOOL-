@@ -99,23 +99,6 @@ module.exports = {
       return safeUser(saved);
     });
   },
-  async resetUserMfa(actor, id, body) {
-    return this.run(actor, async (tx, actor) => {
-      A.requirePermission(actor.user, 'user.manage');
-      if (id === actor.user.id) throw new HttpError(403, 'Ask another authorised account manager to reset your authenticator.');
-      const user = await tx.get('users', id);
-      if (!user) throw new HttpError(404, 'Account not found.');
-      V.revision(user, body);
-      if (!user.mfaEnabled) throw new HttpError(409, 'This account has no enrolled authenticator to reset.');
-      const updated = { ...user, mfaEnabled: false, mfaResetRequired: true, authVersion: user.authVersion + 1 };
-      delete updated.mfaSecretEnc;
-      delete updated.lastTotpStep;
-      const saved = await tx.update('users', updated);
-      for (const session of await tx.list('sessions')) if (session.userId === user.id) await tx.remove('sessions', session.id);
-      await audit(tx, this.config, actor, 'auth.mfa_reset', 'user', id, 'success', { reenrollmentRequired: true });
-      return safeUser(saved);
-    });
-  },
   async staff(actor, directory = false) {
     return this.run(actor, async (tx, actor) => {
       A.requirePermission(actor.user, 'staff.view_self');

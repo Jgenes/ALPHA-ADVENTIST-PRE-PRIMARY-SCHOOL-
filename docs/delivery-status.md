@@ -31,7 +31,7 @@
 `npm test` currently reports **45 passing tests** (Node’s count includes the three parent test groups). These use isolated synthetic data and real HTTP/cookie/CSRF flows, plus lower-level recovery/operator checks. Coverage includes:
 
 - Default-deny access, retired legacy endpoints, static-file exposure protection, source/account login limits, bounded anonymous session creation and persistence across restart.
-- Role/technical-authority boundaries, author ownership, CSRF/origin checks, password rotation preserving MFA, compulsory privileged enrolment and TOTP replay prevention.
+- Role/technical-authority boundaries, author ownership, CSRF/origin checks, password rotation and session revocation. MFA is not implemented; privileged access relies on passwords and the remaining account protections.
 - Staff scope, server-calculated leave/overlap/reservations, required approval order, concurrent double decisions, return/resubmit and cancellation accounting.
 - Contract sequencing, finance’s stage-specific access, employee-only visibility, wrong-user/wrong-session/expired/replayed download grants, fresh-session revocation inside transactions.
 - All five original public forms, references/deduplication, private queues, status transitions/CAS, signed reference-only alert payloads, retry/success states and retention.
@@ -51,7 +51,7 @@ Production dependency audit returned **zero known vulnerabilities** at the lates
 
 - Home/EN–SW navigation, public contact submission/reference, Kids Zone local activity.
 - Real login, dashboard, leave creation/submission, notice reading/acknowledgement.
-- Additional HTTPS cross-site-iframe auth regression: secure partitioned cookies, an expired form, one bounded CSRF retry, initial username/password-only login, password-before-MFA challenge, and blocked-cookie/new-tab guidance. Existing MFA and backend CSRF checks remain enforced.
+- Additional HTTPS cross-site-iframe auth regression: secure partitioned cookies, an expired form, one bounded CSRF retry, password-only login and blocked-cookie/new-tab guidance. Backend CSRF checks remain enforced.
 - Controlled-document upload/submission, independent API-based reviewer decisions, then actual publisher UI issuance and public download.
 - Structured school-contact draft form and authorised staff/management views.
 - No horizontal overflow/broken images or JavaScript/CSP/resource errors in the exercised views.

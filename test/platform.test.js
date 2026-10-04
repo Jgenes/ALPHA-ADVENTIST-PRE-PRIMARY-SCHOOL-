@@ -31,10 +31,9 @@ test('ADSP security, persistence and institutional workflows', { timeout: 120000
       OFFICE_ALERT_WEBHOOK_URL: 'https://alerts.example.test/receiver', OFFICE_ALERT_WEBHOOK_SECRET: 'synthetic-webhook-secret-at-least-32-characters'
     };
     const generatedConfig = createConfig(generatedEnv);
-    assert.equal(generatedConfig.mfaKey.length, 32);
-    assert.equal(new Set([generatedConfig.mfaKey, generatedConfig.storageKey, generatedConfig.auditKey].map(key => key.toString('hex'))).size, 3);
+    assert.equal(generatedConfig.mfaKey, undefined);
+    assert.equal(new Set([generatedConfig.storageKey, generatedConfig.auditKey].map(key => key.toString('hex'))).size, 2);
     const restartedConfig = createConfig(generatedEnv);
-    assert.equal(restartedConfig.mfaKey.toString('hex'), generatedConfig.mfaKey.toString('hex'));
     assert.equal(restartedConfig.storageKey.toString('hex'), generatedConfig.storageKey.toString('hex'));
     assert.equal(restartedConfig.auditKey.toString('hex'), generatedConfig.auditKey.toString('hex'));
     const remoteConfig = createConfig({
@@ -42,7 +41,7 @@ test('ADSP security, persistence and institutional workflows', { timeout: 120000
       MONGODB_URI: 'mongodb://database.example.test', MONGODB_DB_NAME: 'alpha_production',
       SUPABASE_S3_ENDPOINT: 'https://project.storage.supabase.co/storage/v1/s3', SUPABASE_S3_REGION: 'us-east-1',
       SUPABASE_S3_ACCESS_KEY_ID: 'synthetic-access', SUPABASE_S3_SECRET_ACCESS_KEY: 'synthetic-secret', SUPABASE_STORAGE_BUCKET: 'alpha-private',
-      MFA_ENCRYPTION_KEY: '1'.repeat(64), STORAGE_ENCRYPTION_KEY: '2'.repeat(64), AUDIT_HMAC_KEY: '3'.repeat(64),
+      STORAGE_ENCRYPTION_KEY: '2'.repeat(64), AUDIT_HMAC_KEY: '3'.repeat(64),
       FORM_RETENTION_DAYS: '90', ADMISSION_RETENTION_DAYS: '365', RETENTION_POLICY_APPROVED: 'true',
       OFFICE_ALERT_WEBHOOK_URL: 'https://alerts.example.test/receiver', OFFICE_ALERT_WEBHOOK_SECRET: 'synthetic-webhook-secret-at-least-32-characters',
     });
@@ -52,7 +51,7 @@ test('ADSP security, persistence and institutional workflows', { timeout: 120000
     const gmailConfig = createConfig({
       NODE_ENV: 'production', DATA_DIR: path.join(f.dir, 'gmail-runtime'), BASE_URL: 'https://school.example.test',
       MONGODB_URI: 'mongodb://database.example.test', MONGODB_DB_NAME: 'alpha_production',
-      MFA_ENCRYPTION_KEY: '4'.repeat(64), STORAGE_ENCRYPTION_KEY: '5'.repeat(64), AUDIT_HMAC_KEY: '6'.repeat(64),
+      STORAGE_ENCRYPTION_KEY: '5'.repeat(64), AUDIT_HMAC_KEY: '6'.repeat(64),
       FORM_RETENTION_DAYS: '90', ADMISSION_RETENTION_DAYS: '365', RETENTION_POLICY_APPROVED: 'true',
       GMAIL_SMTP_USER: 'sender@example.test', GMAIL_SMTP_APP_PASSWORD: 'abcd efgh ijkl mnop',
       OFFICE_ALERT_EMAIL: 'office@example.test', PRIVACY_ALERT_EMAIL: 'privacy@example.test',
@@ -140,32 +139,6 @@ test('ADSP security, persistence and institutional workflows', { timeout: 120000
     assert.equal((await u.head.request('PATCH', '/api/users/' + tech.id, { revision: tech.revision, roles: ['hr_officer'] })).status, 403);
     for (const route of ['/api/admissions', '/api/contracts', '/api/staff', '/api/privacy']) assert.equal((await u.tech.request('GET', route)).status, 403, route);
     assert.equal((await u.publisher.request('GET', '/api/submissions')).status, 403);
-  });
-  await t.test('MFA recovery resets one account, revokes sessions and requires re-enrollment', async () => {
-    const target = await createUserRecord('mfa.reset.target', 'Synthetic recovery target', ['head_teacher'], f.password);
-    target.mustChangePassword = false;
-    target.mfaEnabled = true;
-    const secret = L.createTotpSecret();
-    target.mfaSecretEnc = L.encrypt(Buffer.from(secret), f.config.mfaKey).toString('base64');
-    const stored = await app.store.run(tx => tx.insert('users', target));
-    const targetAgent = new Agent(f.base);
-    await targetAgent.login(stored, f.password, secret);
-    assert.equal((await targetAgent.request('GET', '/api/dashboard')).status, 200);
-    assert.equal((await u.tech.request('POST', `/api/users/${users.tech.id}/mfa-reset`, { revision: users.tech.revision })).status, 403);
-    assert.equal((await u.teacher.request('POST', `/api/users/${stored.id}/mfa-reset`, { revision: stored.revision })).status, 403);
-
-    const reset = await u.tech.ok('POST', `/api/users/${stored.id}/mfa-reset`, { revision: stored.revision });
-    assert.equal(reset.mfaEnabled, false);
-    assert.equal(reset.mfaResetRequired, true);
-    assert.equal((await targetAgent.request('GET', '/api/dashboard')).json.code, 'AUTH_REQUIRED');
-    assert.equal(await app.store.run(async tx => (await tx.list('sessions')).some(session => session.userId === stored.id)), false);
-    assert.ok(await app.store.run(async tx => (await tx.list('audit_logs')).some(entry => entry.action === 'auth.mfa_reset' && entry.resourceId === stored.id && entry.userId === users.tech.id)));
-
-    await targetAgent.login(stored, f.password);
-    assert.equal((await targetAgent.request('GET', '/api/dashboard')).json.code, 'MFA_REQUIRED');
-    const setup = await targetAgent.ok('POST', '/api/auth/mfa/setup', {});
-    const enrolled = await targetAgent.ok('POST', '/api/auth/mfa/confirm', { code: L.totp(setup.secret) });
-    assert.equal(enrolled.needsMfa, false);
   });
   await t.test('all five public forms require consent, whitelist fields, return durable references and alerts', async () => {
     const missing = await anonymous.request('POST', '/api/apply', { child_name: 'Synthetic pupil', guardian_name: 'Synthetic guardian', phone: '+255700000000', level: 'KG I', arrangement: 'Day' });
@@ -534,19 +507,18 @@ test('ADSP security, persistence and institutional workflows', { timeout: 120000
     });
     assert.equal(status, 413);
   });
-  await t.test('password rotation preserves MFA and role metadata and revokes old sessions', async () => {
+  await t.test('password rotation preserves role metadata and revokes old sessions', async () => {
     const before = await app.store.run(tx => tx.get('users', users.hr.id));
     const oldCookie = u.hr.cookie;
     const password = crypto.randomBytes(24).toString('base64url') + 'aA2!';
     await u.hr.ok('POST', '/api/auth/password', { currentPassword: f.password, password, confirmPassword: password });
     const after = await app.store.run(tx => tx.get('users', users.hr.id));
-    assert.equal(after.mfaSecretEnc, before.mfaSecretEnc); assert.equal(after.mfaEnabled, true);
     assert.deepEqual(after.roles, before.roles); assert.equal(after.departmentId, before.departmentId);
     const old = new Agent(f.base); old.cookie = oldCookie;
     assert.equal((await old.request('GET', '/api/staff')).status, 403);
     assert.equal((await u.hr.request('GET', '/api/staff')).status, 200);
   });
-  await t.test('MFA enrolment is mandatory before privileged actions and TOTP replay is denied', async () => {
+  await t.test('privileged accounts can access the portal after initial password rotation', async () => {
     const raw = await createUserRecord('fixture.setup', 'Synthetic setup officer', ['system_admin'], f.password);
     const newUser = await app.store.run(tx => tx.insert('users', raw));
     const agent = new Agent(f.base);
@@ -555,14 +527,8 @@ test('ADSP security, persistence and institutional workflows', { timeout: 120000
     assert.equal((await agent.request('GET', '/api/system')).json.code, 'PASSWORD_REQUIRED');
     const password = crypto.randomBytes(24).toString('base64url') + 'aB2!';
     await agent.ok('POST', '/api/auth/password', { currentPassword: f.password, password, confirmPassword: password });
-    assert.equal((await agent.request('GET', '/api/system')).json.code, 'MFA_REQUIRED');
-    const enrollment = await agent.ok('POST', '/api/auth/mfa/setup', {});
-    assert.match(enrollment.secret, /^[A-Z2-7]+$/);
-    const usedCode = L.totp(enrollment.secret);
-    await agent.ok('POST', '/api/auth/mfa/confirm', { code: usedCode });
     assert.equal((await agent.request('GET', '/api/system')).status, 200);
-    const replay = new Agent(f.base); await replay.ok('GET', '/api/auth/session');
-    assert.equal((await replay.request('POST', '/api/auth/login', { username: newUser.username, password, mfa_code: usedCode })).status, 401);
+    assert.equal((await agent.request('POST', '/api/auth/mfa/setup', {})).status, 404);
   });
   await t.test('retention purges personal forms on schedule and keeps the audit evidence', async () => {
     await app.store.run(async tx => {

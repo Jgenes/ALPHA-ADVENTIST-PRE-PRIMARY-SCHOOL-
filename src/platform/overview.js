@@ -107,7 +107,7 @@ module.exports = {
         if (safeguardingRecord) {
           try { safeguardingContactConfigured = Boolean(require('./school-details').validateDetails(safeguardingRecord.published.body).safeguardingName); } catch { /* Keep the status false if a legacy record is invalid. */ }
         }
-        output.security = { failedSignIns: logs.filter(item => item.action === 'auth.login' && item.result === 'failure').length, lockouts: logs.filter(item => item.action === 'auth.locked').length, privilegedWithoutMfa: (await tx.list('users')).filter(item => item.active && A.requiresMfa(item) && !item.mfaEnabled).length, database: this.store.kind, externalAlertsConfigured: !!this.config.alertUrl, binaryScannerConfigured: !!this.config.scanCommand, safeguardingContactConfigured };
+        output.security = { failedSignIns: logs.filter(item => item.action === 'auth.login' && item.result === 'failure').length, lockouts: logs.filter(item => item.action === 'auth.locked').length, database: this.store.kind, externalAlertsConfigured: !!this.config.alertUrl, binaryScannerConfigured: !!this.config.scanCommand, safeguardingContactConfigured };
       }
       await audit(tx, this.config, actor, 'report.read', 'report', 'authorised');
       return output;

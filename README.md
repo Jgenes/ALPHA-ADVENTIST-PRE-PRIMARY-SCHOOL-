@@ -13,7 +13,7 @@ A governed public website and staff workspace for **Alpha Adventist Pre & Primar
 - Configurable, versioned approval routes with per-stage authority, comments, return/reject/cancel states, escalation notifications and append-only audit events.
 - Admissions state transitions and private enquiry queues. All five original public forms produce references and durable office-alert jobs; safeguarding/privacy requests have separate restricted queues.
 - Guardian media consent by pupil reference and channel, annual expiry, withdrawal enforcement and external-removal follow-up. Published images are checked on every request.
-- Scrypt passwords, persistent account/IP login limits, session rotation/revocation, mandatory privileged MFA, CSRF/origin checks, server-side resource authorisation, encrypted private files and one-use download grants.
+- Scrypt passwords, persistent account/IP login limits, session rotation/revocation, CSRF/origin checks, server-side resource authorisation, encrypted private files and one-use download grants.
 - Limited PWA/offline shell. **No private records, API responses, submissions or photographs are cached by the service worker.**
 
 ## UI source
@@ -44,7 +44,7 @@ npm run bootstrap -- --username YOUR_NAMED_USERNAME --name "Authorised person's 
 npm run bootstrap -- --username ANOTHER_NAMED_USERNAME --name "Authorised school leader" --role head_teacher
 ```
 
-Replace the uppercase command placeholders with chosen lowercase usernames; they are not credentials. Each invocation requires `BOOTSTRAP_APPROVED=true`, a private `BOOTSTRAP_APPROVAL_REFERENCE`, and `BOOTSTRAP_PASSWORD_FILE` in the operator environment. No password belongs in the command line or this README. The first sign-in requires a password change and authenticator enrolment. Bootstrap refuses to repeat an existing initial authority.
+Replace the uppercase command placeholders with chosen lowercase usernames; they are not credentials. Each invocation requires `BOOTSTRAP_APPROVED=true`, a private `BOOTSTRAP_APPROVAL_REFERENCE`, and `BOOTSTRAP_PASSWORD_FILE` in the operator environment. No password belongs in the command line or this README. The first sign-in requires a password change. Bootstrap refuses to repeat an existing initial authority.
 
 For a host without an operator shell, the first `head_teacher` account can instead be provisioned once at startup using `HEAD_TEACHER_USERNAME`, `HEAD_TEACHER_NAME`, `HEAD_TEACHER_PASSWORD`, `HEAD_TEACHER_APPROVED=true`, and `HEAD_TEACHER_APPROVAL_REFERENCE`. Set these temporarily in the host's private environment settings, deploy, confirm the account was created, then remove all five values. This path refuses to create the account without explicit approval and will not update an existing head-teacher account. Do not put the password or approval reference in source control. Management can then create ordinary staff accounts and assign business roles through the portal.
 
@@ -69,7 +69,7 @@ Use separate databases, storage, keys, origins and alert recipients for each env
 
 - An explicitly configured, verified HTTPS `BASE_URL`.
 - A transaction-capable MongoDB replica set/Atlas database and either persistent `DATA_DIR` storage or a private Supabase S3 bucket for files. `DATA_DIR` must remain persistent in both configurations because it holds quarantine and the generated application key file.
-- Three distinct 32-byte keys for MFA, private storage and audit HMAC. If not supplied as secrets or protected key files, production creates them once in `application-keys.json` under `DATA_DIR`; `DATA_DIR` must be a persistent, protected disk. Escrow this file separately and never replace it after real use.
+- Two distinct 32-byte keys for private storage and audit HMAC. If not supplied as secrets or protected key files, production creates them once in `application-keys.json` under `DATA_DIR`; `DATA_DIR` must be a persistent, protected disk. Escrow this file separately and never replace it after real use. Legacy encrypted MFA fields are ignored and left untouched.
 - A signed office-alert endpoint/secret or configured Gmail SMTP delivery with approved office and privacy recipients, and an explicitly approved retention schedule. The safeguarding contact is managed dynamically through the portal’s independently reviewed and published school-contact settings; until configured, the site directs people to the Head of School’s office.
 
 The public site at **https://alpha-adventist-pre-primary-school.onrender.com** was reachable during a read-only check on **30 September 2026**. The similarly spelled hostname without the hyphen between `alpha` and `adventist` returned “Not Found.” The reachable URL is the development fallback only; production still requires an explicit `BASE_URL`, and the school must confirm its long-term official domain. No live deployment was performed in this implementation session.

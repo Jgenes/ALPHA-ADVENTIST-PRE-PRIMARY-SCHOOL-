@@ -47,7 +47,7 @@
         if (help) help.hidden = false;
         throw new Error('Your browser could not keep the sign-in session. Open the portal in a new tab using the link below, then sign in there.');
       }
-      if (['AUTH_REQUIRED', 'MFA_REQUIRED', 'PASSWORD_REQUIRED'].includes(result.code)) { document.body.replaceChildren(); window.location.replace('/portal'); }
+      if (['AUTH_REQUIRED', 'PASSWORD_REQUIRED'].includes(result.code)) { document.body.replaceChildren(); window.location.replace('/portal'); }
       throw new Error(result.message || 'The request could not be completed.');
     }
     if (typeof result.csrf === 'string') context.csrf = result.csrf;
@@ -153,7 +153,7 @@
   }
   async function renderUsers() {
     const records = await api('/api/users'); state.rows = records;
-    return toolbar('Identity administration is separate from institutional authority. No account includes a built-in password.', has('user.create') ? button('new-user', '+ Create account') : '') + info('New accounts must change their initial password. Privileged users must then enrol MFA. Technical administrators can provision ordinary accounts, but only management can grant business roles. Role changes invalidate existing sessions.') + table(['Account', 'Roles', 'MFA', 'Status', 'Actions'], records.map(record => `<tr><td><strong>${esc(record.name)}</strong><small>${esc(record.username)}</small></td><td>${record.roles.map(role => `<small>${esc(pretty(role))}</small>`).join('')}</td><td>${status(record.mfaEnabled ? 'Enabled' : record.mfaResetRequired ? 'Pending' : 'Not enrolled')}</td><td>${status(record.active ? 'Active' : 'Disabled')}</td><td><div class="p-row-actions">${record.id !== context.user.id && has('role.grant') && !record.roles.some(role => ['system_admin', 'ict_officer'].includes(role)) ? button('edit-roles', 'Assign roles', record.id, true) : ''}${record.id !== context.user.id && has('user.manage') ? button('toggle-user', record.active ? 'Disable' : 'Enable', record.id, true) : ''}${record.id !== context.user.id && record.mfaEnabled && has('user.manage') ? button('reset-user-mfa', 'Reset MFA', record.id, true) : ''}</div></td></tr>`));
+    return toolbar('Identity administration is separate from institutional authority. No account includes a built-in password.', has('user.create') ? button('new-user', '+ Create account') : '') + info('New accounts must change their initial password. Technical administrators can provision ordinary accounts, but only management can grant business roles. Role changes invalidate existing sessions.') + table(['Account', 'Roles', 'Status', 'Actions'], records.map(record => `<tr><td><strong>${esc(record.name)}</strong><small>${esc(record.username)}</small></td><td>${record.roles.map(role => `<small>${esc(pretty(role))}</small>`).join('')}</td><td>${status(record.active ? 'Active' : 'Disabled')}</td><td><div class="p-row-actions">${record.id !== context.user.id && has('role.grant') && !record.roles.some(role => ['system_admin', 'ict_officer'].includes(role)) ? button('edit-roles', 'Assign roles', record.id, true) : ''}${record.id !== context.user.id && has('user.manage') ? button('toggle-user', record.active ? 'Disable' : 'Enable', record.id, true) : ''}</div></td></tr>`));
   }
   async function renderNotifications() {
     const records = await api('/api/notifications'); state.rows = records;
@@ -247,7 +247,7 @@
         const roles = has('role.grant') ? Object.entries(state.meta.roles).filter(([key]) => !['system_admin', 'ict_officer', 'parent', 'student'].includes(key)).map(([id, name]) => ({ id, name })) : [{ id: 'supporting_staff', name: 'Ordinary staff — management grants additional roles' }];
         return openDialog('user', 'Provision a school account', info('Use an individual account and a unique temporary password. Deliver credentials in person or via an approved secure channel. Never put them in a public document.') + field('name', 'Full name') + field('username', 'Username', '', 'text', true, '3–64 lowercase letters, numbers, dots or hyphens.') + select('role', 'Initial role', roles, 'supporting_staff') + field('password', 'Unique temporary password', '', 'password'));
       }
-      case 'edit-roles': return openDialog('roles', 'Grant institutional responsibilities', info('Management approval is recorded. All existing sessions are revoked; MFA is required before the new privileged role can be used.') + area('roles', 'Role keys (comma-separated)', record.roles.join(', '), true, Object.keys(state.meta.roles).filter(role => !['system_admin', 'ict_officer'].includes(role)).join(', ')) + field('auditScopes', 'Auditor resource scopes', (record.auditScopes || []).join(', '), 'text', false, 'Auditors see nothing by default. Example: document_version, notice, user'), record);
+      case 'edit-roles': return openDialog('roles', 'Grant institutional responsibilities', info('Management approval is recorded. All existing sessions are revoked.') + area('roles', 'Role keys (comma-separated)', record.roles.join(', '), true, Object.keys(state.meta.roles).filter(role => !['system_admin', 'ict_officer'].includes(role)).join(', ')) + field('auditScopes', 'Auditor resource scopes', (record.auditScopes || []).join(', '), 'text', false, 'Auditors see nothing by default. Example: document_version, notice, user'), record);
       case 'new-profile': case 'edit-profile': {
         const users = state.extra.users || await api('/api/users'); state.extra.users = users;
         const item = record || {};
@@ -334,9 +334,6 @@
     else if (action === 'toggle-user') {
       if (!confirm(`${record.active ? 'Disable' : 'Enable'} this account? Existing sessions will be invalidated.`)) return;
       result = await api(`/api/users/${id}`, 'PATCH', { revision: record.revision, active: !record.active });
-    } else if (action === 'reset-user-mfa') {
-      if (!confirm(`Reset MFA for ${record.name}? Their sessions will end and they must enroll a new authenticator before accessing the portal.`)) return;
-      result = await api(`/api/users/${id}/mfa-reset`, 'POST', { revision: record.revision });
     } else if (action === 'submit-content' || action === 'archive-content') {
       if (action === 'archive-content' && !confirm('Archive this item and remove it from the public website?')) return;
       result = await api(`/api/cms/${id}/action`, 'POST', { revision: record.revision, action: action === 'submit-content' ? 'SUBMIT' : 'ARCHIVE' });
@@ -422,31 +419,11 @@
       authForm.querySelector('.p-form-status').hidden = true;
       try {
         const body = Object.fromEntries(new FormData(authForm));
-        const route = { login: 'login', password: 'password', mfa: 'mfa/confirm' }[context.mode];
+        const route = { login: 'login', password: 'password' }[context.mode];
         const result = await api('/api/auth/' + route, 'POST', body);
-        if (context.mode === 'login' && result.requiresMfaCode) {
-          authForm.querySelector('[data-login-credentials]').hidden = true;
-          const verification = authForm.querySelector('[data-login-verification]');
-          verification.hidden = false;
-          verification.innerHTML = '<p class="p-small">This account already has two-step verification. Open the authenticator app you previously set up for Alpha and enter its current six-digit code. If you just used a code, wait for the next one.</p><div class="p-field"><label for="sign-in-code">Six-digit verification code</label><input id="sign-in-code" name="mfa_code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6" maxlength="6" required></div><button class="p-text-btn" type="button" data-change-login>Use a different account</button>';
-          submit.textContent = 'Verify & sign in'; submit.disabled = false;
-          verification.querySelector('input').focus();
-          verification.querySelector('[data-change-login]').addEventListener('click', () => {
-            authForm.reset(); verification.replaceChildren(); verification.hidden = true;
-            authForm.querySelector('[data-login-credentials]').hidden = false;
-            authForm.querySelector('.p-form-status').hidden = true;
-            submit.textContent = 'Sign in to workspace'; authForm.elements.username.focus();
-          });
-          return;
-        }
         authForm.reset();
         window.location.assign('/portal');
       } catch (error) { formError(authForm, error); submit.disabled = false; }
-    });
-    document.querySelector('[data-setup-mfa]')?.addEventListener('click', async event => {
-      const button = event.currentTarget; button.disabled = true;
-      try { const result = await api('/api/auth/mfa/setup', 'POST', {}); const panel = document.getElementById('mfa-secret'); panel.querySelector('code').textContent = result.secret; panel.hidden = false; button.textContent = 'Setup key generated'; }
-      catch (error) { formError(authForm, error); button.disabled = false; }
     });
   }
   const recordForm = document.getElementById('record-form');

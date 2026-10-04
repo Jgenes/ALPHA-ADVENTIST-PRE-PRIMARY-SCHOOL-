@@ -45,8 +45,6 @@ async function handleApi(req, res, url, platform, auth) {
     if (route === '/api/auth/login') result = await auth.login(actor, body, req, res);
     else if (route === '/api/auth/logout') result = await auth.logout(actor, req, res);
     else if (route === '/api/auth/password') result = await auth.password(actor, body, req, res);
-    else if (route === '/api/auth/mfa/setup') result = await auth.setupMfa(actor);
-    else if (route === '/api/auth/mfa/confirm') result = await auth.confirmMfa(actor, body, req, res);
     else throw new HttpError(404, 'Authentication action not found.');
     return json(res, 200, { ok: true, ...result });
   }
@@ -70,7 +68,6 @@ async function handleApi(req, res, url, platform, auth) {
   else if (route === '/api/roles' && verb === 'GET') { A.requirePermission(actor.user, 'role.grant'); result = A.ROLE_PERMISSIONS; }
   else if (route === '/api/users' && verb === 'GET') result = await platform.users(actor);
   else if (route === '/api/users' && verb === 'POST') result = await platform.createUser(actor, body);
-  else if (/^\/api\/users\/[^/]+\/mfa-reset$/.test(route) && verb === 'POST') result = await platform.resetUserMfa(actor, id, body);
   else if (/^\/api\/users\/[^/]+$/.test(route) && verb === 'PATCH') result = await platform.changeUser(actor, id, body);
   else if (route === '/api/staff' && verb === 'GET') result = await platform.staff(actor);
   else if (route === '/api/staff/directory' && verb === 'GET') result = await platform.staff(actor, true);

@@ -19,8 +19,8 @@ The carousel retains its original controls and now has an explicit pause button 
 
 ## Safety and functionality retained
 
-- All server-side permissions, private-file controls, audit, consent, CSRF, MFA and embedded-preview login fixes remain in force.
-- The login still has only username/password initially; restoring the original visual layout does not restore its old always-visible authenticator field.
+- All server-side permissions, private-file controls, audit, consent, CSRF and embedded-preview login fixes remain in force.
+- The portal uses username/password sign-in; MFA setup and verification have been removed.
 - School contacts, public news/events, reviewed hero banners and approved downloads still come from the governed platform.
 - Empty/unpublished news/gallery areas, unlaunched course promotions and sample parent information are not republished merely to imitate the old screen.
 - Old credentials, runtime data, private artifacts and unverified pupil photos were **not** restored. Unapproved photo slots use the existing school crest. Photos may appear only through consent-checked `/media/` routes after independent approval. The invented campus SVG is removed.

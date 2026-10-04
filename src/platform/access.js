@@ -24,7 +24,6 @@ const ROLE_PERMISSIONS = Object.freeze({
   student: []
 });
 const ROLE_LABELS = { system_admin: 'System Administrator', ict_officer: 'ICT Officer', head_teacher: 'Head Teacher', school_admin: 'School Administrator', hr_officer: 'HR Officer', finance_officer: 'Finance Officer', academic_coordinator: 'Academic Coordinator', head_of_department: 'Head of Department', teacher: 'Teacher', supporting_staff: 'Supporting Staff', dpo: 'Privacy Officer', cms_author: 'Content Author', cms_editor: 'Content Editor', cms_publisher: 'CMS Publisher', media_manager: 'Media Manager', auditor: 'Auditor', parent: 'Parent / Guardian', student: 'Student' };
-const PRIVILEGED = new Set(Object.keys(ROLE_PERMISSIONS).filter(role => !['teacher', 'supporting_staff', 'parent', 'student'].includes(role)));
 function permissions(user) {
   if (!user || user.active === false) return [];
   return [...new Set((user.roles || []).flatMap(role => ROLE_PERMISSIONS[role] || []))];
@@ -33,7 +32,6 @@ function has(user, action) { return permissions(user).includes(action); }
 function requirePermission(user, action) {
   if (!has(user, action)) throw new HttpError(403, 'You are not authorised for this action.', 'FORBIDDEN');
 }
-function requiresMfa(user) { return (user.roles || []).some(role => PRIVILEGED.has(role)); }
 function isStaff(user) { return has(user, 'staff.view_self'); }
 function audienceAllows(user, audience = {}) {
   if (!user) return false;
@@ -70,4 +68,4 @@ function validRoles(roles) {
   if (roles.some(role => ['system_admin', 'ict_officer'].includes(role)) && roles.some(role => !['system_admin', 'ict_officer'].includes(role))) throw new HttpError(400, 'Technical administration and business roles must use separate accounts.');
   return [...new Set(roles)];
 }
-module.exports = { ROLE_PERMISSIONS, ROLE_LABELS, CLASSIFICATIONS, permissions, has, requirePermission, requiresMfa, isStaff, audienceAllows, canReadStaff, canReadLeave, canReadContract, canReadDocument, validRoles };
+module.exports = { ROLE_PERMISSIONS, ROLE_LABELS, CLASSIFICATIONS, permissions, has, requirePermission, isStaff, audienceAllows, canReadStaff, canReadLeave, canReadContract, canReadDocument, validRoles };

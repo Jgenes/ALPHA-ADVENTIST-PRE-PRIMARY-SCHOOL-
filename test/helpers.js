@@ -7,8 +7,6 @@ const assert = require('node:assert/strict');
 const { createConfig } = require('../src/config');
 const { createApplication } = require('../server');
 const { createUserRecord } = require('../src/platform/auth');
-const A = require('../src/platform/access');
-const L = require('../src/lib');
 class Agent {
   constructor(base) { this.base = base; this.cookie = ''; this.csrf = ''; }
   async request(method, route, body, options = {}) {
@@ -27,9 +25,9 @@ class Agent {
     assert.equal(response.status, 200, `${method} ${route}: ${response.json?.message || response.status}`);
     return response.data;
   }
-  async login(user, password, secret) {
+  async login(user, password) {
     await this.ok('GET', '/api/auth/session');
-    return this.ok('POST', '/api/auth/login', { username: user.username, password, ...(secret ? { mfa_code: L.totp(secret) } : {}) });
+    return this.ok('POST', '/api/auth/login', { username: user.username, password });
   }
 }
 async function fixture() {
@@ -39,16 +37,15 @@ async function fixture() {
   await new Promise(resolve => app.server.listen(0, '0.0.0.0', resolve));
   const base = `http://127.0.0.1:${app.server.address().port}`;
   const password = crypto.randomBytes(24).toString('base64url') + 'aA1!';
-  const users = {}, agents = {}, secrets = {};
+  const users = {}, agents = {};
   for (const [key, role] of Object.entries({ tech: 'system_admin', head: 'head_teacher', office: 'school_admin', hr: 'hr_officer', finance: 'finance_officer', hod: 'head_of_department', teacher: 'teacher', other: 'teacher', author: 'cms_author', otherAuthor: 'cms_author', editor: 'cms_editor', publisher: 'cms_publisher', dpo: 'dpo', media: 'media_manager', auditor: 'auditor' })) {
     const record = await createUserRecord('fixture.' + key.toLowerCase(), 'Synthetic ' + key, [role], password);
     record.mustChangePassword = false;
-    if (A.requiresMfa(record)) { const secret = L.createTotpSecret(); secrets[key] = secret; record.mfaEnabled = true; record.mfaSecretEnc = L.encrypt(Buffer.from(secret), config.mfaKey).toString('base64'); }
     users[key] = await app.store.run(tx => tx.insert('users', record));
     agents[key] = new Agent(base);
-    await agents[key].login(users[key], password, secrets[key]);
+    await agents[key].login(users[key], password);
   }
-  return { app, dir, config, base, users, agents, secrets, password, anonymous: new Agent(base), async close() { await this.app.close(); await fs.rm(dir, { recursive: true, force: true }); } };
+  return { app, dir, config, base, users, agents, password, anonymous: new Agent(base), async close() { await this.app.close(); await fs.rm(dir, { recursive: true, force: true }); } };
 }
 function textFile(content = 'Synthetic controlled document. No real personal data.') { return { name: 'controlled-document.txt', content: Buffer.from(content).toString('base64') }; }
 function nextMonday() {

@@ -11,7 +11,7 @@ const { createUserRecord, sessionCookieOptions } = require('../src/platform/auth
 const L = require('../src/lib');
 const { Agent } = require('./helpers');
 
-test('login recovery and progressive second-factor verification', async t => {
+test('password sign-in, session recovery and cookie policy', async t => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'alpha-auth-test-'));
   const config = createConfig({ NODE_ENV: 'test', DATA_DIR: dir, BASE_URL: 'https://school.example.test' });
   const app = await createApplication(config, { jobs: false });
@@ -24,8 +24,7 @@ test('login recovery and progressive second-factor verification', async t => {
   const manager = await createUserRecord('login.manager', 'Synthetic manager', ['head_teacher'], password);
   manager.mustChangePassword = false;
   manager.mfaEnabled = true;
-  const secret = L.createTotpSecret();
-  manager.mfaSecretEnc = L.encrypt(Buffer.from(secret), config.mfaKey).toString('base64');
+  manager.mfaSecretEnc = 'legacy-encrypted-mfa-data';
   await app.store.run(async tx => { await tx.insert('users', teacher); await tx.insert('users', manager); });
 
   await t.test('initial sign-in has username and password only, with a new-tab fallback', async () => {
@@ -36,7 +35,7 @@ test('login recovery and progressive second-factor verification', async t => {
     assert.ok(!result.text.includes('name="mfa_code"'));
     assert.ok(!result.text.includes('Authenticator code'));
     assert.ok(result.text.includes('open the portal in a new tab'));
-    assert.ok(result.text.includes('/js/portal.js?v=3'));
+    assert.ok(result.text.includes('/js/portal.js?v=4'));
     assert.match(result.headers.get('cache-control'), /no-store/);
   });
   await t.test('only the development preview uses secure partitioned cross-site cookies', () => {
@@ -68,36 +67,26 @@ test('login recovery and progressive second-factor verification', async t => {
     const staleWrite = await agent.request('POST', '/api/leave', {}, { headers: { 'X-CSRF-Token': oldToken } });
     assert.equal(staleWrite.status, 403); assert.equal(staleWrite.json.code, 'CSRF_FAILED');
   });
-  await t.test('MFA is requested only after password proof and cannot be skipped', async () => {
+  await t.test('privileged accounts sign in with a password and MFA endpoints are unavailable', async () => {
     const agent = new Agent(base);
     await agent.ok('GET', '/api/auth/session');
     const invalid = await agent.request('POST', '/api/auth/login', { username: manager.username, password: 'not-the-password' });
     assert.equal(invalid.status, 401); assert.equal(invalid.json.requiresMfaCode, undefined);
-    const before = agent.cookie;
-    const challenge = await agent.ok('POST', '/api/auth/login', { username: manager.username, password });
-    assert.equal(challenge.requiresMfaCode, true);
-    assert.equal(challenge.user, undefined);
-    assert.equal(agent.cookie, before, 'A password-only challenge does not mint an authenticated cookie');
-    assert.equal((await agent.ok('GET', '/api/auth/session')).user, null);
-    assert.equal((await agent.request('GET', '/api/dashboard')).status, 403);
-    assert.equal((await agent.request('POST', '/api/auth/login', { username: manager.username, password, mfa_code: 'bad-code' })).status, 401);
-    const usedCode = L.totp(secret);
-    const signedIn = await agent.ok('POST', '/api/auth/login', { username: manager.username, password, mfa_code: usedCode });
+    const signedIn = await agent.ok('POST', '/api/auth/login', { username: manager.username, password });
     assert.equal(signedIn.user.id, manager.id);
-    assert.notEqual(agent.cookie, before);
     assert.equal((await agent.request('GET', '/api/dashboard')).status, 200);
-    const replay = new Agent(base); await replay.ok('GET', '/api/auth/session');
-    assert.equal((await replay.request('POST', '/api/auth/login', { username: manager.username, password, mfa_code: usedCode })).status, 401);
+    assert.equal((await agent.request('POST', '/api/auth/mfa/setup', {})).status, 404);
+    assert.equal((await agent.request('POST', '/api/auth/mfa/confirm', { code: '123456' })).status, 404);
   });
-  await t.test('first-time management accounts receive clear setup instructions, not a login code prompt', async () => {
+  await t.test('first-time management accounts can continue after password change', async () => {
     const account = await createUserRecord('login.newmanager', 'Synthetic new manager', ['head_teacher'], password);
     account.mustChangePassword = false; // Isolate the post-password-change enrolment screen.
     await app.store.run(tx => tx.insert('users', account));
     const agent = new Agent(base); const result = await agent.login(account, password);
-    assert.equal(result.requiresMfaCode, undefined); assert.equal(result.needsMfa, true);
+    assert.equal(result.requiresMfaCode, undefined);
     const page = await agent.request('GET', '/portal');
-    assert.ok(page.text.includes('Google Authenticator'));
-    assert.ok(page.text.includes('not sent by SMS or email'));
-    assert.equal((await agent.request('GET', '/api/dashboard')).json.code, 'MFA_REQUIRED');
+    assert.equal(page.status, 200);
+    assert.ok(!page.text.includes('Google Authenticator'));
+    assert.equal((await agent.request('GET', '/api/dashboard')).status, 200);
   });
 });

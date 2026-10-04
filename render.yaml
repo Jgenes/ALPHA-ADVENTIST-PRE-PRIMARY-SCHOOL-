@@ -36,8 +36,6 @@ services:
         sync: false
       - key: SUPABASE_STORAGE_BUCKET
         sync: false
-      - key: MFA_ENCRYPTION_KEY
-        sync: false
       - key: STORAGE_ENCRYPTION_KEY
         sync: false
       - key: AUDIT_HMAC_KEY

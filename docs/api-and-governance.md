@@ -5,8 +5,8 @@
 The vanilla-JS portal calls the same server-authorised APIs a separate client would use. Hiding a navigation item is not an access control.
 
 1. `GET /api/auth/session` obtains an anonymous session and CSRF value.
-2. Refresh `GET /api/auth/session` immediately before sign-in, then `POST /api/auth/login` with the cookie, CSRF header and named credentials. For an enrolled account, a correct password without a code returns `requiresMfaCode: true` without authenticating the session. Submit the credentials plus the current TOTP code to complete sign-in; existing clients may still supply both factors together. The initial browser form contains only username and password.
-3. Complete mandatory password rotation/MFA before calling business APIs.
+2. Refresh `GET /api/auth/session` immediately before sign-in, then `POST /api/auth/login` with the cookie, CSRF header and named credentials.
+3. Complete any mandatory initial password rotation before calling business APIs.
 4. For mutating authenticated requests, send JSON, the cookie and `X-CSRF-Token`. Cross-site origins are rejected. CSRF values are never placed in URLs.
 5. Updates/decisions include the record’s numeric `revision`; stale writes return 409. Reload instead of blindly repeating an approval.
 6. Check both action permission and returned resource scope. An ID/reference, role label, client-submitted owner or browser button is not authorisation.
@@ -21,7 +21,7 @@ The exact dispatcher is `src/platform/router.js`; there are no wildcard model en
 
 | Group | Main routes |
 | --- | --- |
-| Auth | `GET /api/auth/session`; `POST /api/auth/{login,logout,password,mfa/setup,mfa/confirm}` |
+| Auth | `GET /api/auth/session`; `POST /api/auth/{login,logout,password}` |
 | Context/accounts | `GET /api/{meta,permissions,roles,users,departments}`; `POST /api/users`; `PATCH /api/users/:id` |
 | Staff | `GET /api/staff`, `/api/staff/directory`; `PUT /api/staff/:userId` |
 | Leave | `GET/POST /api/leave`, `/api/leave/balances`; `PUT /api/leave/:id`, `/api/leave/types/:id`; `POST /api/leave/:id/action` |

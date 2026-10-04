@@ -24,7 +24,7 @@ async function main() {
   const app = await createApplication(undefined, { jobs: false });
   try {
     const result = await bootstrapUser(app.store, app.config, { ...values, approved: true, approvalReference: process.env.BOOTSTRAP_APPROVAL_REFERENCE, password });
-    console.log(`Initial ${result.role} account created. First sign-in requires a password change and MFA. Remove the temporary password file after secure handover. No password is printed.`);
+    console.log(`Initial ${result.role} account created. First sign-in requires a password change. Remove the temporary password file after secure handover. No password is printed.`);
   } finally { await app.close(); }
 }
 if (require.main === module) main().catch(error => { console.error('[bootstrap] Failed. Review approval, protected password file, role existence and database connection.', error.name, error.code || ''); process.exitCode = 1; });

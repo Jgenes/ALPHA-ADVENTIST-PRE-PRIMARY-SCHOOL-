@@ -29,7 +29,7 @@ function createConfig(env = process.env) {
   if (!production || publicPreview) {
     if (fs.existsSync(keyFile)) localKeys = JSON.parse(fs.readFileSync(keyFile, 'utf8'));
     else {
-      for (const key of ['MFA_ENCRYPTION_KEY', 'STORAGE_ENCRYPTION_KEY', 'AUDIT_HMAC_KEY']) localKeys[key] = crypto.randomBytes(32).toString('hex');
+      for (const key of ['STORAGE_ENCRYPTION_KEY', 'AUDIT_HMAC_KEY']) localKeys[key] = crypto.randomBytes(32).toString('hex');
       fs.writeFileSync(keyFile, JSON.stringify(localKeys), { flag: 'wx', mode: 0o600 });
     }
   } else {
@@ -39,17 +39,17 @@ function createConfig(env = process.env) {
     if (fs.existsSync(productionKeyFile)) {
       try { localKeys = JSON.parse(fs.readFileSync(productionKeyFile, 'utf8')); }
       catch { throw new Error('The persistent application key file is unreadable; restore its separately escrowed copy.'); }
-      for (const key of ['MFA_ENCRYPTION_KEY', 'STORAGE_ENCRYPTION_KEY', 'AUDIT_HMAC_KEY']) {
+      for (const key of ['STORAGE_ENCRYPTION_KEY', 'AUDIT_HMAC_KEY']) {
         if (!/^[a-f0-9]{64}$/i.test(localKeys[key] || '')) throw new Error(`The persistent application key file is missing a valid ${key}; restore its separately escrowed copy.`);
       }
     } else {
       const initialKeys = {};
-      for (const key of ['MFA_ENCRYPTION_KEY', 'STORAGE_ENCRYPTION_KEY', 'AUDIT_HMAC_KEY']) {
+      for (const key of ['STORAGE_ENCRYPTION_KEY', 'AUDIT_HMAC_KEY']) {
         const configured = env[key] || (env[key + '_FILE'] && fs.readFileSync(env[key + '_FILE'], 'utf8').trim());
         if (configured && !/^[a-f0-9]{64}$/i.test(configured)) throw new Error(`${key} must contain exactly 64 hexadecimal characters.`);
         initialKeys[key] = configured || crypto.randomBytes(32).toString('hex');
       }
-      if (new Set(Object.values(initialKeys).map(value => value.toLowerCase())).size !== 3) throw new Error('MFA, storage and audit keys must be different.');
+      if (new Set(Object.values(initialKeys).map(value => value.toLowerCase())).size !== 2) throw new Error('Storage and audit keys must be different.');
       try { fs.writeFileSync(productionKeyFile, JSON.stringify(initialKeys), { flag: 'wx', mode: 0o600 }); localKeys = initialKeys; }
       catch (error) {
         if (error.code !== 'EEXIST') throw error;
@@ -87,8 +87,8 @@ function createConfig(env = process.env) {
     smtp = { user: env.GMAIL_SMTP_USER, password, from: env.GMAIL_SMTP_USER, officeEmail: env.OFFICE_ALERT_EMAIL, privacyEmail: env.PRIVACY_ALERT_EMAIL };
   }
   if (production && !publicPreview && !webhookConfigured && !smtp) throw new Error('Configure the signed office-alert integration or approved Gmail SMTP delivery before production/staging startup.');
-  const keys = { mfaKey: secret('MFA_ENCRYPTION_KEY'), storageKey: secret('STORAGE_ENCRYPTION_KEY'), auditKey: secret('AUDIT_HMAC_KEY') };
-  if (new Set(Object.values(keys).map(value => value.toString('hex'))).size !== 3) throw new Error('MFA, storage and audit keys must be different.');
+  const keys = { storageKey: secret('STORAGE_ENCRYPTION_KEY'), auditKey: secret('AUDIT_HMAC_KEY') };
+  if (new Set(Object.values(keys).map(value => value.toString('hex'))).size !== 2) throw new Error('Storage and audit keys must be different.');
   const port = Number(env.PORT || 3000);
   if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error('Invalid PORT.');
   const proxyHops = Number(env.TRUST_PROXY_HOPS || 0);

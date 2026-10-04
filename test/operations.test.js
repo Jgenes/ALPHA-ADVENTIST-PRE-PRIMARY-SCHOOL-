@@ -78,7 +78,7 @@ test('operator safeguards and an actual isolated SQLite/file recovery rehearsal'
     await assert.rejects(bootstrapUser(app.store, config, { ...input, role: 'hr_officer' }));
     const result = await bootstrapUser(app.store, config, input);
     const user = await app.store.run(tx => tx.get('users', result.id));
-    assert.equal(user.mustChangePassword, true); assert.equal(user.mfaEnabled, false); assert.deepEqual(user.roles, ['system_admin']);
+    assert.equal(user.mustChangePassword, true); assert.equal(user.mfaEnabled, undefined); assert.deepEqual(user.roles, ['system_admin']);
     await assert.rejects(bootstrapUser(app.store, config, { ...input, username: 'another.operator' }), /already exists/);
   });
   await t.test('Render head-teacher environment bootstrap requires approval and provisions only once', async () => {
@@ -179,7 +179,7 @@ test('operator safeguards and an actual isolated SQLite/file recovery rehearsal'
     const restoredDir = path.join(root, 'restore');
     await B.restoreFiles(restoredDir, backup.files);
     await fs.writeFile(path.join(restoredDir, 'adsp.sqlite'), Buffer.from(backup.sqlite, 'base64'), { mode: 0o600, flag: 'wx' });
-    const restoredConfig = createConfig({ NODE_ENV: 'test', DATA_DIR: restoredDir, BASE_URL: config.baseUrl, MFA_ENCRYPTION_KEY: config.mfaKey.toString('hex'), STORAGE_ENCRYPTION_KEY: config.storageKey.toString('hex'), AUDIT_HMAC_KEY: config.auditKey.toString('hex') });
+    const restoredConfig = createConfig({ NODE_ENV: 'test', DATA_DIR: restoredDir, BASE_URL: config.baseUrl, STORAGE_ENCRYPTION_KEY: config.storageKey.toString('hex'), AUDIT_HMAC_KEY: config.auditKey.toString('hex') });
     app = await createApplication(restoredConfig, { jobs: false }); closed = false;
     const record = await app.store.run(tx => tx.get('document_versions', 'RECOVERY-DOC'));
     assert.equal((await app.platform.files.read(record.file)).toString(), 'RECOVERY SYNTHETIC CONTENT');
