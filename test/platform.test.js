@@ -106,9 +106,21 @@ test('ADSP security, persistence and institutional workflows', { timeout: 120000
     assert.ok(home.text.includes('class="news-feat"'));
     assert.ok(!home.text.includes('adsp-hero'));
     assert.ok(!home.text.includes('campus-illustration.svg'));
+    assert.ok(home.text.includes('/img/site-campus.webp'));
+    assert.ok(home.text.includes('/img/site-classroom.webp'));
     const sw = await anonymous.request('GET', '/sw');
     assert.match(sw.text, /class="hero" data-hero/);
     assert.ok(sw.text.includes('Karibu Shule ya Awali na Msingi'));
+    assert.ok(sw.text.includes('/img/site-campus.webp'));
+    const gallery = await anonymous.request('GET', '/gallery');
+    assert.equal(gallery.status, 200);
+    assert.ok(gallery.text.includes('/img/site-sports.webp'));
+    assert.ok(gallery.text.includes('data-cat="Campus"'));
+    for (const image of ['site-campus.webp', 'site-garden.webp', 'site-project.webp', 'site-leadership.webp', 'site-choir.webp', 'site-graduation.webp', 'site-choir-stage.webp', 'site-awards.webp', 'site-school-community.webp', 'site-gate.webp', 'site-classroom.webp', 'site-sports.webp']) {
+      const photo = await anonymous.request('GET', '/img/' + image);
+      assert.equal(photo.status, 200, image);
+      assert.match(photo.headers.get('content-type'), /image\/webp/, image);
+    }
     const login = await anonymous.request('GET', '/portal');
     assert.ok(login.text.includes('card form admin-login'));
     assert.ok(!login.text.includes('p-auth-story'));

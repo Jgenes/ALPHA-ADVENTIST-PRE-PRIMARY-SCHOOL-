@@ -14,8 +14,7 @@ body{overflow-wrap:anywhere}
 .home-actions{display:flex;flex-wrap:wrap;gap:12px}
 .techgrid{grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr))}
 .hero__tag{max-width:48ch}
-/* Reuse the school's existing crest when no consented photograph is published.
-   No invented campus artwork or unverified pupil photo is used as a fallback. */
+/* Use the school's crest only when no approved local or published photo is available. */
 .media-pending{display:block;background:var(--navy-050);overflow:hidden}
 .media-pending img{width:100%;height:100%;object-fit:contain!important;padding:clamp(30px,7vw,100px);background:var(--navy-050)}
 .hero__media .media-pending,.hero__media .media-pending img{background:var(--navy-800)}

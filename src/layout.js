@@ -64,11 +64,22 @@ function icon(name, cls = '') {
 }
 
 /* ============ image helper ============ */
+const PHOTO_ASSETS = {
+  campus: 'site-campus.webp', 'garden-project': 'site-garden.webp',
+  'exhibit-pupils': 'site-project.webp', 'exhibit-teacher': 'site-classroom.webp',
+  'graduation-group': 'site-graduation.webp', 'graduation-certificate': 'site-awards.webp',
+  'choir-green': 'site-choir.webp', 'choir-teal': 'site-choir-stage.webp',
+  'staff-group': 'site-leadership.webp', 'leadership-guests': 'site-leadership.webp',
+  'school-community': 'site-school-community.webp', gate: 'site-gate.webp', classroom: 'site-classroom.webp', sports: 'site-sports.webp'
+};
+function photoSrc(name) { return PHOTO_ASSETS[name] ? `/img/${PHOTO_ASSETS[name]}` : ''; }
 function pic(base, alt, opts = {}) {
-  const approved = /^\/media\/MED-[a-f0-9-]+$/.test(String(base));
-  const src = approved ? base : '/img/logo-512.png';
-  const description = approved ? alt : 'Alpha school crest — a photograph will be shown only after consent and publication approval';
-  return `<picture${approved ? '' : ' class="media-pending"'}><img src="${esc(src)}" alt="${esc(description)}" ${opts.cls ? `class="${esc(opts.cls)}"` : ''} ${opts.eager ? 'fetchpriority="high"' : 'loading="lazy"'} decoding="async" width="1200" height="820" ${opts.ratio ? `style="aspect-ratio:${esc(opts.ratio)}"` : ''}></picture>`;
+  const media = /^\/media\/MED-[a-f0-9-]+$/.test(String(base));
+  const local = photoSrc(base);
+  const src = media ? base : local || '/img/logo-512.png';
+  const description = media || local ? alt : 'Alpha school crest';
+  const pending = !media && !local;
+  return `<picture${pending ? ' class="media-pending"' : ''}><img src="${esc(src)}" alt="${esc(description)}" ${opts.cls ? `class="${esc(opts.cls)}"` : ''} ${opts.eager ? 'fetchpriority="high"' : 'loading="lazy"'} decoding="async" width="1200" height="820" ${opts.ratio ? `style="aspect-ratio:${esc(opts.ratio)}"` : ''}></picture>`;
 }
 
 /* ============ small partials ============ */
@@ -301,4 +312,4 @@ function schoolJsonLd(ctx) {
   };
 }
 
-module.exports = { icon, pic, btn, sectionHead, header, footer, page, NAV, schoolJsonLd, localPath, baseOf, ICONS: P };
+module.exports = { icon, pic, photoSrc, btn, sectionHead, header, footer, page, NAV, schoolJsonLd, localPath, baseOf, ICONS: P };

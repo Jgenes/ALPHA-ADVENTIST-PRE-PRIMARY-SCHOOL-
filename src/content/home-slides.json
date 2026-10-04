@@ -5,6 +5,8 @@
     "title": "Welcome to Alpha Adventist Pre & Primary School",
     "text": "A Seventh-day Adventist educational institution within the Western Tanzania Conference – Kigoma, committed to developing knowledgeable, disciplined, creative, responsible and spiritually grounded learners.",
     "strap": "Education • Faith • Technology • Talent • Character • Future",
+    "image": "campus",
+    "alt": "Alpha Adventist school buildings and courtyard in Kigoma",
     "cta": {
       "label": "Apply for Admission",
       "href": "/admissions#apply"
@@ -20,6 +22,8 @@
     "title": "Strong Academic Foundations for Every Learner",
     "text": "Learning that develops knowledge, confidence, discipline and curiosity.",
     "strap": "",
+    "image": "classroom",
+    "alt": "Pupils taking part in a classroom lesson at Alpha",
     "cta": {
       "label": "Explore Academics",
       "href": "/academics"
@@ -32,6 +36,8 @@
     "title": "Preparing Children for the Digital Future",
     "text": "Practical computer learning, digital creativity and responsible technology use.",
     "strap": "",
+    "image": "exhibit-teacher",
+    "alt": "A teacher guiding pupils during a practical school activity",
     "cta": {
       "label": "Explore Computer Learning",
       "href": "/computer-learning"
@@ -44,6 +50,8 @@
     "title": "Developing the Whole Child",
     "text": "Faith, character, talent, creativity, teamwork and leadership are part of the Alpha experience.",
     "strap": "",
+    "image": "choir-green",
+    "alt": "Alpha pupils singing during a school worship programme",
     "cta": {
       "label": "Discover School Life",
       "href": "/school-life"

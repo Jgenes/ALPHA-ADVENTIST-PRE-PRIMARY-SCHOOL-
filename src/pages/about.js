@@ -2,11 +2,13 @@
 const X = require('../layout');
 const L = require('../lib');
 const { esc, paragraphs } = L;
-const { icon, pic, btn, sectionHead } = X;
+const { icon, pic, photoSrc, btn, sectionHead } = X;
 
 function phero(ctx, kicker, title, text, img) {
+  const photo = /^\/media\/MED-[a-f0-9-]+$/.test(String(img)) ? img : photoSrc(img);
+  const style = photo ? ` style="--ph-img:url('${photo}')"` : '';
   return `
-  <section class="phero">
+  <section class="phero"${style}>
     <div class="container">
       <nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a>${icon('chevron')}<span aria-current="page">${esc(kicker)}</span></nav>
       <h1>${esc(title)}</h1>
@@ -33,7 +35,7 @@ ${phero(ctx, 'About Us', 'About Alpha Adventist Pre & Primary School', 'A Sevent
     </div>
     <div class="media-stack rv">
       <div class="media-stack__main">${pic('staff-group', 'Alpha Adventist staff group photograph in front of the school building', { widths: [800, 1200], ratio: '4/3' })}</div>
-      <div class="media-stack__float">${pic('banner-conference', 'Official banner of the Western Tanzania Conference of Seventh-day Adventists with the Alpha school crest', { widths: [480, 800], ratio: '1000/182' })}</div>
+      <div class="media-stack__float">${pic('campus', 'Alpha Adventist school buildings and courtyard in Kigoma', { widths: [480, 800], ratio: '4/3' })}</div>
     </div>
   </div>
 </section>
