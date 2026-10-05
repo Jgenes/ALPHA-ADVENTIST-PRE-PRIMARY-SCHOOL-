@@ -5,6 +5,8 @@ const { safeUser } = require('../platform/auth');
 const { has, ROLE_LABELS } = require('../platform/access');
 const NAV = [
   ['dashboard', 'grid', 'Overview', null, 'Workspace'],
+  ['family', 'users', 'Family portal', ['student.profile.read', 'student.results.read'], 'Family'],
+  ['students', 'book', 'Students & classes', 'student.manage', 'Academic services'],
   ['profile', 'users', 'My profile', 'staff.view_self', 'My work'],
   ['leave', 'calendar', 'Leave', 'leave.create', 'My work'],
   ['contracts', 'clipboard', 'My contracts', 'contract.view_self', 'My work'],
@@ -53,13 +55,13 @@ function portal(ctx, actor, config) {
     <div class="p-field"><label for="confirm-password">Confirm new password</label><input id="confirm-password" type="password" name="confirmPassword" autocomplete="new-password" minlength="12" maxlength="128" required></div>`;
   // Reuse the original repository's admin-login/admin-wrap/admin-side shell.
   // Authentication and API authorisation remain the governed implementation.
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#0A1E59"><title>${esc(mode === 'app' ? title : 'Staff sign in')} — Alpha School Portal</title><link rel="icon" href="/img/favicon-32.png"><link rel="manifest" href="/site.webmanifest"><link rel="stylesheet" href="/fonts/fonts.css"><link rel="stylesheet" href="/css/main.css?v=5"><link rel="stylesheet" href="/css/portal.css?v=3"></head>
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#0A1E59"><title>${esc(mode === 'app' ? title : 'Portal sign in')} — Alpha School Portal</title><link rel="icon" href="/img/favicon-32.png"><link rel="manifest" href="/site.webmanifest"><link rel="stylesheet" href="/fonts/fonts.css"><link rel="stylesheet" href="/css/main.css?v=5"><link rel="stylesheet" href="/css/portal.css?v=3"></head>
 <body class="${mode === 'app' ? 'p-app' : 'sec--sand p-auth'}">
 <a class="skip-link" href="#workspace">Skip to workspace</a>
 ${mode !== 'app' ? `
 <main class="container" id="workspace">
   <div class="card form admin-login">
-    <div class="portal-login-brand"><img src="/img/logo-160.png" alt="Alpha Adventist School crest" width="64" height="64"><h1>${mode === 'login' ? 'Alpha School Portal' : 'Make this account yours.'}</h1><p class="muted">${mode === 'login' ? 'Authorised school staff and management only' : 'Use a unique password of 12–128 characters, with uppercase, lowercase, a number and a symbol.'}</p></div>
+    <div class="portal-login-brand"><img src="/img/logo-160.png" alt="Alpha Adventist School crest" width="64" height="64"><h1>${mode === 'login' ? 'Alpha School Portal' : 'Make this account yours.'}</h1><p class="muted">${mode === 'login' ? 'Authorised staff, parents, guardians and learners' : 'Use a unique password of 12–128 characters, with uppercase, lowercase, a number and a symbol.'}</p></div>
     <form id="auth-form" data-auth="${mode}">${fields}<p class="p-form-status" role="alert" hidden></p><button class="p-btn p-btn-primary p-full" type="submit">${mode === 'login' ? 'Sign in to workspace' : 'Save new password'} ${icon('arrow')}</button></form>
     <p class="p-small" data-framed-login hidden>If sign-in is blocked inside this preview, <a href="/portal" target="_blank" rel="noopener noreferrer">open the portal in a new tab</a>.</p>
     <p class="p-small text-center" style="margin-top:18px">Sessions expire after 30 minutes idle or 8 hours maximum. Login attempts are rate-limited.</p>

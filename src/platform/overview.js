@@ -5,9 +5,69 @@ const W = require('./workflows');
 const V = require('./validation');
 const { audit, verifyAudit } = require('./audit');
 const { HttpError } = L;
+function familyRecords(tx, user) {
+  return Promise.all([
+    tx.list('student_profiles'), tx.list('student_guardians'), tx.list('classes'),
+    tx.list('class_teachers'), tx.list('attendance_records'), tx.list('student_results'),
+    tx.list('learning_materials')
+  ]).then(([profiles, guardians, classes, assignments, attendance, results, materials]) => {
+    const classById = new Map(classes.map(item => [item.id, item]));
+    let visible;
+    if (user.roles.includes('parent')) {
+      const linkedIds = new Set(guardians.filter(link => link.guardianUserId === user.id && link.status === 'VERIFIED' && link.verifiedAt).map(link => link.studentId));
+      visible = profiles.filter(item => linkedIds.has(item.id) && item.active !== false);
+    } else if (user.roles.includes('student')) {
+      visible = profiles.filter(item => item.userId === user.id && item.active !== false);
+    } else if (user.roles.includes('teacher')) {
+      const classIds = new Set(assignments.filter(item => item.teacherUserId === user.id && item.active !== false).map(item => item.classId));
+      visible = profiles.filter(item => classIds.has(item.classId) && item.active !== false);
+    } else {
+      visible = [];
+    }
+    return visible.map(student => {
+      const classRecord = classById.get(student.classId);
+      const studentAttendance = attendance.filter(item => item.studentId === student.id);
+      const present = studentAttendance.filter(item => item.status === 'PRESENT').length;
+      const publishedResults = results.filter(item => item.studentId === student.id && (item.status === 'PUBLISHED' || item.published === true)).map(item => ({ subject: item.subject, score: item.score, term: item.term }));
+      const availableMaterials = materials.filter(item => (item.status === 'PUBLISHED' || item.published === true) && ((item.studentIds || []).includes(student.id) || (item.classIds || []).includes(student.classId)));
+      return {
+        id: student.id,
+        name: student.name,
+        studentRef: student.studentRef,
+        classId: student.classId,
+        className: classRecord?.name || '',
+        yearLevel: student.yearLevel || classRecord?.yearLevel || '',
+        attendance: studentAttendance.length ? { present, total: studentAttendance.length, percentage: Math.round(present / studentAttendance.length * 100) } : null,
+        results: publishedResults,
+        materials: availableMaterials.map(item => ({ id: item.id, title: item.title, description: item.description || '', href: item.href || '' }))
+      };
+    });
+  });
+}
 module.exports = {
   async metadata(actor) {
     return this.run(actor, async (tx, actor) => ({ publicSettings: require('./school-details').applyDetails(require('../../data/seed.json').settings, (await tx.list('cms_content')).filter(item => item.published && item.status !== 'ARCHIVED').map(item => ({ kind: item.kind, ...item.published }))), departments: await tx.list('departments'), leaveTypes: A.has(actor.user, 'leave.create') ? await tx.list('leave_types') : [], roles: A.has(actor.user, 'role.grant') || A.has(actor.user, 'user.create') ? A.ROLE_LABELS : {}, classifications: A.CLASSIFICATIONS, environment: this.config.environment }));
+  },
+  async family(actor) {
+    return this.run(actor, async (tx, actor) => {
+      const user = actor.user;
+      if (!['parent', 'student', 'teacher'].some(role => user.roles.includes(role))) throw new HttpError(403, 'This account has no family or classroom portal access.', 'FORBIDDEN');
+      const students = await familyRecords(tx, user);
+      const notices = (await tx.list('notices')).filter(item => item.status === 'PUBLISHED' && V.activeDate(item) && A.audienceAllows(user, item.audience)).slice(0, 5).map(item => ({ id: item.id, title: item.title, message: item.message, category: item.category, publishedAt: item.publishedAt || item.createdAt }));
+      const calendar = (await tx.list('calendar')).filter(item => item.date >= new Date().toISOString().slice(0, 10) && A.audienceAllows(user, item.audience)).sort((a, b) => a.date.localeCompare(b.date)).slice(0, 5).map(item => ({ id: item.id, title: item.title, description: item.description || '', date: item.date, category: item.category }));
+      if (user.roles.includes('parent')) {
+        return { role: 'parent', children: students, notices, calendar };
+      }
+      if (user.roles.includes('student')) {
+        return { role: 'student', student: students[0] || null, notices, calendar };
+      }
+      if (user.roles.includes('teacher')) {
+        const classes = await tx.list('classes');
+        const assignments = (await tx.list('class_teachers')).filter(item => item.teacherUserId === user.id && item.active !== false);
+        return { role: 'teacher', classrooms: assignments.map(assignment => ({ ...classes.find(item => item.id === assignment.classId), students: students.filter(student => student.classId === assignment.classId) })), notices, calendar };
+      }
+      return { role: 'staff', children: [], notices, calendar };
+    });
   },
   async dashboard(actor) {
     return this.run(actor, async (tx, actor) => {
@@ -35,6 +95,20 @@ module.exports = {
         acknowledgementsDue: notices.filter(notice => notice.acknowledgementRequired && !receipts.some(receipt => receipt.noticeId === notice.id && receipt.version === notice.version && receipt.userId === user.id && receipt.acknowledgedAt)).length,
         documents: documents.length, pendingApprovals, notifications: notifications.slice(-5).reverse(), upcoming: calendar
       };
+      if (user.roles.includes('parent')) {
+        const family = await familyRecords(tx, user);
+        output.family = { children: family };
+      }
+      if (user.roles.includes('student')) {
+        const student = (await familyRecords(tx, user))[0];
+        output.student = student ? { studentRef: student.studentRef, className: student.className, attendance: student.attendance, results: student.results } : null;
+      }
+      if (user.roles.includes('teacher')) {
+        const assignments = (await tx.list('class_teachers')).filter(item => item.teacherUserId === user.id && item.active !== false);
+        const classes = await tx.list('classes');
+        const classroomStudents = await familyRecords(tx, user);
+        output.teacher = { classrooms: assignments.map(item => ({ ...classes.find(record => record.id === item.classId), studentCount: classroomStudents.filter(student => student.classId === item.classId).length })) };
+      }
       if (A.has(user, 'staff.view_all')) output.staffTotal = (await tx.list('staff_profiles')).length;
       if (A.has(user, 'system.read')) {
         output.accountsTotal = (await tx.list('users')).filter(item => item.active).length;

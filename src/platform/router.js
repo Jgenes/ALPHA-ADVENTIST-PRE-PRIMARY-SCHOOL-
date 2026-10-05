@@ -63,6 +63,26 @@ async function handleApi(req, res, url, platform, auth) {
   let result;
   if (verb === 'GET' && /^\/api\/downloads\/[a-f0-9]{64}$/.test(route)) return sendFile(res, await platform.privateDownload(actor, id));
   if (route === '/api/dashboard' && verb === 'GET') result = await platform.dashboard(actor);
+  else if (route === '/api/family' && verb === 'GET') result = await platform.family(actor);
+  else if (route === '/api/students' && verb === 'GET') result = await platform.students(actor);
+  else if (route === '/api/students' && verb === 'POST') result = await platform.saveStudent(actor, body);
+  else if (/^\/api\/students\/[^/]+$/.test(route) && verb === 'PUT') result = await platform.saveStudent(actor, body, id);
+  else if (/^\/api\/students\/[^/]+\/guardians$/.test(route) && verb === 'POST') result = await platform.verifyGuardian(actor, id, body);
+  else if (route === '/api/classes' && verb === 'GET') result = await platform.classes(actor);
+  else if (route === '/api/classes' && verb === 'POST') result = await platform.saveClass(actor, body);
+  else if (/^\/api\/classes\/[^/]+$/.test(route) && verb === 'PUT') result = await platform.saveClass(actor, body, id);
+  else if (route === '/api/class-teachers' && verb === 'POST') result = await platform.assignTeacher(actor, body);
+  else if (route === '/api/attendance' && verb === 'GET') result = await platform.attendance(actor, url.searchParams.get('studentId') || '');
+  else if (route === '/api/attendance' && verb === 'POST') result = await platform.recordAttendance(actor, body);
+  else if (route === '/api/results' && verb === 'GET') result = await platform.results(actor, url.searchParams.get('studentId') || '');
+  else if (route === '/api/results' && verb === 'POST') result = await platform.saveResult(actor, body);
+  else if (/^\/api\/results\/[^/]+\/publish$/.test(route) && verb === 'POST') result = await platform.publishResult(actor, id, body);
+  else if (route === '/api/learning-materials' && verb === 'GET') result = await platform.materials(actor);
+  else if (route === '/api/learning-materials' && verb === 'POST') result = await platform.saveMaterial(actor, body);
+  else if (/^\/api\/learning-materials\/[^/]+\/publish$/.test(route) && verb === 'POST') result = await platform.publishMaterial(actor, id, body);
+  else if (route === '/api/family/messages' && verb === 'GET') result = await platform.familyMessages(actor, url.searchParams.get('studentId') || '');
+  else if (route === '/api/family/messages' && verb === 'POST') result = await platform.sendFamilyMessage(actor, body);
+  else if (route === '/api/family/contacts' && verb === 'GET') result = await platform.familyContacts(actor, url.searchParams.get('studentId') || '');
   else if (route === '/api/meta' && verb === 'GET') result = await platform.metadata(actor);
   else if (route === '/api/permissions' && verb === 'GET') result = A.permissions(actor.user);
   else if (route === '/api/roles' && verb === 'GET') { A.requirePermission(actor.user, 'role.grant'); result = A.ROLE_PERMISSIONS; }

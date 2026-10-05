@@ -8,7 +8,7 @@ A governed public website and staff workspace for **Alpha Adventist Pre & Primar
 
 - Original GitHub homepage layout and navy/gold design system; English/Kiswahili Home, Admissions and Contact; Downloads and Portal navigation; mobile Call/WhatsApp/Apply; child-friendly, local-only Kids Zone.
 - Central `BASE_URL` for canonical, Open Graph, structured data and sitemap URLs. Unapproved photo slots use the existing school crest; only consented, approved media can replace it.
-- Private `/portal`: dashboards, profiles, HR records, leave balances/applications, employment contracts, controlled documents, notices/acknowledgements, calendars, requests, notifications and authorised search/reports.
+- Private `/portal`: role-specific staff, parent, student and teacher views; school-provisioned student accounts; audited guardian verification; class/teacher assignment; scoped attendance, published results, learning materials, notices, events and parent-teacher messaging; plus the existing HR and governance workflows.
 - CMS drafts, independent editorial/authority review, separate publication, scheduling and historical published snapshots. School contacts, verified map and official social links use the same review process.
 - Configurable, versioned approval routes with per-stage authority, comments, return/reject/cancel states, escalation notifications and append-only audit events.
 - Admissions state transitions and private enquiry queues. All five original public forms produce references and durable office-alert jobs; safeguarding/privacy requests have separate restricted queues.
@@ -100,4 +100,4 @@ Keep real credentials, private operations records, guardian evidence, exports, b
 
 ## Later phases
 
-Parent/authorised-child portals, student academic records, attendance/fees/payments, admissions document collection, native apps, formal e-signatures, teacher-managed quiz authoring, provider-specific messaging, advanced HR casework and additional CMS/menu/profile tooling remain later or separate work. No native app was built ahead of the portals.
+Fees/payments, admissions document collection, native apps, formal e-signatures, teacher-managed quiz authoring, provider-specific messaging, advanced HR casework and additional CMS/menu/profile tooling remain later or separate work. The family portal code has not been deployed or accepted against real school records. Guardian verification is an audited staff attestation, not automated identity proof; school-approved verification policy and real-data acceptance are required before production use. No native app was built ahead of the portals.

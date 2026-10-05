@@ -34,6 +34,7 @@ The exact dispatcher is `src/platform/router.js`; there are no wildcard model en
 | CMS | `GET/POST /api/cms`; `PUT /api/cms/:id`; `POST /api/cms/:id/action`; kinds: news, page, event, vacancy, FAQ, banner, settings |
 | Enquiries/admissions | `GET /api/admissions`, `/api/submissions`; `PATCH /api/{admissions,submissions}/:id` |
 | Staff notifications | `GET /api/notifications`; `POST /api/notifications/:id/read` |
+| Family and learning | `GET /api/{family,students,classes,attendance,results,learning-materials,family/contacts,family/messages}`; management `POST /api/{students,classes,class-teachers,attendance,results,learning-materials,family/messages}`; guardian links `POST /api/students/:studentId/guardians`; independent publication `POST /api/{results,learning-materials}/:id/publish` |
 | Privacy | `GET /api/privacy`; `POST /api/privacy/consents`; consent `/:id/{withdraw,removal}`; `PATCH /api/privacy/requests/:id`; `POST /api/privacy/incidents`; `PATCH /api/privacy/incidents/:id` |
 | Media | `GET/POST /api/media`; `POST /api/media/:id/action`; consent-checked public `GET /media/:id` |
 | Oversight | `GET /api/{dashboard,search,reports,audit,system}`; `POST /api/system/alerts/:id/retry` |

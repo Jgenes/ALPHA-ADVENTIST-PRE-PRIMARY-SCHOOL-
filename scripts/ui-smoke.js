@@ -7,6 +7,7 @@ const path = require('node:path');
 const AxeBuilder = require('@axe-core/playwright').default;
 const { chromium, expect } = require('@playwright/test');
 const { fixture, nextMonday, addDays, approve } = require('../test/helpers');
+const { createUserRecord } = require('../src/platform/auth');
 async function main() {
   const f = await fixture();
   let browser;
@@ -17,12 +18,24 @@ async function main() {
     await f.agents.hr.ok('POST', '/api/leave/balances', { userId: teacher.id, year: Number(date.slice(0, 4)), typeId: 'annual', entitledDays: 18 });
     let notice = await f.agents.hr.ok('POST', '/api/notices', { title: 'Synthetic staff welcome', message: 'This is an automated test notice, not a school announcement.', category: 'HR', priority: 'Information', acknowledgementRequired: true, audience: { type: 'ALL_STAFF' } });
     await f.agents.head.ok('POST', '/api/notices/' + notice.id + '/publish', { revision: notice.revision });
+    const familyParent = await createUserRecord('browser.parent', 'Synthetic Family', ['parent'], f.password);
+    familyParent.mustChangePassword = false;
+    const familyStudent = await createUserRecord('browser.student', 'Synthetic Learner', ['student'], f.password);
+    familyStudent.mustChangePassword = false;
+    await f.app.store.run(async tx => { await tx.insert('users', familyParent); await tx.insert('users', familyStudent); });
+    const familyClass = await f.agents.head.ok('POST', '/api/classes', { id: 'ui-kg-ii', name: 'Synthetic KG II', yearLevel: 'KG II' });
+    await f.agents.head.ok('POST', '/api/class-teachers', { classId: familyClass.id, teacherUserId: teacher.id });
+    const familyProfile = await f.agents.head.ok('POST', '/api/students', { userId: familyStudent.id, studentRef: 'STU-UI-100', classId: familyClass.id, yearLevel: 'KG II' });
+    await f.agents.head.ok('POST', `/api/students/${familyProfile.id}/guardians`, { guardianUserId: familyParent.id, relationship: 'Parent', verificationReference: 'SYNTHETIC-UI-VERIFY', authorityVerified: true });
+    await f.agents.teacher.ok('POST', '/api/attendance', { studentId: familyProfile.id, date: new Date().toISOString().slice(0, 10), status: 'PRESENT' });
+    const familyResult = await f.agents.teacher.ok('POST', '/api/results', { studentId: familyProfile.id, subject: 'Mathematics', term: 'Term 1', score: 'A' });
+    await f.agents.head.ok('POST', `/api/results/${familyResult.id}/publish`, { revision: familyResult.revision });
     browser = await chromium.launch({ headless: true, ...(process.env.CHROMIUM_EXECUTABLE ? { executablePath: process.env.CHROMIUM_EXECUTABLE } : {}), args: ['--no-sandbox', '--disable-dev-shm-usage'] });
     const desktop = await browser.newContext({ viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce' });
     const page = await desktop.newPage();
     const problems = [];
     page.on('pageerror', error => problems.push(error.message));
-    page.on('console', message => { if (message.type() === 'error') problems.push(message.text()); });
+    page.on('console', message => { if (message.type() === 'error' && !message.text().includes('ERR_INTERNET_DISCONNECTED')) problems.push(message.text()); });
     page.on('response', response => { if (response.status() >= 400) problems.push(response.status() + ' ' + new URL(response.url()).pathname); });
     const output = path.resolve('.runtime/ui-test');
     await fs.mkdir(output, { recursive: true });
@@ -36,6 +49,7 @@ async function main() {
     }
     await view('/', 'home-desktop', true);
     await expect(page.locator('.mainnav').getByRole('link', { name: 'Portal Login' })).toBeVisible();
+    await page.locator('.mainnav .nav-dropdown').filter({ hasText: 'Resources' }).locator('summary').click();
     await expect(page.locator('.mainnav').getByRole('link', { name: 'Downloads', exact: true })).toBeVisible();
     await expect(page.locator('[data-hero]')).toBeVisible();
     await expect(page.locator('.trust__card')).toHaveCount(6);
@@ -109,7 +123,10 @@ async function main() {
     await page.getByRole('button', { name: 'School contact details', exact: true }).click();
     await expect(dialog.locator('[name="officePhone"]')).not.toBeEmpty();
     await dialog.locator('[name="detailsVerified"]').check();
+    const schoolDetailsSave = page.waitForResponse(response => /\/api\/cms(?:\/[^/]+)?$/.test(new URL(response.url()).pathname) && ['POST', 'PUT'].includes(response.request().method()));
     await dialog.getByRole('button', { name: /Save/ }).click();
+    const schoolDetailsResponse = await schoolDetailsSave;
+    assert.equal(schoolDetailsResponse.status(), 200, 'School contact save response: ' + await schoolDetailsResponse.text());
     await expect(page.locator('#page-content')).toContainText('School contact details');
     await expect(page.locator('dialog[open]')).toHaveCount(0);
     const cacheKeys = await page.evaluate(async () => { const output = []; for (const name of await caches.keys()) for (const request of await (await caches.open(name)).keys()) output.push(new URL(request.url).pathname); return output; });
@@ -121,6 +138,7 @@ async function main() {
     await view('/', 'public-mobile-menu');
     await page.getByRole('button', { name: 'Open menu', exact: true }).click();
     await expect(page.locator('#mobileNav').getByRole('link', { name: 'Portal Login' })).toBeVisible();
+    await page.locator('#mobileNav .nav-dropdown').filter({ hasText: 'Resources' }).locator('summary').click();
     await expect(page.locator('#mobileNav').getByRole('link', { name: 'Downloads', exact: true })).toBeVisible();
     for (const width of [320, 360, 640, 768, 1024, 1280, 1366]) {
       await page.setViewportSize({ width, height: 900 });
@@ -132,6 +150,7 @@ async function main() {
     await page.setViewportSize({ width: 390, height: 844 });
     await view('/portal', 'portal-mobile-menu');
     await expect(page.locator('.admin-side')).toBeVisible();
+    await page.locator('.admin-side .p-nav-group').filter({ hasText: 'My work' }).locator('summary').click();
     await page.locator('.admin-side').getByRole('link', { name: 'My profile', exact: true }).scrollIntoViewIfNeeded();
     await page.locator('.admin-side').getByRole('link', { name: 'My profile', exact: true }).click();
     await expect(page.locator('#workspace h1')).toHaveText('My profile');
@@ -158,8 +177,32 @@ async function main() {
     assert.equal((await f.anonymous.request('GET', '/downloads/' + controlled.id)).text, 'SYNTHETIC BROWSER CONTROLLED GUIDE');
     await managePage.goto(f.base + '/portal', { waitUntil: 'networkidle' });
     await managePage.screenshot({ path: path.join(output, 'portal-management-desktop.png'), fullPage: true });
+    const familyContext = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
+    const familyPage = await familyContext.newPage();
+    familyPage.on('pageerror', error => problems.push(error.message));
+    familyPage.on('console', message => { if (message.type() === 'error' && !message.text().includes('ERR_INTERNET_DISCONNECTED')) problems.push(message.text()); });
+    familyPage.on('response', response => { if (response.status() >= 400) problems.push(response.status() + ' ' + new URL(response.url()).pathname); });
+    await familyPage.goto(f.base + '/portal', { waitUntil: 'networkidle' });
+    await familyPage.locator('[name="username"]').fill(familyParent.username);
+    await familyPage.locator('[name="password"]').fill(f.password);
+    await familyPage.getByRole('button', { name: 'Sign in to workspace' }).click();
+    await expect(familyPage.locator('#workspace h1')).toHaveText('Overview');
+    await familyPage.locator('.p-nav-group').filter({ hasText: 'Family' }).locator('summary').click();
+    await familyPage.getByRole('link', { name: 'Family portal' }).click();
+    await expect(familyPage.locator('#page-content')).toContainText('Synthetic Learner');
+    await expect(familyPage.locator('#page-content')).toContainText('Mathematics');
+    await expect(familyPage.locator('#page-content')).toContainText('1/1 (100%)');
+    await familyPage.getByRole('button', { name: 'Message teacher' }).click();
+    const familyDialog = familyPage.locator('dialog[open]');
+    await familyDialog.locator('[name="recipientId"]').selectOption(teacher.id);
+    await familyDialog.locator('[name="message"]').fill('Synthetic browser parent message.');
+    await familyDialog.getByRole('button', { name: /Save/ }).click();
+    await expect(familyPage.locator('dialog[open]')).toHaveCount(0);
+    await expect(familyPage.locator('#page-content')).toContainText('Synthetic browser parent message.');
+    await familyPage.screenshot({ path: path.join(output, 'portal-parent-mobile.png'), fullPage: true });
+    await familyContext.close();
     assert.deepEqual(problems, [], 'No JS, CSP or failed-resource errors');
-    console.log('UI smoke passed: public forms, EN/SW, desktop/mobile, real login, leave/notices, approved-document issuance, school-settings drafts, role views, representative accessibility, offline fallback, and no private caching. Synthetic screenshots: .runtime/ui-test/');
+    console.log('UI smoke passed: public forms, EN/SW, desktop/mobile, real staff and parent login, family attendance/results and messaging, leave/notices, approved-document issuance, school-settings drafts, representative accessibility, offline fallback, and no private caching. Synthetic screenshots: .runtime/ui-test/');
   } finally { if (browser) await browser.close(); await f.close(); }
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

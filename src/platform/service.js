@@ -141,6 +141,6 @@ class Platform {
     });
   }
 }
-Object.assign(Platform.prototype, require('./people'), require('./documents'), require('./communications'), require('./privacy'), require('./overview'));
+Object.assign(Platform.prototype, require('./people'), require('./documents'), require('./communications'), require('./privacy'), require('./family'), require('./overview'));
 module.exports = { Platform };
 // Shared pure validation helpers are separate to avoid circular module loading.

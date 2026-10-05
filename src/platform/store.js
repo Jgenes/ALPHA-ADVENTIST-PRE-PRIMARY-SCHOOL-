@@ -5,7 +5,7 @@ const { HttpError } = require('../lib');
 
 // Names are code-owned, never interpolated from a request. The prefix keeps the
 // audited platform separate from legacy collections until an explicit migration.
-const COLLECTIONS = ['users', 'sessions', 'login_limits', 'departments', 'staff_profiles', 'leave_types', 'leave_requests', 'leave_balances', 'contracts', 'documents', 'document_versions', 'workflow_definitions', 'workflow_instances', 'notices', 'notice_acknowledgements', 'cms_content', 'admissions', 'submissions', 'notifications', 'outbox', 'calendar', 'media', 'media_consents', 'privacy_requests', 'incidents', 'audit_logs', 'system_settings', 'download_grants'];
+const COLLECTIONS = ['users', 'sessions', 'login_limits', 'departments', 'staff_profiles', 'student_profiles', 'student_guardians', 'classes', 'class_teachers', 'attendance_records', 'student_results', 'learning_materials', 'family_messages', 'leave_types', 'leave_requests', 'leave_balances', 'contracts', 'documents', 'document_versions', 'workflow_definitions', 'workflow_instances', 'notices', 'notice_acknowledgements', 'cms_content', 'admissions', 'submissions', 'notifications', 'outbox', 'calendar', 'media', 'media_consents', 'privacy_requests', 'incidents', 'audit_logs', 'system_settings', 'download_grants'];
 const clone = value => value == null ? null : structuredClone(value);
 const conflict = () => new HttpError(409, 'This record changed. Refresh and try again.', 'VERSION_CONFLICT');
 function table(name) {
@@ -83,6 +83,12 @@ async function openStore(config) {
       await db.collection(table('users')).createIndex({ username: 1 }, { unique: true });
       await db.collection(table('audit_logs')).createIndex({ sequence: 1 }, { unique: true });
       await db.collection(table('staff_profiles')).createIndex({ staffId: 1 }, { unique: true });
+      await db.collection(table('student_profiles')).createIndex({ studentRef: 1 }, { unique: true });
+      await db.collection(table('student_profiles')).createIndex({ userId: 1 }, { unique: true });
+      await db.collection(table('student_guardians')).createIndex({ studentId: 1, guardianUserId: 1 }, { unique: true });
+      await db.collection(table('class_teachers')).createIndex({ classId: 1, teacherUserId: 1 }, { unique: true });
+      await db.collection(table('attendance_records')).createIndex({ studentId: 1, date: 1 }, { unique: true });
+      await db.collection(table('family_messages')).createIndex({ studentId: 1, createdAt: 1 });
       await db.collection(table('cms_content')).createIndex({ kind: 1, slug: 1 }, { unique: true });
       for (const name of ['sessions', 'login_limits', 'download_grants']) await db.collection(table(name)).createIndex({ expiresAt: 1 });
       return {
@@ -108,6 +114,11 @@ async function openStore(config) {
   for (const name of COLLECTIONS) db.exec(`CREATE TABLE IF NOT EXISTS ${table(name)} (id TEXT PRIMARY KEY, revision INTEGER NOT NULL, payload TEXT NOT NULL CHECK(json_valid(payload)))`);
   db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS adsp_username ON adsp_users(json_extract(payload, '$.username'));
     CREATE UNIQUE INDEX IF NOT EXISTS adsp_staff_id ON adsp_staff_profiles(json_extract(payload, '$.staffId'));
+    CREATE UNIQUE INDEX IF NOT EXISTS adsp_student_ref ON adsp_student_profiles(json_extract(payload, '$.studentRef'));
+    CREATE UNIQUE INDEX IF NOT EXISTS adsp_student_user ON adsp_student_profiles(json_extract(payload, '$.userId'));
+    CREATE UNIQUE INDEX IF NOT EXISTS adsp_student_guardian ON adsp_student_guardians(json_extract(payload, '$.studentId'), json_extract(payload, '$.guardianUserId'));
+    CREATE UNIQUE INDEX IF NOT EXISTS adsp_class_teacher ON adsp_class_teachers(json_extract(payload, '$.classId'), json_extract(payload, '$.teacherUserId'));
+    CREATE UNIQUE INDEX IF NOT EXISTS adsp_attendance_student_date ON adsp_attendance_records(json_extract(payload, '$.studentId'), json_extract(payload, '$.date'));
     CREATE UNIQUE INDEX IF NOT EXISTS adsp_content_slug ON adsp_cms_content(json_extract(payload, '$.kind'), json_extract(payload, '$.slug'));
     CREATE TRIGGER IF NOT EXISTS audit_no_update BEFORE UPDATE ON adsp_audit_logs BEGIN SELECT RAISE(ABORT, 'Audit records are append-only'); END;
     CREATE TRIGGER IF NOT EXISTS audit_no_delete BEFORE DELETE ON adsp_audit_logs BEGIN SELECT RAISE(ABORT, 'Audit records are append-only'); END;`);

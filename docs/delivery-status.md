@@ -1,6 +1,6 @@
 # Blueprint delivery status
 
-**Implementation/review date: 30 September 2026.** This is a substantial governed-platform foundation and staged delivery, not completion of every item in the master blueprint. No production deployment was performed. Publishing the implementation branch is separate from deploying the site or cleaning repository history.
+**Implementation/review date: 5 October 2026.** This is a substantial governed-platform foundation and staged delivery, not completion of every item in the master blueprint. No production deployment was performed. Publishing the implementation branch is separate from deploying the site or cleaning repository history.
 
 ## Scope matrix
 
@@ -16,19 +16,20 @@
 | Controlled documents | Five classifications, ACLs, metadata/dates, encrypted originals, unscanned PDF uploads with basic active-content checks, version review/issuance/supersession/archive, public metadata, expiring single-use private grants | Malware scanning; more document formats; approved disposal/legal holds and external object storage. Uploaded binaries may contain malware. Retired unapproved drafts do not become broadly visible issued history |
 | Notices/calendar | Audiences by role/department/named user, notice category/priority/expiry, independent publication, revision-specific read/ack receipts with session evidence and completion reports; private calendars | Notice file attachments, scheduled notices, recurring meetings and calendar integration. Public events use reviewed CMS |
 | Governance/RBAC | Code-owned action permission catalogue, management role assignment, fresh-session/resource/state checks, ICT separation, versioned workflow definitions/instances/decisions/comments, denial audit | Custom role/permission builder, formal delegation, automatic overdue reassignment/escalation policy and independent security review |
-| Forms/admissions | Five public forms, consent/minimisation, idempotency/reference, private queues, controlled admission stages through enrolment, in-app and durable external-alert outbox | Guardian-authenticated application drafts/tracking, secure admissions document upload, assessment scheduling, offer letters, enrolment-to-student-record conversion and family access |
-| Messaging | Signed HTTPS webhook, minimal reference/type/link payload, durable attempts/leases/backoff/retry controls; in-app staff notifications | Configured email/SMS/WhatsApp integration and verified recipients, actual delivery callbacks, parent-channel messages, bulk campaigns and provider contracts |
+| Forms/admissions | Five public forms, consent/minimisation, idempotency/reference, private queues, controlled admission stages through enrolment, in-app and durable external-alert outbox | Guardian-authenticated application drafts/tracking, secure admissions document upload, assessment scheduling, offer letters and enrolment-to-student-record conversion |
+| Parent/student/teacher portal | School-provisioned learner profiles, staff-attested guardian links, explicit class-teacher assignments, scoped parent/student/teacher reads, recorded attendance, independently published results/materials, audience-filtered notices/calendar and participant-scoped parent-teacher messages | Fees/payments, admissions document collection, quizzes/e-learning, real identity assurance, school policy/data acceptance, production Mongo staging and deployed browser acceptance; guardian verification is an audited staff attestation, not automated proof |
+| Messaging | Signed HTTPS webhook, minimal reference/type/link payload, durable attempts/leases/backoff/retry controls; in-app notifications and scoped parent-teacher portal messages | Configured email/SMS/WhatsApp integration and verified recipients, actual delivery callbacks, bulk campaigns and provider contracts |
 | Privacy/media | Separate per-channel grants/refusals, verified guardian evidence/reference, annual expiry, deterministic latest consent, independent media review, immediate web withdrawal and forty-eight-hour external removal task; private requests/incidents | Legal/PDPC review, real guardian verification/consent, external-provider removal actions, general subject export/erasure/legal holds and retention beyond form queues |
 | Audit/search/reports | Transactional HMAC audit chain, no application log edits/deletes, scoped auditor access, authorised filtered search and basic HR/admissions/document/CMS/security summaries/export | Independent protected audit anchoring, analytics/BI, pagination and scale tuning; not DBA-proof immutability |
 | Operations | SQLite development store, transaction-capable Mongo adapter, production configuration gates, health probes, graceful jobs/shutdown, approved bootstrap, encrypted backup/isolated restore/guarded legacy import scripts, CI definition | Real Mongo/hosting tests, provider/AV integration, automatic off-site backup schedule, monitored restore drills, secrets escrow, tested break-glass support and production rollout |
 | PWA/Kids Zone | Installable manifest, local assets, bilingual generic offline contact fallback, no private/API/media/download caching; local games/Kiswahili activities without ads/chat/data submission | Not an offline private portal; formal curriculum/teacher-assigned quiz authoring and supervised learner services remain future work |
-| Parent/student/native apps | Reserved least-privilege roles only; no inappropriate staff inheritance | Verified guardian-child relationships, academic records/attendance/fees/results/payments, parent/student portals and then native mobile apps. No native app was built prematurely |
+| Native apps and extended learning | Local Kids Zone; responsive web portals for family/classroom roles | Native apps, formal online learning/quiz authoring, fees/payments, certificate verification and digital libraries |
 
 ## Verification actually performed
 
 ### Automated application and recovery checks
 
-`npm test` currently reports **45 passing tests** (Node’s count includes the three parent test groups). These use isolated synthetic data and real HTTP/cookie/CSRF flows, plus lower-level recovery/operator checks. Coverage includes:
+`npm test` currently reports **51 passing tests** (Node’s count includes parent test groups). These use isolated synthetic data and real HTTP/cookie/CSRF flows, plus lower-level recovery/operator checks. Coverage includes:
 
 - Default-deny access, retired legacy endpoints, static-file exposure protection, source/account login limits, bounded anonymous session creation and persistence across restart.
 - Role/technical-authority boundaries, author ownership, CSRF/origin checks, password rotation and session revocation. MFA is not implemented; privileged access relies on passwords and the remaining account protections.
@@ -39,6 +40,7 @@
 - Encrypted files, type/size limits, explicit unscanned-file status, clean chunked-request 413 handling, controlled-version publication, approved-version visibility and retired-draft non-disclosure.
 - Scoped notices/calendar/notifications, version acknowledgement, audit integrity/tamper detection/scoped auditing.
 - Guardian channels/evidence, immediate withdrawal, deterministic consent order, missing-child denial, annual expiry checked without waiting for jobs and no automatic republication.
+- Synthetic family portal end-to-end: school creates learner/class/teacher links, staff verifies a guardian, teacher records attendance and draft results/materials, management publishes them, and parent/student/assigned-teacher views stay scoped. Unverified links, off-audience notices and unrelated-parent messages are denied.
 - Approved one-time bootstrap, AES-GCM archive integrity/wrong-key failures, restore target/path/checksum guards, **actual isolated SQLite + private-file restoration**, intact recovered audit chain and file decryption; synthetic idempotent legacy import.
 
 `npm run check` verifies JavaScript syntax, all seven actual PWA precache resources, safe seed/current-tree artifact rules and diff whitespace. This does not scan or remove old Git history.
@@ -50,6 +52,7 @@ Production dependency audit returned **zero known vulnerabilities** at the lates
 `npm run test:ui` passed in headless Chromium at **1440×1000** and **390×844**, with synthetic role fixtures:
 
 - Home/EN–SW navigation, public contact submission/reference, Kids Zone local activity.
+- Parent sign-in, verified learner records, persisted attendance/results and scoped parent-to-assigned-teacher messaging at mobile width.
 - Real login, dashboard, leave creation/submission, notice reading/acknowledgement.
 - Additional HTTPS cross-site-iframe auth regression: secure partitioned cookies, an expired form, one bounded CSRF retry, password-only login and blocked-cookie/new-tab guidance. Backend CSRF checks remain enforced.
 - Controlled-document upload/submission, independent API-based reviewer decisions, then actual publisher UI issuance and public download.
@@ -78,7 +81,7 @@ An earlier GitHub repository-access check returned HTTP 401. No visibility chang
 1. Owner completes P0 release gates, GitHub reconnection/history/asset cleanup, secrets rotation and infrastructure/provider configuration.
 2. Rehearse with isolated Mongo staging, integration test recipients, restored backups and named independent role-holders; obtain school/legal acceptance and explicitly approve the risk of unscanned uploads.
 3. Deploy the reviewed web/staff platform with monitoring and controlled rollback.
-4. Extend admissions and add verified parent/student services; only then plan native mobile delivery.
+4. Validate guardian verification policy, academic records and family messaging with school-approved synthetic staging scenarios; deploy and accept the web portals only after the release gates above. Then extend admissions and plan native mobile delivery.
 
 ## UI correction — original repository design
 

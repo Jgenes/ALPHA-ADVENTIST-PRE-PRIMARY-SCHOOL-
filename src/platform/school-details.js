@@ -13,12 +13,12 @@ function validateDetails(input) {
   if (typeof input === 'string') { try { body = JSON.parse(input); } catch { throw new L.HttpError(400, 'School details must use the structured school-details form.'); } }
   if (!body || body.detailsVerified !== true) throw new L.HttpError(400, 'Confirm the school has verified these public contact details.');
   function phone(value) { const text = L.text(value, 24, true); if (!/^\+[1-9][0-9 ()-]{7,22}$/.test(text)) throw new L.HttpError(400, 'Use an international school telephone number.'); return text; }
-  function optionalPhone(value) { const text = L.text(value, 24, true); return text ? phone(text) : ''; }
+  function optionalPhone(value) { const text = L.text(value, 24); return text ? phone(text) : ''; }
   const email = L.text(body.email, 160, true);
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new L.HttpError(400, 'Use the verified school email address.');
   const centreCode = L.text(body.centreCode, 24, true);
   if (!/^[A-Z0-9-]+$/.test(centreCode)) throw new L.HttpError(400, 'Use the official examination centre code.');
-  return { officePhone: phone(body.officePhone), headPhone: phone(body.headPhone), whatsappPhone: phone(body.whatsappPhone), safeguardingName: L.text(body.safeguardingName, 120, true), safeguardingPhone: optionalPhone(body.safeguardingPhone), email, box: L.text(body.box, 80, true), locationText: L.text(body.locationText, 180, true), officeHours: L.text(body.officeHours, 500, true), centreCode, mapUrl: external(body.mapUrl, ['google.com', 'maps.app.goo.gl']), facebookUrl: external(body.facebookUrl, ['facebook.com']), instagramUrl: external(body.instagramUrl, ['instagram.com']), youtubeUrl: external(body.youtubeUrl, ['youtube.com', 'youtu.be']), detailsVerified: true };
+  return { officePhone: phone(body.officePhone), headPhone: phone(body.headPhone), whatsappPhone: phone(body.whatsappPhone), safeguardingName: L.text(body.safeguardingName, 120), safeguardingPhone: optionalPhone(body.safeguardingPhone), email, box: L.text(body.box, 80, true), locationText: L.text(body.locationText, 180, true), officeHours: L.text(body.officeHours, 500, true), centreCode, mapUrl: external(body.mapUrl, ['google.com', 'maps.app.goo.gl']), facebookUrl: external(body.facebookUrl, ['facebook.com']), instagramUrl: external(body.instagramUrl, ['instagram.com']), youtubeUrl: external(body.youtubeUrl, ['youtube.com', 'youtu.be']), detailsVerified: true };
 }
 function applyDetails(settings, published) {
   const record = published.find(item => item.kind === 'settings' && item.slug === 'school-contact');
