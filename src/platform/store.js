@@ -5,7 +5,7 @@ const { HttpError } = require('../lib');
 
 // Names are code-owned, never interpolated from a request. The prefix keeps the
 // audited platform separate from legacy collections until an explicit migration.
-const COLLECTIONS = ['users', 'sessions', 'login_limits', 'departments', 'staff_profiles', 'student_profiles', 'student_guardians', 'classes', 'class_teachers', 'attendance_records', 'student_results', 'learning_materials', 'family_messages', 'leave_types', 'leave_requests', 'leave_balances', 'contracts', 'documents', 'document_versions', 'workflow_definitions', 'workflow_instances', 'notices', 'notice_acknowledgements', 'cms_content', 'admissions', 'submissions', 'notifications', 'outbox', 'calendar', 'media', 'media_consents', 'privacy_requests', 'incidents', 'audit_logs', 'system_settings', 'download_grants'];
+const COLLECTIONS = ['users', 'sessions', 'login_limits', 'departments', 'staff_profiles', 'student_profiles', 'student_guardians', 'classes', 'class_teachers', 'attendance_records', 'student_results', 'learning_materials', 'family_messages', 'admission_documents', 'leave_types', 'leave_requests', 'leave_balances', 'contracts', 'documents', 'document_versions', 'workflow_definitions', 'workflow_instances', 'notices', 'notice_acknowledgements', 'cms_content', 'admissions', 'submissions', 'notifications', 'outbox', 'calendar', 'media', 'media_consents', 'privacy_requests', 'incidents', 'audit_logs', 'system_settings', 'download_grants'];
 const clone = value => value == null ? null : structuredClone(value);
 const conflict = () => new HttpError(409, 'This record changed. Refresh and try again.', 'VERSION_CONFLICT');
 function table(name) {

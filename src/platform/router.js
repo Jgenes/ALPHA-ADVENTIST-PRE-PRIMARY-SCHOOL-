@@ -52,7 +52,7 @@ async function handleApi(req, res, url, platform, auth) {
   let body = {};
   if (mutating) {
     // File bodies are explicitly bounded; anonymous clients never reach here.
-    const large = verb === 'POST' && (/^\/api\/(documents|contracts|media|leave)$/.test(route) || /^\/api\/documents\/[^/]+\/versions$/.test(route)) || verb === 'PUT' && /^\/api\/(contracts|leave)\/[^/]+$/.test(route);
+    const large = verb === 'POST' && (/^\/api\/(documents|contracts|media|leave)$/.test(route) || /^\/api\/documents\/[^/]+\/versions$/.test(route) || /^\/api\/my\/admissions\/[^/]+\/documents$/.test(route)) || verb === 'PUT' && /^\/api\/(contracts|leave)\/[^/]+$/.test(route);
     if (large && !await platform.store.run(tx => limit(tx, 'upload:' + actor.user.id, 30, 10 * 60 * 1000))) throw new HttpError(429, 'Too many upload attempts. Please wait before retrying.', 'RATE_LIMIT');
     body = await L.parseForm(req, large ? 7 * 1024 * 1024 : 100000);
     requireCsrf(actor, req, body);
@@ -62,7 +62,13 @@ async function handleApi(req, res, url, platform, auth) {
   const action = parts[3] || '';
   let result;
   if (verb === 'GET' && /^\/api\/downloads\/[a-f0-9]{64}$/.test(route)) return sendFile(res, await platform.privateDownload(actor, id));
-  if (route === '/api/dashboard' && verb === 'GET') result = await platform.dashboard(actor);
+  if (route === '/api/my/admissions' && verb === 'GET') result = await platform.myAdmissions(actor);
+  else if (route === '/api/my/admissions' && verb === 'POST') result = await platform.createMyAdmission(actor, body);
+  else if (/^\/api\/my\/admissions\/[^/]+$/.test(route) && verb === 'PUT') result = await platform.updateMyAdmission(actor, id, body);
+  else if (/^\/api\/my\/admissions\/[^/]+\/submit$/.test(route) && verb === 'POST') result = await platform.submitMyAdmission(actor, id, body);
+  else if (/^\/api\/my\/admissions\/[^/]+\/documents$/.test(route) && verb === 'POST') result = await platform.uploadAdmissionDocument(actor, id, body);
+  else if (/^\/api\/admission-documents\/[^/]+\/download-link$/.test(route) && verb === 'POST') result = await platform.admissionDocumentGrant(actor, id);
+  else if (route === '/api/dashboard' && verb === 'GET') result = await platform.dashboard(actor);
   else if (route === '/api/family' && verb === 'GET') result = await platform.family(actor);
   else if (route === '/api/students' && verb === 'GET') result = await platform.students(actor);
   else if (route === '/api/students' && verb === 'POST') result = await platform.saveStudent(actor, body);

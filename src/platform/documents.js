@@ -33,6 +33,12 @@ async function downloadable(tx, user, kind, id) {
     const leave = await tx.get('leave_requests', id);
     return leave && A.canReadLeave(user, leave) ? leave : null;
   }
+  if (kind === 'admission_document') {
+    const document = await tx.get('admission_documents', id);
+    const application = document && await tx.get('admissions', document.applicationId);
+    if (application?.applicantUserId === user.id && A.has(user, 'admission.read_self')) return document;
+    return application && A.has(user, 'admission.read') ? document : null;
+  }
   return null;
 }
 const documentView = (document, current, draft, versions) => ({ ...document, current: V.safeRecord(current), draft: V.safeRecord(draft), versions: versions.map(V.safeRecord) });

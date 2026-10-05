@@ -103,3 +103,34 @@ test('family API excludes unverified links, fabricated records, and off-audience
     await fixtureData.close();
   }
 });
+
+test('parent can submit and track only their own authenticated admission applications', async () => {
+  const fixtureData = await fixture();
+  const { app, base, password, agents } = fixtureData;
+  try {
+    const parent = await createUserRecord('admission.parent', 'Synthetic Applicant', ['parent'], password);
+    parent.mustChangePassword = false;
+    const otherParent = await createUserRecord('admission.other', 'Other Applicant', ['parent'], password);
+    otherParent.mustChangePassword = false;
+    await app.store.run(async tx => { await tx.insert('users', parent); await tx.insert('users', otherParent); });
+    const applicant = new Agent(base);
+    const unrelated = new Agent(base);
+    await applicant.login(parent, password);
+    await unrelated.login(otherParent, password);
+
+    const application = await applicant.ok('POST', '/api/my/admissions', { childName: 'Synthetic Child', level: 'KG I', arrangement: 'Day', guardianPhone: '+255700000000', guardianEmail: 'family@example.test', message: 'Synthetic application.', privacyConsent: true });
+    assert.equal(application.status, 'SUBMITTED');
+    assert.ok(application.reference);
+    assert.equal((await applicant.ok('GET', '/api/my/admissions')).length, 1);
+    assert.equal((await unrelated.ok('GET', '/api/my/admissions')).length, 0);
+
+    const adminQueue = await agents.office.ok('GET', '/api/admissions');
+    assert.ok(adminQueue.some(item => item.id === application.id));
+    await agents.office.ok('PATCH', `/api/admissions/${application.id}`, { revision: application.revision, status: 'UNDER_REVIEW', comment: 'Synthetic review.' });
+    const updated = await applicant.ok('GET', '/api/my/admissions');
+    assert.equal(updated[0].status, 'UNDER_REVIEW');
+    assert.equal((await unrelated.ok('GET', '/api/my/admissions')).length, 0);
+  } finally {
+    await fixtureData.close();
+  }
+});

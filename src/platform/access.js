@@ -18,7 +18,7 @@ const ROLE_PERMISSIONS = Object.freeze({
   cms_publisher: [...STAFF, 'cms.publish', 'cms.archive', 'media.publish'],
   media_manager: [...STAFF, 'media.create', 'cms.create'],
   auditor: ['audit.read', 'notification.read'],
-  parent: ['notification.read', 'notice.read', 'calendar.read', 'document.read', 'search', 'student.read', 'student.profile.read', 'student.results.read', 'student.attendance.read', 'student.communication.read', 'student.communication.send'],
+  parent: ['notification.read', 'notice.read', 'calendar.read', 'document.read', 'search', 'student.read', 'student.profile.read', 'student.results.read', 'student.attendance.read', 'student.communication.read', 'student.communication.send', 'admission.submit', 'admission.read_self'],
   student: ['notification.read', 'notice.read', 'calendar.read', 'document.read', 'search', 'student.read', 'student.profile.read', 'student.results.read', 'student.attendance.read', 'student.communication.read']
 });
 const ROLE_LABELS = { system_admin: 'System Administrator', ict_officer: 'ICT Officer', head_teacher: 'Head Teacher', school_admin: 'School Administrator', hr_officer: 'HR Officer', finance_officer: 'Finance Officer', academic_coordinator: 'Academic Coordinator', head_of_department: 'Head of Department', teacher: 'Teacher', supporting_staff: 'Supporting Staff', dpo: 'Privacy Officer', cms_author: 'Content Author', cms_editor: 'Content Editor', cms_publisher: 'CMS Publisher', media_manager: 'Media Manager', auditor: 'Auditor', parent: 'Parent / Guardian', student: 'Student' };

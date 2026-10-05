@@ -18,6 +18,7 @@ const FORM_RULES = {
   'privacy-request': { type: 'Privacy request', fields: ['name', 'phone', 'email', 'request_type', 'message'], required: ['name', 'message'], private: true }
 };
 const ADMISSION_TRANSITIONS = {
+  DRAFT: ['SUBMITTED'],
   SUBMITTED: ['DOCUMENTS_REQUIRED', 'UNDER_REVIEW'], DOCUMENTS_REQUIRED: ['UNDER_REVIEW', 'DECLINED'],
   UNDER_REVIEW: ['DOCUMENTS_REQUIRED', 'ASSESSMENT', 'ACCEPTED', 'WAITLISTED', 'DECLINED'],
   ASSESSMENT: ['DOCUMENTS_REQUIRED', 'ACCEPTED', 'WAITLISTED', 'DECLINED'], ACCEPTED: ['ENROLLED', 'DECLINED'],
@@ -100,6 +101,7 @@ module.exports = {
       record.history.push({ from, to: next, note, by: actor.user.id, at: new Date().toISOString() });
       record.status = next; record.updatedAt = new Date().toISOString();
       const saved = await tx.update(collection, record);
+      if (admissions && record.applicantUserId) await W.notify(tx, record.applicantUserId, `Admission application ${record.reference}: ${next.replace(/_/g, ' ').toLowerCase()}`, '/portal/family', record.id);
       await audit(tx, this.config, actor, admissions ? 'admission.status_change' : 'submission.status_change', collection, id, 'success', { from, to: next });
       return saved;
     });
