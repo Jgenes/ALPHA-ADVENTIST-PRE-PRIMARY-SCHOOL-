@@ -65,6 +65,8 @@ async function main() {
     const cookie = cookies.find(item => item.name === 'alpha_sid' && item.domain === '3000-login-fixture.e2b.app');
     assert.ok(cookie); assert.equal(cookie.secure, true); assert.equal(cookie.httpOnly, true); assert.equal(cookie.sameSite, 'None'); assert.ok(cookie.partitionKey, 'Embedded session is partitioned to the parent site');
     assert.equal(await frame.evaluate(() => localStorage.length + sessionStorage.length), 0);
+    await frame.locator('[data-logout]').click();
+    await expect(frame.locator('#auth-form[data-auth="login"]')).toBeVisible();
 
     // Privileged accounts use the same password-only sign-in.
     const secondContext = await browser.newContext({ ignoreHTTPSErrors: true });

@@ -470,8 +470,9 @@
     const logout = event.target.closest('[data-logout]');
     if (logout) {
       logout.disabled = true;
+      toast('Signing out…');
       try { await api('/api/auth/logout', 'POST', {}); document.getElementById('page-content')?.replaceChildren(); window.location.replace('/portal/login'); }
-      catch (error) { logout.disabled = false; alert(error.message); }
+      catch (error) { logout.disabled = false; toast('Could not sign out: ' + error.message); }
       return;
     }
     const menu = event.target.closest('[data-menu]');
