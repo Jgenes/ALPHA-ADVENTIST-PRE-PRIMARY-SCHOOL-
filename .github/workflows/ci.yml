@@ -58,7 +58,12 @@ jobs:
           code=$?
           cat /tmp/mysql-test.log
           if [ "$code" != "0" ]; then
-            grep -nE "not ok|ok [0-9]|AssertionError|expected|actual|error|at TestContext|code: |failureType|# (tests|pass|fail)" /tmp/mysql-test.log | head -90 | while IFS= read -r line; do echo "::error::${line}"; done
+            python3 - <<'PY'
+          import base64
+          blob = base64.b64encode(open('/tmp/mysql-test.log','rb').read()[-18000:]).decode()
+          for index in range(3):
+              print('::error::MYSQLLOG%d:%s' % (index, blob[index*3000:(index+1)*3000]))
+          PY
           fi
           exit $code
       - name: Whole suite with the MySQL store configured
