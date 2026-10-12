@@ -49,6 +49,17 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
-      - run: npm run test:mysql
+      - name: Report what the MySQL server accepts
+        run: node scripts/mysql-diagnose.js
+      - name: Run npm run test:mysql
+        run: |
+          set +e
+          npm run test:mysql > /tmp/mysql-test.log 2>&1
+          code=$?
+          cat /tmp/mysql-test.log
+          if [ "$code" != "0" ]; then
+            grep -nE "not ok|AssertionError|expected:|actual:|error:|at TestContext|code: |failureType" /tmp/mysql-test.log | head -70 | while IFS= read -r line; do echo "::error::${line}"; done
+          fi
+          exit $code
       - name: Whole suite with the MySQL store configured
         run: npm test
