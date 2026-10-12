@@ -1,6 +1,7 @@
 'use strict';
 require('dotenv').config();
 const path = require('node:path');
+const L = require('../src/lib');
 const { mysqlConfig } = require('../src/platform/mysql-config');
 const { COLLECTIONS, table } = require('../src/platform/collections');
 const B = require('./backup-lib');
@@ -49,5 +50,5 @@ async function main() {
     await connection.end();
   }
 }
-if (require.main === module) main().catch(error => { console.error('[backup] Failed. Check the approved backup window, keys, storage and database access.', error.name, error.code || ''); process.exitCode = 1; });
+if (require.main === module) main().catch(error => { console.error('[backup] Failed. Check the approved backup window, keys, storage and database access.', L.safeErrorMessage(error), error.code || ''); process.exitCode = 1; });
 module.exports = { main };

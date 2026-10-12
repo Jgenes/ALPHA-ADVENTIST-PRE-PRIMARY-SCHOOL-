@@ -1,6 +1,7 @@
 'use strict';
 require('dotenv').config();
 const path = require('node:path');
+const L = require('../src/lib');
 const fs = require('node:fs/promises');
 const { mysqlConfig } = require('../src/platform/mysql-config');
 const { createSchema } = require('../src/platform/mysql-store');
@@ -71,5 +72,5 @@ async function main() {
     console.log(`Import complete: ${planned.planned.reduce((total, entry) => total + entry.rows.length, 0)} records. Sessions and download grants were deliberately cleared, so every person must sign in again and old download links no longer work.\nNow verify: audit-chain integrity in the portal system view, one document download, one approval round trip, and the legacy-migration counts. Keep the old database read-only until the school signs off.`);
   } finally { await connection.end(); }
 }
-if (require.main === module) main().catch(error => { console.error('[import] Failed. Check approval, archive key, an empty target schema and the maintenance window.', error.name, error.code || ''); process.exitCode = 1; });
+if (require.main === module) main().catch(error => { console.error('[import] Failed. Check approval, archive key, an empty target schema and the maintenance window.', L.safeErrorMessage(error), error.code || ''); process.exitCode = 1; });
 module.exports = { convert, validateImport, main };

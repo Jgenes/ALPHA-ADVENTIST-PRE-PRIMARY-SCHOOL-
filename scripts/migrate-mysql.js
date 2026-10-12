@@ -80,5 +80,5 @@ async function main() {
   try { console.log('Legacy migration counts:', await importLegacy(app.store, app.config, snapshot)); console.log('Legacy collections are unchanged. Accounts, old password hashes, photographs, menus, settings and files were NOT imported. Re-provision accounts and review public drafts and private retention before reopening the site.'); }
   finally { await app.close(); }
 }
-if (require.main === module) main().catch(error => { console.error('[migration] Failed. Review approvals, mapping, a fresh backup and the empty target namespace.', error.name, error.code || ''); process.exitCode = 1; });
+if (require.main === module) main().catch(error => { console.error('[migration] Failed. Review approvals, mapping, a fresh backup and the empty target namespace.', L.safeErrorMessage(error), error.code || ''); process.exitCode = 1; });
 module.exports = { legacyRecords, importLegacy, main };

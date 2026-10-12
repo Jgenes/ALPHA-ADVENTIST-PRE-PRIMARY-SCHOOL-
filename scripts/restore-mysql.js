@@ -1,6 +1,7 @@
 'use strict';
 require('dotenv').config();
 const path = require('node:path');
+const L = require('../src/lib');
 const fs = require('node:fs/promises');
 const { mysqlConfig, SCHEMA_PATTERN } = require('../src/platform/mysql-config');
 const { createSchema } = require('../src/platform/mysql-store');
@@ -64,5 +65,5 @@ async function main() {
     console.log(`Isolated restore complete: ${Object.keys(counts).length} tables, ${Object.values(counts).reduce((total, value) => total + value, 0)} records; ${(snapshot.files || []).length} encrypted private files${objectStorage ? ' in Supabase bucket ' + objectStorage.bucket : ''}. Sessions/grants were invalidated. No public files were recreated.\nKeep external alerts disabled. Supply the separately escrowed app keys, verify audit/file integrity, reconcile consent withdrawals, and test workflows before an approved recovery cutover. This command never deploys to production.`);
   } finally { await connection.end(); }
 }
-if (require.main === module) main().catch(error => { console.error('[restore] Failed. Check approval, an empty isolated target, archive integrity and keys. A partially restored target must not be used.', error.name, error.code || ''); process.exitCode = 1; });
+if (require.main === module) main().catch(error => { console.error('[restore] Failed. Check approval, an empty isolated target, archive integrity and keys. A partially restored target must not be used.', L.safeErrorMessage(error), error.code || ''); process.exitCode = 1; });
 module.exports = { validateRestore, restoreSettings, main };
