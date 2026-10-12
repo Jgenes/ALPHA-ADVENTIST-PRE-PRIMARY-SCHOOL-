@@ -122,8 +122,9 @@ async function openMysqlStore(config, { driver } = {}) {
   const settings = config.mysql;
   if (!settings) throw new Error('MySQL is not configured.');
   const mysql = driver || require('mysql2/promise');
-  const pool = mysql.createPool({ ...settings.options, connectionLimit: settings.connectionLimit, waitForConnections: true, queueLimit: 0 });
+  let pool = null;
   const open = async () => {
+    pool = mysql.createPool({ ...settings.options, connectionLimit: settings.connectionLimit, waitForConnections: true, queueLimit: 0 });
     if (settings.createSchema) {
       const admin = await mysql.createConnection({ ...settings.options, database: undefined });
       try { await admin.query(`CREATE DATABASE IF NOT EXISTS ${quote(settings.database)} CHARACTER SET utf8mb4 COLLATE utf8mb4_bin`); }
@@ -163,7 +164,7 @@ async function openMysqlStore(config, { driver } = {}) {
       async close() { await pool.end(); }
     };
   } catch (error) {
-    try { await pool.end(); } catch { /* Report the startup failure instead. */ }
+    try { if (pool) await pool.end(); } catch { /* Report the startup failure instead. */ }
     throw new Error(`MySQL startup connection/check failed: ${error.message}`, { cause: error });
   }
 }

@@ -34,8 +34,8 @@ function validateRestore(snapshot, env) {
 async function main() {
   const file = process.argv[2];
   if (!file) throw new Error('Supply the encrypted backup path.');
+  // A MongoDB archive is refused inside readBackup: it must go through the cutover import.
   const snapshot = await B.readBackup(file, await B.backupKey());
-  if (snapshot.legacy) throw new Error('This archive was written for MongoDB; use npm run import:mongodb for a cutover import.');
   const target = validateRestore(snapshot, process.env);
   const settings = restoreSettings(process.env);
   const objectStorage = snapshot.storage?.provider === 'supabase-s3'

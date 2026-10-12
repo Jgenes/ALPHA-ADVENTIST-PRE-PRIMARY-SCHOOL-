@@ -22,8 +22,9 @@ jobs:
       - run: npm run test:ui
       # Screenshots, temporary databases and secrets deliberately are not uploaded.
   mysql:
-    # The production store is exercised against a throwaway MySQL 8 server: the schema,
-    # transactions, audit triggers, uniqueness, backup-key handling and the HTTP API.
+    # The production store on a throwaway MySQL 8 server: schema and indexes, rollback,
+    # optimistic conflicts, audit triggers and chain, the retention job, sign-in and the
+    # portal API. See test/mysql-store.test.js; it skips locally without MYSQL_URL.
     runs-on: ubuntu-latest
     timeout-minutes: 15
     services:
@@ -49,22 +50,4 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
-      - name: Report what the MySQL server accepts
-        run: node scripts/mysql-diagnose.js
-      - name: Run npm run test:mysql
-        run: |
-          set +e
-          npm run test:mysql > /tmp/mysql-test.log 2>&1
-          code=$?
-          cat /tmp/mysql-test.log
-          if [ "$code" != "0" ]; then
-            python3 - <<'PY'
-          import base64
-          blob = base64.b64encode(open('/tmp/mysql-test.log','rb').read()[-18000:]).decode()
-          for index in range(3):
-              print('::error::MYSQLLOG%d:%s' % (index, blob[index*3000:(index+1)*3000]))
-          PY
-          fi
-          exit $code
-      - name: Whole suite with the MySQL store configured
-        run: npm test
+      - run: npm run test:mysql

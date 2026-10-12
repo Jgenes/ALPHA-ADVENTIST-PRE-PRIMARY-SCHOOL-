@@ -67,7 +67,7 @@ async function main() {
     if (tables.length) throw new Error('The target schema already has tables. Import only into an empty schema so a partial cutover can never be mistaken for a complete one.');
     await createSchema(connection);
     await T.writeTables(connection, planned);
-    if (files.length) await B.restoreFiles(dataDir || path.resolve('.'), files, objectStorage);
+    if (files.length) await B.restoreFiles(dataDir, files, objectStorage);
     console.log(`Import complete: ${planned.planned.reduce((total, entry) => total + entry.rows.length, 0)} records. Sessions and download grants were deliberately cleared, so every person must sign in again and old download links no longer work.\nNow verify: audit-chain integrity in the portal system view, one document download, one approval round trip, and the legacy-migration counts. Keep the old database read-only until the school signs off.`);
   } finally { await connection.end(); }
 }

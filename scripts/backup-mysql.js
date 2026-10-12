@@ -21,8 +21,11 @@ async function main() {
   try {
     await connection.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
     await connection.query('START TRANSACTION WITH CONSISTENT SNAPSHOT READ ONLY');
-    const [found] = await connection.query('SELECT TABLE_NAME AS name FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() ORDER BY TABLE_NAME');
+    const [found] = await connection.query('SELECT TABLE_NAME AS name, ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() ORDER BY TABLE_NAME');
     const present = found.map(row => row.name);
+    // A consistent snapshot only means something on a transactional engine.
+    const wrongEngine = found.filter(row => String(row.ENGINE).toUpperCase() !== 'INNODB');
+    if (wrongEngine.length) throw new Error(`These tables are not InnoDB and cannot be snapshotted consistently: ${wrongEngine.map(row => row.name + '=' + row.ENGINE).join(', ')}.`);
     const expected = COLLECTIONS.map(table);
     const missing = expected.filter(name => !present.includes(name));
     if (missing.length) throw new Error(`The schema is incomplete; missing tables: ${missing.join(', ')}. Refusing to write a partial backup.`);
