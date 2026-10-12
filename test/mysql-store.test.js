@@ -279,11 +279,13 @@ test('the platform runs on a real MySQL schema', {
     const created = await agent.ok('POST', '/api/users', { username: 'mysql.teacher', name: 'Synthetic MySQL Teacher', roles: ['supporting_staff'], password });
     assert.equal(await app.store.run(tx => tx.get('users', created.id)).then(record => record.username), 'mysql.teacher');
     // A stale revision is rejected by the database predicate, not by a race-free guess.
-    const stale = await agent.request('PATCH', '/api/users/' + created.id, { revision: 99, name: 'Renamed too late' });
+    const stale = await agent.request('PATCH', '/api/users/' + created.id, { revision: 99, active: true });
     assert.equal(stale.status, 409);
     assert.equal(stale.json.code, 'VERSION_CONFLICT');
-    const renamed = await agent.ok('PATCH', '/api/users/' + created.id, { revision: created.revision, name: 'Renamed in time' });
-    assert.equal(renamed.revision, created.revision + 1);
+    assert.equal((await app.store.run(tx => tx.get('users', created.id))).revision, created.revision);
+    const updated = await agent.ok('PATCH', '/api/users/' + created.id, { revision: created.revision, active: true });
+    assert.equal(updated.revision, created.revision + 1);
+    assert.equal(updated.active, true);
     const second = new Agent(base);
     await second.login({ username: 'mysql.teacher' }, password);
     assert.equal((await second.ok('GET', '/api/auth/session')).user.username, 'mysql.teacher');
