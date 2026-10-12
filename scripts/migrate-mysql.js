@@ -1,6 +1,7 @@
 'use strict';
 require('dotenv').config();
 const L = require('../src/lib');
+const { mysqlConfig } = require('../src/platform/mysql-config');
 const B = require('./backup-lib');
 const { createApplication } = require('../server');
 const { audit } = require('../src/platform/audit');
@@ -65,14 +66,18 @@ async function importLegacy(store, config, snapshot) {
 }
 function isoDate(value) { return new Date(value).toISOString(); }
 async function main() {
-  if (process.env.MONGO_MIGRATION_APPROVED !== 'true' || process.env.BACKUP_WRITES_PAUSED !== 'true') throw new Error('Explicit migration approval and a maintenance window are required.');
-  if (['production', 'staging'].includes(process.env.NODE_ENV) && process.env.MONGO_MIGRATION_STAGE_VERIFIED !== 'true') throw new Error('Record successful rehearsal before migrating a non-development environment.');
-  if (!process.env.MONGODB_URI || !process.env.MONGODB_DB_NAME || !process.env.MONGO_MIGRATION_BACKUP_FILE) throw new Error('Explicit MongoDB target and pre-migration backup are required.');
-  const snapshot = await B.readBackup(process.env.MONGO_MIGRATION_BACKUP_FILE, await B.backupKey());
-  if (snapshot.database !== process.env.MONGODB_DB_NAME) throw new Error('Backup source and migration database differ.');
+  const env = process.env;
+  if (env.MYSQL_MIGRATION_APPROVED !== 'true' || env.BACKUP_WRITES_PAUSED !== 'true') throw new Error('Explicit migration approval and a maintenance window are required.');
+  if (['production', 'staging'].includes(env.NODE_ENV) && env.MYSQL_MIGRATION_STAGE_VERIFIED !== 'true') throw new Error('Record successful rehearsal before migrating a non-development environment.');
+  if (!env.MYSQL_MIGRATION_BACKUP_FILE || !env.MYSQL_MIGRATION_SOURCE_DB_NAME) throw new Error('A pre-migration backup file and the explicit source database name are required.');
+  const target = mysqlConfig(env, { production: ['production', 'staging'].includes(env.NODE_ENV) });
+  if (!target) throw new Error('The MySQL target (MYSQL_URL or MYSQL_HOST/MYSQL_USER/MYSQL_DB_NAME) is required.');
+  const snapshot = await B.readBackup(env.MYSQL_MIGRATION_BACKUP_FILE, await B.backupKey());
+  if (snapshot.database !== env.MYSQL_MIGRATION_SOURCE_DB_NAME) throw new Error('Backup source and declared migration source database differ.');
+  if (snapshot.database === target.database) throw new Error('The migration source and MySQL target must be different databases.');
   if (Date.now() - Date.parse(snapshot.exportedAt) > 24 * 60 * 60 * 1000) throw new Error('Use a verified backup made within the last 24 hours.');
   const app = await createApplication(undefined, { jobs: false });
-  try { console.log('Legacy migration counts:', await importLegacy(app.store, app.config, snapshot)); console.log('Old collections are unchanged. Accounts, old password hashes, photographs, menus, settings and files were NOT imported. Re-provision accounts and review public drafts and private retention before reopening the site.'); }
+  try { console.log('Legacy migration counts:', await importLegacy(app.store, app.config, snapshot)); console.log('Legacy collections are unchanged. Accounts, old password hashes, photographs, menus, settings and files were NOT imported. Re-provision accounts and review public drafts and private retention before reopening the site.'); }
   finally { await app.close(); }
 }
 if (require.main === module) main().catch(error => { console.error('[migration] Failed. Review approvals, mapping, a fresh backup and the empty target namespace.', error.name, error.code || ''); process.exitCode = 1; });

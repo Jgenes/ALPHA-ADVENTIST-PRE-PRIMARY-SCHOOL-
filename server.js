@@ -173,6 +173,6 @@ if (require.main === module) {
     app.server.listen(app.config.port, '0.0.0.0', () => console.log(`[alpha] digital school platform listening on :${app.config.port} (${app.store.kind})`));
     let closing = false;
     for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, async () => { if (closing) return; closing = true; await app.close(); });
-  }).catch(error => { console.error('[startup]', error.message.replace(/mongodb(?:\+srv)?:\/\/[^\s]+/gi, '[redacted database URI]')); process.exitCode = 1; });
+  }).catch(error => { console.error('[startup]', error.message.replace(/(?:mongodb(?:\+srv)?|mysql):\/\/[^\s]+/gi, '[redacted database URI]').replace(/password=[^\s&]+/gi, 'password=[redacted]')); process.exitCode = 1; });
 }
 module.exports = { createApplication };

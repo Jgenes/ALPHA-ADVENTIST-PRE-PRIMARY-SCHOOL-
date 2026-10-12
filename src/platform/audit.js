@@ -8,7 +8,8 @@ function canonical(value) {
 }
 function signature(record, key) { return crypto.createHmac('sha256', key).update(canonical(record)).digest('hex'); }
 async function audit(tx, config, actor, action, resourceType, resourceId, result = 'success', metadata = {}) {
-  const head = await tx.get('system_settings', 'audit-head');
+  // Locked, so parallel appends extend the chain instead of racing into a conflict.
+  const head = await (tx.getForUpdate ? tx.getForUpdate('system_settings', 'audit-head') : tx.get('system_settings', 'audit-head'));
   const sequence = (head?.sequence || 0) + 1;
   const record = {
     id: 'AUD-' + String(sequence).padStart(12, '0'), sequence, previousHash: head?.hash || 'GENESIS',

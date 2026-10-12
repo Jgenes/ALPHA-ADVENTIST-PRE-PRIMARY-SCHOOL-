@@ -89,7 +89,7 @@
       ['Document library', data.documents, 'issued', 'Authorised, controlled documents', 'book', '/portal/documents']
     ] : has('system.read') ? [
       ['Active accounts', data.accountsTotal, '', 'Identity and access administration', 'users', '/portal/users'],
-      ['Database', data.database === 'sqlite' ? 'Development' : 'MongoDB', '', data.database === 'sqlite' ? 'Local transactional SQLite' : 'Transactional replica-set storage', 'chip', '/portal/system'],
+      ['Database', data.database === 'sqlite' ? 'Development' : 'MySQL', '', data.database === 'sqlite' ? 'Local transactional SQLite' : 'Transactional InnoDB storage', 'chip', '/portal/system'],
       ['Alert queue', data.alertsPending, 'pending', data.officeAlertsConfigured ? 'External integration configured' : 'Messaging provider not configured', 'mail', '/portal/system'],
       ['Business access', 'Separate', '', 'No automatic HR or approval authority', 'shield', '/portal/help']
     ] : [['My notifications', data.notifications.length, 'unread', 'Only messages addressed to you', 'mail', '/portal/notifications']];
