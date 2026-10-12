@@ -267,8 +267,9 @@ test('the platform runs on a real MySQL schema', {
     admin.mustChangePassword = false;
     await app.store.run(async tx => { await tx.insert('users', admin); await audit(tx, config, { userId: 'bootstrap' }, 'user.create', 'user', admin.id, 'success', { roles: admin.roles }); });
     const agent = new Agent(base);
+    // No session yet, so no CSRF token and no authority.
     assert.equal((await agent.request('GET', '/api/system')).status, 403);
-    await agent.ok('POST', '/api/auth/login', { username: 'mysql.admin', password });
+    await agent.login({ username: 'mysql.admin' }, password);
     const status = await agent.ok('GET', '/api/system');
     assert.equal(status.database, 'mysql');
     assert.equal(status.environment, 'test');
@@ -284,8 +285,7 @@ test('the platform runs on a real MySQL schema', {
     const renamed = await agent.ok('PATCH', '/api/users/' + created.id, { revision: created.revision, name: 'Renamed in time' });
     assert.equal(renamed.revision, created.revision + 1);
     const second = new Agent(base);
-    await second.ok('GET', '/api/auth/session');
-    await second.ok('POST', '/api/auth/login', { username: 'mysql.teacher', password });
+    await second.login({ username: 'mysql.teacher' }, password);
     assert.equal((await second.ok('GET', '/api/auth/session')).user.username, 'mysql.teacher');
     const auditRows = await app.store.run(tx => tx.list('audit_logs'));
     assert.ok(auditRows.some(row => row.action === 'user.create' && row.resourceId === created.id));
