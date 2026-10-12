@@ -227,7 +227,7 @@ test('the platform runs on a real MySQL schema', {
     assert.equal(verifyAudit(after, config.auditKey, await app.store.run(tx => tx.get('system_settings', 'audit-head'))), true);
     const connection = await mysql.createConnection(config.mysql.options);
     try {
-      await assert.rejects(connection.query('UPDATE adsp_audit_logs SET action = "rewritten" WHERE id = ' + JSON.stringify(after.at(-1).id)), /append-only/);
+      await assert.rejects(connection.query('UPDATE adsp_audit_logs SET revision = revision + 1 WHERE id = ' + JSON.stringify(after.at(-1).id)), /append-only/);
       await assert.rejects(connection.query('DELETE FROM adsp_audit_logs WHERE id = ' + JSON.stringify(after.at(-1).id)), /append-only/);
     } finally { await connection.end(); }
   });
@@ -274,7 +274,7 @@ test('the platform runs on a real MySQL schema', {
     assert.equal(status.environment, 'test');
     const dashboard = await agent.ok('GET', '/api/dashboard');
     assert.equal(dashboard.database, 'mysql');
-    assert.equal(dashboard.accountsTotal, 1);
+    assert.equal(dashboard.accountsTotal, (await app.store.run(tx => tx.list('users'))).filter(item => item.active).length);
     const created = await agent.ok('POST', '/api/users', { username: 'mysql.teacher', name: 'Synthetic MySQL Teacher', roles: ['supporting_staff'], password });
     assert.equal(await app.store.run(tx => tx.get('users', created.id)).then(record => record.username), 'mysql.teacher');
     // A stale revision is rejected by the database predicate, not by a race-free guess.

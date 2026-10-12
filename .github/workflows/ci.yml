@@ -58,7 +58,7 @@ jobs:
           code=$?
           cat /tmp/mysql-test.log
           if [ "$code" != "0" ]; then
-            grep -nE "not ok|AssertionError|expected:|actual:|error:|at TestContext|code: |failureType" /tmp/mysql-test.log | head -70 | while IFS= read -r line; do echo "::error::${line}"; done
+            grep -nE "not ok|ok [0-9]|AssertionError|expected|actual|error|at TestContext|code: |failureType|# (tests|pass|fail)" /tmp/mysql-test.log | head -90 | while IFS= read -r line; do echo "::error::${line}"; done
           fi
           exit $code
       - name: Whole suite with the MySQL store configured

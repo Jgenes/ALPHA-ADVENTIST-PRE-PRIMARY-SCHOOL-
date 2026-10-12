@@ -77,6 +77,7 @@ function mysqlConfig(env = process.env, { production = false } = {}) {
     database,
     sslMode,
     createSchema: env.MYSQL_CREATE_SCHEMA === 'true',
+    requireAuditTriggers: env.MYSQL_REQUIRE_AUDIT_TRIGGERS !== 'false',
     connectionLimit: integer('MYSQL_POOL_SIZE', env.MYSQL_POOL_SIZE, 15, 1, 100),
     options: {
       host: host || 'localhost',

@@ -88,11 +88,21 @@ function translateError(error) {
   if (error.code === 'ER_TRIGGER' || /append-only/i.test(error.sqlMessage || '')) return new HttpError(409, 'Audit records are append-only.');
   return error;
 }
-async function createSchema(connection) {
+async function createSchema(connection, { requireAuditTriggers = true } = {}) {
   for (const name of COLLECTIONS) await connection.query(createTableSql(name));
   const [triggerRows] = await connection.query('SELECT TRIGGER_NAME AS name FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = DATABASE()');
   const present = new Set(triggerRows.map(row => row.name));
-  for (const trigger of auditTriggers()) if (!present.has(trigger.name)) await connection.query(trigger.sql);
+  for (const trigger of auditTriggers()) {
+    if (present.has(trigger.name)) continue;
+    try { await connection.query(trigger.sql); }
+    catch (error) {
+      // Managed providers sometimes deny trigger creation. The application still refuses
+      // to audit-edit, but that guarantee is then only as strong as the app itself, so it
+      // must be a deliberate decision rather than a warning nobody reads.
+      if (!requireAuditTriggers) { console.warn('[mysql] audit append-only trigger unavailable (' + error.code + '); continuing because MYSQL_REQUIRE_AUDIT_TRIGGERS=false'); continue; }
+      throw new Error('The audit append-only trigger could not be created (' + error.code + ': ' + error.sqlMessage + '). Grant the TRIGGER privilege, or set MYSQL_REQUIRE_AUDIT_TRIGGERS=false to accept application-level enforcement only.');
+    }
+  }
 }
 async function verifyCapabilities(pool, schemaName) {
   const [variables] = await pool.query('SELECT @@transaction_isolation AS isolation, @@version AS version, @@version_comment AS comment');
@@ -124,7 +134,7 @@ async function openMysqlStore(config, { driver } = {}) {
     // empty schema that nobody is backing up.
     await pool.query('SELECT 1 AS ok');
     const info = await verifyCapabilities(pool, settings.database);
-    await createSchema(pool);
+    await createSchema(pool, { requireAuditTriggers: settings.requireAuditTriggers !== false });
     return info;
   };
   try {

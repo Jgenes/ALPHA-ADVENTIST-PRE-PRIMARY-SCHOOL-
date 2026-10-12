@@ -16,6 +16,7 @@ unit of work a transaction with `get`, `list`, `insert`, `update` and `remove`, 
 | Audit chain | `BEFORE UPDATE`/`BEFORE DELETE` triggers on `adsp_audit_logs` refuse in-place rewriting |
 | Deadlocks/lock timeouts | Translated into the same `409` conflict answer rather than retried behind the caller's back |
 | Engine checks | Startup refuses a non-InnoDB `adsp_*` table or an isolation level below `READ-COMMITTED` |
+| Audit head | Read with `SELECT … FOR UPDATE`, so simultaneous audited requests queue briefly on that row instead of failing as a version conflict |
 
 Records are JSON documents, so the migration did not need a table-per-field rewrite; the
 constraints that used to live in MongoDB validators and indexes now live in the schema.
@@ -42,6 +43,7 @@ Explicit settings win over the connection string.
 | `MYSQL_POOL_SIZE` | 15 | Connections per instance; each transaction takes one from the pool |
 | `MYSQL_CONNECT_TIMEOUT_MS` | 10000 | |
 | `MYSQL_CREATE_SCHEMA` | false | Let startup create a missing schema. Development/rehearsal only; a production typo must fail loudly |
+| `MYSQL_REQUIRE_AUDIT_TRIGGERS` | true | Startup also installs `BEFORE UPDATE`/`BEFORE DELETE` triggers on the audit table and refuses to run without them. Set to `false` only when the provider denies trigger creation |
 
 Outside development a missing or half-configured MySQL setup stops startup; there is no
 silent fallback to SQLite. Public preview (`PUBLIC_PREVIEW=true`) refuses any `MYSQL_*`
@@ -57,7 +59,10 @@ GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, TRIGGER, REFERENCES
 ```
 
 `CREATE`/`ALTER`/`INDEX`/`TRIGGER` are needed because the application owns its schema and
-creates missing tables and the audit triggers at startup. Grant the account access to
+creates missing tables and the audit triggers at startup. Binary logging does not block
+trigger creation, but a provider that denies it must either grant `TRIGGER` or be told to
+skip the guard with `MYSQL_REQUIRE_AUDIT_TRIGGERS=false` — a deliberate downgrade from a
+database-enforced audit trail to an application-enforced one, so it is never silent. Grant the account access to
 **one** schema only, and give the backup/restore operators a separate account: a restore
 needs `CREATE` on a second schema, and an import rehearsal should be read-only.
 
