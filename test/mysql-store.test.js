@@ -12,7 +12,7 @@ const { verifyAudit, audit } = require('../src/platform/audit');
 const { openStore } = require('../src/platform/store');
 const { COLLECTIONS, table, indexGroups } = require('../src/platform/collections');
 const { mysqlConfig } = require('../src/platform/mysql-config');
-const { createTableSql, auditTriggers, decode, translateError, MysqlUnit } = require('../src/platform/mysql-store');
+const { createTableSql, auditTriggers, decode, translateError, verifyCapabilities, MysqlUnit } = require('../src/platform/mysql-store');
 const { Agent } = require('./helpers');
 
 test('MySQL connection settings are explicit and fail closed', () => {
@@ -100,6 +100,24 @@ test('MySQL driver errors map onto the platform conflict answer', () => {
   assert.deepEqual(decode('{"a":1}'), { a: 1 });
   assert.deepEqual(decode({ a: 1 }), { a: 1 });
   assert.equal(decode(null), null);
+});
+
+test('database capability check supports MariaDB isolation variable names', async () => {
+  const queries = [];
+  const pool = {
+    async query(sql) {
+      queries.push(sql);
+      if (sql.includes('@@transaction_isolation')) throw Object.assign(new Error('Unknown system variable'), { code: 'ER_UNKNOWN_SYSTEM_VARIABLE' });
+      if (sql.includes('@@tx_isolation')) return [[{ isolation: 'REPEATABLE-READ', version: '10.4.32-MariaDB' }]];
+      if (sql.includes('information_schema.TABLES')) return [COLLECTIONS.map(name => ({ name: table(name), ENGINE: 'InnoDB' }))];
+      throw new Error('Unexpected capability query.');
+    }
+  };
+  const result = await verifyCapabilities(pool, 'alpha_school');
+  assert.equal(result.isolation, 'REPEATABLE-READ');
+  assert.equal(result.version, '10.4.32-MariaDB');
+  assert.match(queries[0], /@@transaction_isolation/);
+  assert.match(queries[1], /@@tx_isolation/);
 });
 
 // A stub connection proves the SQL each store operation issues, without a server.

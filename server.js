@@ -164,6 +164,7 @@ async function createApplication(config = createConfig(), options = {}) {
 }
 if (require.main === module) {
   createApplication().then(app => {
+    console.log(`[alpha] Database connected (${app.store.kind})`);
     app.server.listen(app.config.port, '0.0.0.0', () => console.log(`[alpha] digital school platform listening on :${app.config.port} (${app.store.kind})`));
     let closing = false;
     for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, async () => { if (closing) return; closing = true; await app.close(); });

@@ -36,7 +36,7 @@ With no MySQL configured, development uses transactional SQLite in ignored `.run
 
 ### Initial access
 
-Appoint **separate people** for technical administration and school business authority. Provide a strong temporary password through a mode-600 file outside source control, then use an approved operator terminal:
+Appoint **separate people** for technical administration and school business authority. Provide a strong temporary password through a mode-600 file outside source control (or, on Windows, a file with a protected NTFS ACL), then use an approved operator terminal:
 
 ```sh
 npm run bootstrap -- --username YOUR_NAMED_USERNAME --name "Authorised person's name" --role system_admin

@@ -1,6 +1,6 @@
 # MySQL: setup, migration and operations
 
-The platform stores its audited records in MySQL 8 (InnoDB) instead of MongoDB. The
+The platform stores its audited records in MySQL 8 or compatible MariaDB (InnoDB) instead of MongoDB. The
 application code above the store did not change: `src/platform/store.js` still hands every
 unit of work a transaction with `get`, `list`, `insert`, `update` and `remove`, and
 `src/platform/mysql-store.js` implements that contract on one pooled MySQL connection.
@@ -20,6 +20,8 @@ unit of work a transaction with `get`, `list`, `insert`, `update` and `remove`, 
 
 Records are JSON documents, so the migration did not need a table-per-field rewrite; the
 constraints that used to live in MongoDB validators and indexes now live in the schema.
+The startup capability check reads either MySQL's `transaction_isolation` or MariaDB's
+`tx_isolation` variable, depending on which the server supports.
 
 ## Environment
 
@@ -48,6 +50,8 @@ Explicit settings win over the connection string.
 Outside development a missing or half-configured MySQL setup stops startup; there is no
 silent fallback to SQLite. Public preview (`PUBLIC_PREVIEW=true`) refuses any `MYSQL_*`
 setting so it can never write into the school database.
+Startup verifies the connection with `SELECT 1` before the server listens, then logs
+`[alpha] Database connected (mysql)` after the application initializes successfully.
 
 ## Preparing the schema
 

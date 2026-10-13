@@ -105,11 +105,17 @@ async function createSchema(connection, { requireAuditTriggers = true } = {}) {
   }
 }
 async function verifyCapabilities(pool, schemaName) {
-  const [variables] = await pool.query('SELECT @@transaction_isolation AS isolation, @@version AS version, @@version_comment AS comment');
+  let variables;
+  try {
+    [variables] = await pool.query('SELECT @@transaction_isolation AS isolation, @@version AS version, @@version_comment AS comment');
+  } catch (error) {
+    if (error.code !== 'ER_UNKNOWN_SYSTEM_VARIABLE') throw error;
+    [variables] = await pool.query('SELECT @@tx_isolation AS isolation, @@version AS version, @@version_comment AS comment');
+  }
   const isolation = String(variables[0].isolation || '').toUpperCase();
   // READ UNCOMMITTED would let a transaction observe another writer's uncommitted
   // rows, which the revision checks and audit chain both depend on not happening.
-  if (!['READ-COMMITTED', 'REPEATABLE-READ', 'SERIALIZABLE'].includes(isolation)) throw new Error(`MySQL transaction isolation must be READ-COMMITTED, REPEATABLE-READ or SERIALIZABLE (found ${isolation || 'unknown'}).`);
+  if (!['READ-COMMITTED', 'REPEATABLE-READ', 'SERIALIZABLE'].includes(isolation)) throw new Error(`Database transaction isolation must be READ-COMMITTED, REPEATABLE-READ or SERIALIZABLE (found ${isolation || 'unknown'}).`);
   const placeholders = COLLECTIONS.map(() => '?').join(', ');
   const [tables] = await pool.query(`SELECT TABLE_NAME AS name, ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME IN (${placeholders})`, [schemaName, ...COLLECTIONS.map(table)]);
   const engines = new Map(tables.map(row => [row.name, String(row.ENGINE || '').toUpperCase()]));
@@ -168,4 +174,4 @@ async function openMysqlStore(config, { driver } = {}) {
     throw new Error(`MySQL startup connection/check failed: ${error.message}`, { cause: error });
   }
 }
-module.exports = { openMysqlStore, MysqlUnit, createSchema, createTableSql, auditTriggers, indexName, extractExpression, decode, translateError };
+module.exports = { openMysqlStore, MysqlUnit, createSchema, createTableSql, auditTriggers, indexName, extractExpression, decode, translateError, verifyCapabilities };
