@@ -12,8 +12,10 @@ const { Files } = require('../src/platform/files');
 const { supabaseStorageConfig, createSupabaseStorage } = require('../src/platform/supabase-storage');
 const { verifyAudit } = require('../src/platform/audit');
 const { bootstrapUser } = require('../scripts/bootstrap');
-const { legacyRecords, importLegacy } = require('../scripts/migrate-mongodb');
-const { validateRestore } = require('../scripts/restore-mongodb');
+const { legacyRecords, importLegacy } = require('../scripts/migrate-mysql');
+const { validateRestore } = require('../scripts/restore-mysql');
+const { convert, validateImport } = require('../scripts/import-mongodb');
+const T = require('../scripts/mysql-transfer');
 const B = require('../scripts/backup-lib');
 const { textFile } = require('./helpers');
 
@@ -144,8 +146,8 @@ test('operator safeguards and an actual isolated SQLite/file recovery rehearsal'
     await assert.rejects(B.restoreFiles(remoteRestoreDir, remoteFiles, remoteTarget), /bucket must be empty/);
     await app.close(); closed = true;
     const sqlite = (await fs.readFile(path.join(config.dataDir, 'adsp.sqlite'))).toString('base64');
-    const snapshot = { version: 2, database: 'synthetic_source', exportedAt: new Date(), collections, files, sqlite };
-    archivePath = path.join(root, 'archives', 'synthetic.ejson.enc');
+    const snapshot = { version: 3, dialect: 'mysql', database: 'synthetic_source', exportedAt: new Date(), collections, files, sqlite };
+    archivePath = path.join(root, 'archives', 'synthetic.json.enc');
     const result = await B.writeBackup(archivePath, snapshot, key);
     const ciphertext = await fs.readFile(archivePath);
     assert.equal(result.sha256, crypto.createHash('sha256').update(ciphertext).digest('hex'));
@@ -163,12 +165,29 @@ test('operator safeguards and an actual isolated SQLite/file recovery rehearsal'
     assert.throws(() => B.keyBytes('not-a-key'));
   });
   await t.test('restore requires an approved empty isolated target, never the live database', () => {
-    const env = { NODE_ENV: 'test', RESTORE_APPROVED: 'true', MONGODB_RESTORE_URI: 'mongodb://localhost:27017', MONGODB_RESTORE_DB_NAME: 'synthetic_restore_test', RESTORE_DATA_DIR: path.join(root, 'restore') };
+    const env = { NODE_ENV: 'test', RESTORE_APPROVED: 'true', MYSQL_RESTORE_URL: 'mysql://restore:secret@localhost:3306', MYSQL_RESTORE_DB_NAME: 'synthetic_restore_test', RESTORE_DATA_DIR: path.join(root, 'restore') };
     assert.equal(validateRestore(backup, env), 'synthetic_restore_test');
     assert.throws(() => validateRestore(backup, { ...env, NODE_ENV: 'production' }));
     assert.throws(() => validateRestore(backup, { ...env, RESTORE_APPROVED: 'false' }));
-    assert.throws(() => validateRestore(backup, { ...env, MONGODB_RESTORE_DB_NAME: backup.database }));
+    assert.throws(() => validateRestore(backup, { ...env, MYSQL_RESTORE_DB_NAME: backup.database }));
+    assert.throws(() => validateRestore(backup, { ...env, MYSQL_RESTORE_URL: undefined }), /MYSQL_RESTORE_URL/);
     assert.throws(() => validateRestore(backup, { ...env, DATA_DIR: env.RESTORE_DATA_DIR }));
+    // A cutover import maps legacy names, clears access records and refuses junk.
+    const converted = convert({ database: 'legacy', exportedAt: new Date().toISOString(), collections: [{ name: 'adsp_users', documents: [{ _id: 'USR-1', username: 'legacy' }] }, { name: 'users', documents: [{ id: 'USR-2' }] }, { name: 'news', documents: [{ id: 'n1' }] }] });
+    assert.deepEqual(converted.collections[0].documents.map(item => item.id), ['USR-1', 'USR-2']);
+    assert.deepEqual(converted.skipped, ['news']);
+    assert.throws(() => T.planTables([{ name: 'adsp_users; DROP TABLE x', documents: [] }]), /unrecognised table/);
+    assert.throws(() => T.planTables([{ name: 'adsp_users', documents: [{ id: 'a' }] }]), /valid revision/);
+    assert.equal(T.planTables([{ name: 'adsp_sessions', documents: [{ id: 's', revision: 1 }] }]).planned[0].rows.length, 0);
+    const archive = { version: 3, dialect: 'mysql', database: 'alpha_live', exportedAt: new Date().toISOString(), collections: [{ name: 'adsp_users', documents: [{ id: 'u1', revision: 4, username: 'operator.tech' }] }, { name: 'adsp_sessions', documents: [{ id: 's1', revision: 1 }] }], files: [] };
+    const importEnv = { NODE_ENV: 'test', MYSQL_IMPORT_APPROVED: 'true', MYSQL_URL: 'mysql://alpha@db.internal/alpha_school_new' };
+    const planned = validateImport(archive, importEnv).planned.planned.map(entry => [entry.name, entry.rows.length]);
+    assert.deepEqual(planned, [['adsp_users', 1], ['adsp_sessions', 0]]);
+    assert.throws(() => validateImport(archive, { ...importEnv, MYSQL_IMPORT_APPROVED: undefined }), /explicit approval/);
+    assert.throws(() => validateImport(archive, { ...importEnv, MYSQL_URL: 'mysql://alpha@db.internal/alpha_live' }), /must differ/);
+    assert.throws(() => validateImport(archive, { ...importEnv, NODE_ENV: 'production' }), /Rehearse the import/);
+    assert.throws(() => validateImport({ ...archive, collections: [{ name: 'news', documents: [{ id: 'x' }] }] }, importEnv), /no platform tables/);
+    assert.throws(() => T.planTables([{ name: 'adsp_users', documents: [{ id: 'a', revision: -1 }] }]), /valid revision/);
     const remoteBackup = { ...backup, storage: { provider: 'supabase-s3', bucket: 'source-private' } };
     const remoteEnv = { ...env, SUPABASE_STORAGE_BUCKET: 'production-private', SUPABASE_RESTORE_BUCKET: 'restore-private' };
     assert.equal(validateRestore(remoteBackup, remoteEnv), 'synthetic_restore_test');

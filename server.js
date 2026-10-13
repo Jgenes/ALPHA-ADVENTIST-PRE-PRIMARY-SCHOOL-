@@ -33,13 +33,7 @@ function send(res, status, html, headers = {}) {
   res.writeHead(status, { 'Content-Type': 'text/html; charset=utf-8', 'Content-Length': body.length, 'Cache-Control': 'no-cache', ...headers });
   res.end(body);
 }
-function safeErrorMessage(error) {
-  return String(error?.message || error?.name || 'Unknown error')
-    .replace(/mongodb(?:\+srv)?:\/\/[^\s"'`]+/gi, '[redacted MongoDB URI]')
-    .replace(/\b(password|passwd|secret|token|authorization|api[_-]?key)\s*[:=]\s*("[^"]*"|'[^']*'|[^\s,;]+)/gi, '$1=[redacted]')
-    .replace(/[\r\n\t]+/g, ' ')
-    .slice(0, 500);
-}
+const safeErrorMessage = L.safeErrorMessage;
 function safeErrorLocation(error) {
   return String(error?.stack || '').split('\n').slice(1, 4).join(' ').replace(/\s+/g, ' ').slice(0, 500);
 }
@@ -173,6 +167,6 @@ if (require.main === module) {
     app.server.listen(app.config.port, '0.0.0.0', () => console.log(`[alpha] digital school platform listening on :${app.config.port} (${app.store.kind})`));
     let closing = false;
     for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, async () => { if (closing) return; closing = true; await app.close(); });
-  }).catch(error => { console.error('[startup]', error.message.replace(/mongodb(?:\+srv)?:\/\/[^\s]+/gi, '[redacted database URI]')); process.exitCode = 1; });
+  }).catch(error => { console.error('[startup]', L.safeErrorMessage(error)); process.exitCode = 1; });
 }
 module.exports = { createApplication };

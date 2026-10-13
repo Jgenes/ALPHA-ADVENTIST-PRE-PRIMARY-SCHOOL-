@@ -8,6 +8,14 @@ const scrypt = promisify(crypto.scrypt);
 class HttpError extends Error {
   constructor(status, message, code = 'REQUEST_FAILED') { super(message); this.status = status; this.code = code; }
 }
+// Log-friendly error text: never a database URI, never a credential.
+function safeErrorMessage(error) {
+  return String(error?.message || error?.name || 'Unknown error')
+    .replace(/(?:mongodb(?:\+srv)?|mysql):\/\/[^\s"'`]+/gi, '[redacted database URI]')
+    .replace(/\b(password|passwd|secret|token|authorization|api[_-]?key)\s*[:=]\s*("[^"]*"|'[^']*'|[^\s,;]+)/gi, '$1=[redacted]')
+    .replace(/[\r\n\t]+/g, ' ')
+    .slice(0, 500);
+}
 function esc(s) {
   return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
@@ -106,4 +114,4 @@ function serveStatic(req, res, urlPath, publicDir) {
   if (req.method === 'HEAD') res.end(); else fs.createReadStream(file).pipe(res);
   return true;
 }
-module.exports = { HttpError, esc, paragraphs, parseCookies, cookieHeader, isStrongPassword, passwordHash, verifyPassword, safeEqual, encrypt, decrypt, sha256, rid, slugify, text, readBody, parseForm, serveStatic, MIME };
+module.exports = { HttpError, esc, safeErrorMessage, paragraphs, parseCookies, cookieHeader, isStrongPassword, passwordHash, verifyPassword, safeEqual, encrypt, decrypt, sha256, rid, slugify, text, readBody, parseForm, serveStatic, MIME };

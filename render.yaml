@@ -1,6 +1,6 @@
 # Deployment template, not proof of production readiness. Complete the release
 # gates in docs/operations-template.md and rehearse with isolated staging first.
-# Use MongoDB plus this persistent disk (for application keys and local files)
+# Use MySQL plus this persistent disk (for application keys and local files)
 # or a private Supabase S3 bucket (for durable files).
 services:
   - type: web
@@ -22,10 +22,12 @@ services:
         sync: false
       - key: TRUST_PROXY_HOPS
         value: "1"
-      - key: MONGODB_URI
+      - key: MYSQL_URL
         sync: false
-      - key: MONGODB_DB_NAME
+      - key: MYSQL_DB_NAME
         sync: false
+      - key: MYSQL_SSL_MODE
+        value: verify-full
       - key: SUPABASE_S3_ENDPOINT
         sync: false
       - key: SUPABASE_S3_REGION

@@ -11,5 +11,5 @@ coverage
 data/*
 !data/seed.json
 *.sqlite*
-*.ejson.enc
+*.json.enc
 *.log
