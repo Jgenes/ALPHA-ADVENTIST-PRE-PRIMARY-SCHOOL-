@@ -1,4 +1,4 @@
-name: Platform checks
+name: PHP platform checks
 on:
   push:
   pull_request:
@@ -10,21 +10,23 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_sqlite, pdo_mysql, openssl, mbstring, curl, gd, sodium, exif
+          coverage: none
+      - run: php scripts/check.php
+      - run: php test/run.php
+      - run: php test/integrations.php
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
       - run: npm ci
-      - run: npm run check
-      - run: npm test
-      - run: npm audit --omit=dev
       - run: npx playwright install --with-deps chromium
       - run: npm run test:ui
-      # Screenshots, temporary databases and secrets deliberately are not uploaded.
+      # Screenshots, synthetic databases, password files and keys are never uploaded.
   mysql:
-    # The production store on a throwaway MySQL 8 server: schema and indexes, rollback,
-    # optimistic conflicts, audit triggers and chain, the retention job, sign-in and the
-    # portal API. See test/mysql-store.test.js; it skips locally without MYSQL_URL.
     runs-on: ubuntu-latest
     timeout-minutes: 15
     services:
@@ -32,7 +34,7 @@ jobs:
         image: mysql:8.4
         env:
           MYSQL_ROOT_PASSWORD: ci-only-root-password
-          MYSQL_DATABASE: adsp_ci_placeholder
+          MYSQL_DATABASE: alpha_school_test
         ports:
           - 3306:3306
         options: >-
@@ -41,13 +43,13 @@ jobs:
           --health-timeout=5s
           --health-retries=24
     env:
-      MYSQL_URL: mysql://root:ci-only-root-password@127.0.0.1:3306/adsp_ci_placeholder
-      MYSQL_SSL_MODE: disabled
+      TEST_MYSQL_URL: mysql://root:ci-only-root-password@127.0.0.1:3306/alpha_school_test
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: shivammathur/setup-php@v2
         with:
-          node-version: '22'
-          cache: npm
-      - run: npm ci
-      - run: npm run test:mysql
+          php-version: '8.3'
+          extensions: pdo_mysql, pdo_sqlite, openssl, mbstring, curl, gd, sodium, exif
+          coverage: none
+      - run: php test/run.php
+      - run: php test/integrations.php

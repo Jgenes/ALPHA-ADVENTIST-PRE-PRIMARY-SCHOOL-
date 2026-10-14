@@ -1,6 +1,7 @@
 .env
 .env.*
 !.env.example
+!.env.production.example
 node_modules/
 .runtime/
 private/
@@ -16,3 +17,5 @@ coverage/
 # Runtime records and keys never belong in source control.
 data/*
 !data/seed.json
+.arena/
+vendor/

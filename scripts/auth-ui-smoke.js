@@ -9,7 +9,7 @@ const https = require('node:https');
 const http = require('node:http');
 const { execFileSync } = require('node:child_process');
 const { chromium, expect } = require('@playwright/test');
-const { fixture } = require('../test/helpers');
+const { fixture } = require('./ui-fixture');
 async function main() {
   const f = await fixture();
   let browser, proxy;
@@ -51,7 +51,6 @@ async function main() {
     await frame.locator('[name="username"]').fill(f.users.teacher.username);
     await frame.locator('[name="password"]').fill(f.password);
     // An old form/server restart must not require retyping credentials.
-    await f.app.store.run(async tx => { for (const session of await tx.list('sessions')) if (!session.userId) await tx.update('sessions', { ...session, expiresAt: Date.now() - 1 }); });
     let attempts = 0;
     await page.route('**/api/auth/login', async route => {
       attempts++;

@@ -1,0 +1,409 @@
+<?php
+class Files
+{
+    private string $root;
+    private ?array $s3 = null;
+    public function __construct(private array $config)
+    {
+        $this->root = $config["dataDir"] . "/storage";
+        $driver = $config["storageDriver"] ?? storage_configuration();
+        $names = [
+            "endpoint" => "SUPABASE_S3_ENDPOINT",
+            "region" => "SUPABASE_S3_REGION",
+            "access" => "SUPABASE_S3_ACCESS_KEY_ID",
+            "secret" => "SUPABASE_S3_SECRET_ACCESS_KEY",
+            "bucket" => "SUPABASE_STORAGE_BUCKET",
+        ];
+        $s = [];
+        foreach ($names as $k => $env) {
+            $s[$k] = env_value($env);
+        }
+        if ($driver === "local" && array_filter($s)) {
+            throw new RuntimeException(
+                "Local persistent storage cannot be mixed with S3 settings.",
+            );
+        }
+        if ($driver === "supabase" || array_filter($s)) {
+            if (count(array_filter($s)) !== 5) {
+                throw new RuntimeException(
+                    "Complete all private Supabase S3 settings.",
+                );
+            }
+            if (
+                parse_url($s["endpoint"], PHP_URL_SCHEME) !== "https" ||
+                parse_url($s["endpoint"], PHP_URL_USER) ||
+                parse_url($s["endpoint"], PHP_URL_PASS) ||
+                parse_url($s["endpoint"], PHP_URL_QUERY) ||
+                !preg_match('/^[a-z0-9][a-z0-9.-]+$/', $s["bucket"])
+            ) {
+                throw new RuntimeException("Invalid private S3 configuration.");
+            }
+            $this->s3 = $s;
+        }
+    }
+    public function init(): void
+    {
+        if ($this->s3) {
+            $this->s3Request("HEAD", "");
+        } else {
+            foreach (
+                [$this->root, $this->root . "/private", $this->root . "/public"]
+                as $directory
+            ) {
+                if (is_link($directory)) {
+                    throw new RuntimeException(
+                        "Storage directories must not be symbolic links.",
+                    );
+                }
+                if (!is_dir($directory) && !mkdir($directory, 0700, true)) {
+                    throw new RuntimeException(
+                        "Cannot create persistent storage.",
+                    );
+                }
+                if (!is_writable($directory) || !chmod($directory, 0700)) {
+                    throw new RuntimeException(
+                        "Persistent storage must be private and writable by the application account.",
+                    );
+                }
+            }
+        }
+    }
+    public function provider(): string
+    {
+        return $this->s3 ? "supabase-s3" : "local";
+    }
+    private function keyPath($area, $key): string
+    {
+        if (
+            !in_array($area, ["private", "public"], true) ||
+            !preg_match('/^[a-f0-9]{48}$/', $key)
+        ) {
+            throw new RuntimeException("Invalid storage key.");
+        }
+        return $this->root . "/" . $area . "/" . $key;
+    }
+    private function s3Request($method, $key, $bytes = ""): string
+    {
+        $s = $this->s3;
+        $u =
+            rtrim($s["endpoint"], "/") .
+            "/" .
+            $s["bucket"] .
+            ($key !== "" ? "/" . $key : "");
+        $p = parse_url($u);
+        $host = $p["host"] . (isset($p["port"]) ? ":" . $p["port"] : "");
+        $date = gmdate("Ymd\THis\Z");
+        $day = substr($date, 0, 8);
+        $hash = hash("sha256", $bytes);
+        $headers = "host:$host\nx-amz-content-sha256:$hash\nx-amz-date:$date\n";
+        $signed = "host;x-amz-content-sha256;x-amz-date";
+        $canonical =
+            $method .
+            "\n" .
+            $p["path"] .
+            "\n\n" .
+            $headers .
+            "\n" .
+            $signed .
+            "\n" .
+            $hash;
+        $scope = $day . "/" . $s["region"] . "/s3/aws4_request";
+        $toSign =
+            "AWS4-HMAC-SHA256\n$date\n$scope\n" . hash("sha256", $canonical);
+        $k = hash_hmac("sha256", $day, "AWS4" . $s["secret"], true);
+        foreach ([$s["region"], "s3", "aws4_request"] as $part) {
+            $k = hash_hmac("sha256", $part, $k, true);
+        }
+        $signature = hash_hmac("sha256", $toSign, $k);
+        $ch = curl_init($u);
+        curl_setopt_array($ch, [
+            CURLOPT_CUSTOMREQUEST => $method,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 20,
+            CURLOPT_FOLLOWLOCATION => false,
+            CURLOPT_HTTPHEADER => [
+                "Host: " . $host,
+                "x-amz-content-sha256: " . $hash,
+                "x-amz-date: " . $date,
+                "Authorization: AWS4-HMAC-SHA256 Credential=" .
+                $s["access"] .
+                "/" .
+                $scope .
+                ", SignedHeaders=" .
+                $signed .
+                ", Signature=" .
+                $signature,
+            ],
+        ]);
+        if ($method === "HEAD") {
+            curl_setopt($ch, CURLOPT_NOBODY, true);
+        }
+        if ($method === "PUT") {
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $bytes);
+        }
+        $r = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+        curl_close($ch);
+        if ($r === false || $code < 200 || $code >= 300) {
+            throw new RuntimeException(
+                "Private object storage request failed (" . $code . ").",
+            );
+        }
+        return $r;
+    }
+    public function readStored($area, $key): string
+    {
+        $p = $this->keyPath($area, $key);
+        if (!$this->s3 && (!is_file($p) || is_link($p))) {
+            throw new RuntimeException(
+                "Protected storage must be a regular file.",
+            );
+        }
+        return $this->s3
+            ? $this->s3Request("GET", $area . "/" . $key)
+            : file_get_contents($p);
+    }
+    public function writeStored($area, $key, $bytes): void
+    {
+        $p = $this->keyPath($area, $key);
+        if ($this->s3) {
+            $this->s3Request("PUT", $area . "/" . $key, $bytes);
+            return;
+        }
+        $fh = @fopen($p, "x");
+        if (!$fh) {
+            throw new RuntimeException("Cannot write private file.");
+        }
+        try {
+            fwrite($fh, $bytes);
+        } finally {
+            fclose($fh);
+        }
+        chmod($p, 0600);
+    }
+    public function removeStored($area, $key): void
+    {
+        $p = $this->keyPath($area, $key);
+        if ($this->s3) {
+            $this->s3Request("DELETE", $area . "/" . $key);
+        } elseif (is_file($p)) {
+            unlink($p);
+        }
+    }
+    public function prepare($input, $imageOnly = false): array
+    {
+        if (
+            !is_array($input) ||
+            !is_string($input["content"] ?? null) ||
+            !is_string($input["name"] ?? null)
+        ) {
+            throw new HttpError(400, "Choose a file.");
+        }
+        $v = $input["content"];
+        if (
+            strlen($v) > 4 * ceil($this->config["maxUploadBytes"] / 3) ||
+            strlen($v) % 4 !== 0 ||
+            !preg_match('/^[A-Za-z0-9+\/]*={0,2}$/D', $v)
+        ) {
+            throw new HttpError(
+                413,
+                "Invalid file encoding or file over 5 MB.",
+            );
+        }
+        $bytes = base64_decode($v, true);
+        if ($bytes === false || base64_encode($bytes) !== $v) {
+            throw new HttpError(400, "Invalid base64 encoding.");
+        }
+        if (!$bytes || strlen($bytes) > $this->config["maxUploadBytes"]) {
+            throw new HttpError(413, "Choose a nonempty file up to 5 MB.");
+        }
+        $name = substr(
+            preg_replace("/[^a-zA-Z0-9._ -]/", "_", basename($input["name"])),
+            0,
+            100,
+        );
+        $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+        if ($imageOnly && in_array($ext, ["jpg", "jpeg", "png"], true)) {
+            $png = str_starts_with($bytes, hex2bin("89504e470d0a1a0a"));
+            $jpeg = str_starts_with($bytes, hex2bin("ffd8ff"));
+            if (!(($png && $ext === "png") || ($jpeg && $ext !== "png"))) {
+                throw new HttpError(
+                    400,
+                    "Image type does not match its filename.",
+                );
+            }
+            $info = @getimagesizefromstring($bytes);
+            if (!$info || $info[0] * $info[1] > 25000000) {
+                throw new HttpError(400, "This image is invalid or too large.");
+            }
+            $im = @imagecreatefromstring($bytes);
+            if (!$im) {
+                throw new HttpError(400, "This image is invalid or too large.");
+            }
+            if ($jpeg && function_exists("exif_read_data")) {
+                $tmp = tempnam($this->config["dataDir"], "exif-");
+                file_put_contents($tmp, $bytes);
+                try {
+                    $exif = @exif_read_data($tmp);
+                    $orientation = $exif["Orientation"] ?? 1;
+                    if (in_array($orientation, [2, 4, 5, 7], true)) {
+                        imageflip($im, IMG_FLIP_HORIZONTAL);
+                    }
+                    $angle = match ($orientation) {
+                        3, 4 => 180,
+                        5, 6 => -90,
+                        7, 8 => 90,
+                        default => 0,
+                    };
+                    if ($angle) {
+                        $im = imagerotate($im, $angle, 0);
+                    }
+                } finally {
+                    unlink($tmp);
+                }
+            }
+            $w = imagesx($im);
+            $h = imagesy($im);
+            $ratio = min(1, 1600 / $w, 1600 / $h);
+            $out = imagecreatetruecolor(
+                max(1, (int) round($w * $ratio)),
+                max(1, (int) round($h * $ratio)),
+            );
+            $white = imagecolorallocate($out, 255, 255, 255);
+            imagefill($out, 0, 0, $white);
+            imagecopyresampled(
+                $out,
+                $im,
+                0,
+                0,
+                0,
+                0,
+                imagesx($out),
+                imagesy($out),
+                $w,
+                $h,
+            );
+            ob_start();
+            imagejpeg($out, null, 84);
+            $bytes = ob_get_clean();
+            unset($out, $im);
+            $mime = "image/jpeg";
+            $name = "school-activity.jpg";
+            $scan = "UNSCANNED_REENCODED";
+        } elseif (!$imageOnly && $ext === "txt") {
+            if (
+                !mb_check_encoding($bytes, "UTF-8") ||
+                preg_match('/[\x00-\x08\x0b\x0c\x0e-\x1f]/', $bytes)
+            ) {
+                throw new HttpError(
+                    400,
+                    "Text documents must use UTF-8 and contain no binary data.",
+                );
+            }
+            $mime = "text/plain; charset=utf-8";
+            $scan = "PLAIN_TEXT";
+        } elseif (!$imageOnly && $ext === "pdf") {
+            if (
+                !str_starts_with($bytes, "%PDF-") ||
+                !str_contains(substr($bytes, -1024), "%%EOF")
+            ) {
+                throw new HttpError(400, "Invalid PDF signature.");
+            }
+            if (
+                preg_match(
+                    "/\/(JavaScript|JS|Launch|EmbeddedFile|OpenAction|AA|RichMedia)\b/i",
+                    $bytes,
+                )
+            ) {
+                throw new HttpError(
+                    400,
+                    "Active or embedded PDF content is not supported.",
+                );
+            }
+            $mime = "application/pdf";
+            $scan = "UNSCANNED";
+        } else {
+            throw new HttpError(
+                415,
+                $imageOnly
+                    ? "Use a JPEG or PNG image."
+                    : "Use a plain-text (.txt) or scanned PDF document.",
+            );
+        }
+        $key = bin2hex(random_bytes(24));
+        $iv = random_bytes(12);
+        $encrypted = openssl_encrypt(
+            $bytes,
+            "aes-256-gcm",
+            $this->config["storageKey"],
+            OPENSSL_RAW_DATA,
+            $iv,
+            $tag,
+        );
+        if ($encrypted === false) {
+            throw new RuntimeException("Encryption failed.");
+        }
+        $this->writeStored("private", $key, $iv . $encrypted . $tag);
+        return [
+            "storageKey" => $key,
+            "name" => $name,
+            "mime" => $mime,
+            "size" => strlen($bytes),
+            "checksum" => hash("sha256", $bytes),
+            "scanStatus" => $scan,
+        ];
+    }
+    public function read($file, $area = "private"): string
+    {
+        $bytes = $this->readStored($area, $file["storageKey"]);
+        if ($area === "private") {
+            $bytes = openssl_decrypt(
+                substr($bytes, 12, -16),
+                "aes-256-gcm",
+                $this->config["storageKey"],
+                OPENSSL_RAW_DATA,
+                substr($bytes, 0, 12),
+                substr($bytes, -16),
+            );
+            if ($bytes === false) {
+                throw new RuntimeException("File authentication failed.");
+            }
+        }
+        if (!hash_equals($file["checksum"], hash("sha256", $bytes))) {
+            throw new RuntimeException("File integrity check failed.");
+        }
+        return $bytes;
+    }
+    public function publish($file): void
+    {
+        $bytes = $this->read($file);
+        if (
+            !$this->s3 &&
+            is_file($this->keyPath("public", $file["storageKey"]))
+        ) {
+            return;
+        }
+        $this->writeStored("public", $file["storageKey"], $bytes);
+    }
+    public function unpublish($file): void
+    {
+        if ($file) {
+            $this->removeStored("public", $file["storageKey"]);
+        }
+    }
+    public function discard($file): void
+    {
+        if ($file) {
+            $this->removeStored("private", $file["storageKey"]);
+        }
+    }
+}
+function public_file_metadata($f)
+{
+    return $f
+        ? array_intersect_key(
+            $f,
+            array_flip(["name", "mime", "size", "checksum", "scanStatus"]),
+        )
+        : null;
+}

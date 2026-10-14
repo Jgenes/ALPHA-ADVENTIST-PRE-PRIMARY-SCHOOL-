@@ -1,34 +1,20 @@
 {
-  "engines": {
-    "node": ">=22.13.0 <23"
-  },
-  "scripts": {
-    "start": "node server.js",
-    "dev": "node --watch server.js",
-    "test": "node --test test/*.test.js",
-    "test:mysql": "node --test test/mysql-store.test.js",
-    "check": "node scripts/check.js",
-    "bootstrap": "node scripts/bootstrap.js",
-    "backup:mysql": "node scripts/backup-mysql.js",
-    "restore:mysql": "node scripts/restore-mysql.js",
-    "import:mongodb": "node scripts/import-mongodb.js",
-    "migrate:mysql": "node scripts/migrate-mysql.js",
-    "test:ui": "node scripts/ui-smoke.js && node scripts/auth-ui-smoke.js"
-  },
-  "dependencies": {
-    "@aws-sdk/client-s3": "^3.1144.0",
-    "dotenv": "^16.4.7",
-    "mysql2": "^3.24.5",
-    "nodemailer": "^10.0.13",
-    "sharp": "^0.35.5"
-  },
-  "name": "alpha-adventist-digital-school-platform",
-  "version": "1.0.0",
+  "name": "alpha-adventist-browser-tests",
+  "version": "2.0.0",
   "private": true,
+  "description": "Optional browser-only development tools; the application runs entirely on PHP.",
+  "scripts": {
+    "start": "php -S 0.0.0.0:3000 -t public router.php",
+    "dev": "php -S 0.0.0.0:3000 -t public router.php",
+    "test": "php test/run.php && php test/integrations.php",
+    "check": "php scripts/check.php",
+    "test:mysql": "php test/run.php",
+    "test:ui": "node scripts/ui-smoke.js && node scripts/auth-ui-smoke.js",
+    "verify:integrations": "php scripts/verify-integrations.php",
+    "init:production": "php scripts/init-production.php"
+  },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
-    "@playwright/test": "^1.63.0",
-    "playwright-core": "^1.63.0",
-    "yaml": "^2.9.1"
+    "@playwright/test": "^1.63.0"
   }
 }

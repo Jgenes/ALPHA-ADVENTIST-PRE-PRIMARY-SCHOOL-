@@ -1,104 +1,166 @@
-# Alpha Adventist Digital School Platform
+# Alpha Adventist Digital School Platform — PHP
 
-A governed public website and staff workspace for **Alpha Adventist Pre & Primary School, Kigoma**. This implementation follows the September 2026 blueprint’s order: secure the existing site, establish editorial governance, then add staff/HR workflows and an admissions review desk.
-
-**This is an implementation for staged acceptance—not a declaration of production readiness or completion of every later phase.** See [delivery status](docs/delivery-status.md) and the [operations template](docs/operations-template.md).
-
-## What is included
-
-- Original GitHub homepage layout and navy/gold design system; English/Kiswahili Home, Admissions and Contact; Downloads and Portal navigation; mobile Call/WhatsApp/Apply; child-friendly, local-only Kids Zone.
-- Central `BASE_URL` for canonical, Open Graph, structured data and sitemap URLs. Unapproved photo slots use the existing school crest; only consented, approved media can replace it.
-- Private `/portal`: role-specific staff, parent, student and teacher views; school-provisioned student accounts; audited guardian verification; class/teacher assignment; scoped attendance, published results, learning materials, notices, events and parent-teacher messaging; plus the existing HR and governance workflows.
-- CMS drafts, independent editorial/authority review, separate publication, scheduling and historical published snapshots. School contacts, verified map and official social links use the same review process.
-- Configurable, versioned approval routes with per-stage authority, comments, return/reject/cancel states, escalation notifications and append-only audit events.
-- Admissions state transitions and private enquiry queues. All five original public forms produce references and durable office-alert jobs; safeguarding/privacy requests have separate restricted queues.
-- Guardian media consent by pupil reference and channel, annual expiry, withdrawal enforcement and external-removal follow-up. Published images are checked on every request.
-- Scrypt passwords, persistent account/IP login limits, session rotation/revocation, CSRF/origin checks, server-side resource authorisation, encrypted private files and one-use download grants.
-- Limited PWA/offline shell. **No private records, API responses, submissions or photographs are cached by the service worker.**
-
-## UI source
-
-The public homepage, navigation, typography and cards use the original repository UI from commit `82757d3`. The portal reuses its original centred CMS login and navy admin layout. New features extend those components rather than replacing them with another template. See [UI source and integration](docs/ui-source.md).
+The school website and governed staff/family portal now run on **PHP 8.2+** (the production container uses PHP 8.3). There is no Node.js application server and no frontend build step. Existing CSS, JavaScript, photographs, fonts, routes, forms and portal interactions are retained.
 
 ## Run locally
 
-Use **Node.js 22.13+ within the 22.x line**; tested on 22.22.3.
+Install PHP with `pdo_sqlite`, `openssl`, `mbstring`, `curl`, `gd` and `sodium`. Production additionally needs `pdo_mysql`; `exif` preserves image orientation while stripping metadata.
+
+```sh
+cp .env.example .env
+php scripts/check.php
+php -S 0.0.0.0:3000 -t public router.php
+```
+
+Visit `http://localhost:3000`. SQLite is created in the protected, ignored `DATA_DIR` (`.runtime` by default). No database credentials are needed for local public-page development. **Do not use PHP's built-in server in production.**
+
+Composer is optional: `composer check`, `composer test`, `composer start` and `composer maintenance` are convenience commands. The application has no third-party PHP runtime packages.
+
+### Initial accounts
+
+There are no default passwords or public registration endpoints. Provision initial authorities using an approved appointment and a private password file:
+
+```sh
+# Create this file privately, outside the public directory; never commit it.
+chmod 600 /secure/initial-password.txt
+export BOOTSTRAP_APPROVED=true
+export BOOTSTRAP_APPROVAL_REFERENCE='your-approved-appointment-reference'
+export BOOTSTRAP_PASSWORD_FILE=/secure/initial-password.txt
+php scripts/bootstrap.php --username=system-admin --name='System Administrator' --role=system_admin
+# Repeat with the separately approved head_teacher appointment and password file.
+```
+
+An initial account must change its password on first sign-in. Management grants business roles through the portal. Technical administrators cannot grant themselves business access. Remove the temporary password files after secure handover.
+
+Environment provisioning through `ADMIN_PASSWORD` and the complete owner-approved `HEAD_TEACHER_*` settings remains supported. Never place real credentials in source control.
+
+## What is preserved
+
+- The public school website, English/Kiswahili pages, carousel, gallery filters/lightbox, parent dialogs and Kids Zone games.
+- Public enquiry, visit, admission, computer-training, safeguarding and privacy forms with consent, throttling and submission receipts.
+- Staff profiles, leave balances/approvals, employment contracts and controlled document versioning.
+- Verified guardian/learner/classroom scopes, attendance, independently published results and learning materials, and family communication.
+- Independent CMS/media review and publication, child consent checks and withdrawals, notices, acknowledgements, calendars and notifications.
+- Session rotation/expiry, CSRF and same-origin checks, role permissions, audit integrity, encrypted files and single-use private download grants.
+- Office-alert queues, retention maintenance, scheduled publication and contract reminders.
+- Public manifests, offline support, robots, sitemap and health endpoints.
+
+**Browser JavaScript remains JavaScript intentionally.** PHP handles HTTP routing, rendering, persistence and business rules; keeping the browser scripts is necessary to preserve the original UX.
+
+## Project layout
+
+| Location | Purpose |
+| --- | --- |
+| `public/index.php` | Production front controller |
+| `router.php` | Local development router |
+| `src/php/pages_*.php`, `layout.php` | PHP versions of the original page templates |
+| `src/php/platform_*.php` | Permissions, family/staff services and governed workflows |
+| `src/php/runtime.php` | PHP collection/date/formatting helpers used by the migrated code; no JS evaluation |
+| `src/php/support.php`, `auth.php`, `store.php`, `files.php`, `http.php` | Native PHP configuration, security, PDO persistence, encrypted storage and HTTP services |
+| `src/php/jobs.php`, `platform_jobs.php` | Alert delivery and scheduled maintenance |
+| `src/php/operations.php`, `legacy-migration.php` | Guarded backup/restore and legacy archive migration |
+| `public/css`, `public/js`, `public/img`, `public/fonts` | Original assets, unchanged |
+| `data/seed.json`, `src/content/home-slides.json` | Existing published information and homepage slides |
+| `scripts/*.php` | PHP operator commands |
+| `test/run.php`, `test/integrations.php` | Synthetic business/security and SMTP/storage regressions |
+| `scripts/*ui*.js` | Optional browser-test tooling only |
+
+The migrated templates and service methods keep the original structure and use shared PHP helpers to preserve the old collection semantics. They are ordinary PHP files: no generator, Node subprocess, JS interpreter or transpilation step is needed to run or modify the application.
+
+## Persistence and existing installations
+
+The PHP PDO store retains the original `adsp_*` table names, `id/revision/payload` records, MySQL generated-column indexes, SQLite file name, encryption envelope and audit-chain algorithm.
+
+For a Node-to-PHP cutover:
+
+1. Pause writes and take an encrypted backup; separately escrow the application-key file.
+2. Rehearse on an isolated schema/storage directory. Never point test fixtures at live data.
+3. Preserve `DATA_DIR`, the storage encryption/audit keys and the existing schema. **Do not regenerate application keys.**
+4. Install PHP `sodium`. Existing `scrypt-N32768-r8-p1` passwords are verified using the matching native scrypt parameters. New passwords use SHA-256-prehashed bcrypt to avoid the bcrypt 72-byte truncation issue.
+5. Invalidate old sessions/download grants during a recovery, reconcile consent withdrawals, verify the audit chain and test private downloads before an approved release.
+6. Remove the Node start command and use the PHP production deployment below.
+
+Changing the language is not an approval to deploy to production. Confirm institutional facts, access appointments, retention schedules, lawful consent and recovery procedures with the school.
+
+## Production deployment
+
+### Docker / Render
+
+`Dockerfile` uses PHP 8.3 + Apache with `public/` as the only web root. It also starts a PHP maintenance worker under the web-service account. `render.yaml` is a **Docker** deployment template with a persistent `/var/data` disk and `/readyz` health check.
+
+```sh
+docker build -t alpha-school-php .
+# Use a verified production environment file and persistent protected data volume.
+docker run --env-file /secure/alpha-production.env -p 8080:80 \
+  -v alpha-school-data:/var/data alpha-school-php
+```
+
+Set `APP_ENV=production`, a verified HTTPS `BASE_URL`, persistent `DATA_DIR`, **MySQL database `alpha_school`**, `STORAGE_DRIVER=local`, approved retention periods and your authenticated SMTP provider with approved office/privacy recipients. MySQL production connections require `MYSQL_SSL_MODE=verify-full`; use the system CA trust store or supply `MYSQL_TLS_CA_FILE` / `MYSQL_SSL_CA` as appropriate for the provider.
+
+### Database, email and storage setup
+
+Use [the production integration runbook](docs/production-integrations.md) and `.env.production.example` to supply hosting secrets, initialize `alpha_school`, verify encrypted disk storage and explicitly test both SMTP recipients. Setup does not silently rename existing databases or send email.
+
+```sh
+# After the provider has created alpha_school and the protected environment is ready:
+php scripts/init-production.php
+php scripts/verify-integrations.php
+# Explicit opt-in synthetic email, not an automatic test:
+php scripts/verify-integrations.php --check=email --send-test=office
+```
+
+The application integration is implemented; live MySQL/TLS and inbox delivery still require your real provider endpoint/secret settings and operator verification.
+
+### PHP hosting / Apache
+
+Point Apache's document root at `public/`, enable `mod_rewrite`, and allow the included `.htaccess`. Never expose the repository root, `.env`, `src/`, `data/` or `DATA_DIR`. Configure PHP to disable public error display and allow an 8 MB request body (uploads are still limited to 5 MB by the application).
+
+For installations not using the container worker, schedule maintenance every minute under the application account:
+
+```cron
+* * * * * cd /srv/alpha-school && /usr/bin/php scripts/maintenance.php
+```
+
+The cron job must receive the same protected environment as the web process. Maintenance is not an HTTP endpoint. Use only one scheduling method; database transactions and outbox claims prevent overlapping workers from delivering the same claim concurrently. External delivery remains at-least-once; webhook receivers should honour the idempotency key.
+
+## Operator tools
+
+All operational commands are PHP:
+
+```sh
+php scripts/check.php
+php scripts/bootstrap.php --username=... --name=... --role=...
+php scripts/maintenance.php
+php scripts/backup-mysql.php
+php scripts/restore-mysql.php /secure/backup.json.enc
+php scripts/import-mongodb.php /secure/legacy-backup.json.enc
+php scripts/migrate-mysql.php /secure/legacy-backup.json.enc
+```
+
+Backup requires `BACKUP_WRITES_PAUSED=true` and a separate protected backup encryption key. The `ALPHAMYS` AES-GCM archive format remains compatible with existing archives. Restore requires an explicit approved, pre-created isolated MySQL schema ending in `_restore_test` and an empty `RESTORE_DATA_DIR`; existing records are never overwritten. Restored sessions and grants are cleared and public file copies are not recreated.
+
+Object-storage archives restore into isolated **local** storage; review private files before transferring them to a new bucket. Legacy import requires explicit approval and a separate MySQL target. Legacy public text becomes a draft, and retired accounts/media are not automatically granted access or republished. See `docs/php-migration.md` for cutover details.
+
+## Tests
+
+```sh
+php scripts/check.php
+php test/run.php
+php test/integrations.php
+# Optional MySQL regression against a disposable schema, never a live schema:
+TEST_MYSQL_URL='mysql://user:password@127.0.0.1:3306/alpha_school_test' php test/run.php
+```
+
+The PHP suite covers public submissions/idempotency, permissions and family scopes, applications/files, leave/contract/document/CMS/media workflows, consent withdrawal, audit integrity, optimistic conflicts, encrypted storage, maintenance and original-renderer markup hashes. It uses synthetic records only.
+
+Optional browser tests need Node **only as a development tool**, not as an application dependency:
 
 ```sh
 npm ci
-cp .env.example .env
-npm start
-```
-
-Open `http://localhost:3000`; the staff workspace is `/portal`. The server binds to `0.0.0.0`. Browser-facing requests use relative URLs, so a proxied preview works without calling the visitor’s localhost.
-
-With no MySQL configured, development uses transactional SQLite in ignored `.runtime/`, not a JSON-file database. Set `MYSQL_URL` (or `MYSQL_HOST`, `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_DB_NAME`) to run the same application against MySQL instead — see [docs/mysql-migration.md](docs/mysql-migration.md). Development keys are generated locally with restrictive permissions. Do not reuse them outside development. There are **no default login credentials, demo users or invented employment balances**.
-
-### Initial access
-
-Appoint **separate people** for technical administration and school business authority. Provide a strong temporary password through a mode-600 file outside source control (or, on Windows, a file with a protected NTFS ACL), then use an approved operator terminal:
-
-```sh
-npm run bootstrap -- --username YOUR_NAMED_USERNAME --name "Authorised person's name" --role system_admin
-# A separate, owner-approved first appointment:
-npm run bootstrap -- --username ANOTHER_NAMED_USERNAME --name "Authorised school leader" --role head_teacher
-```
-
-Replace the uppercase command placeholders with chosen lowercase usernames; they are not credentials. Each invocation requires `BOOTSTRAP_APPROVED=true`, a private `BOOTSTRAP_APPROVAL_REFERENCE`, and `BOOTSTRAP_PASSWORD_FILE` in the operator environment. No password belongs in the command line or this README. The first sign-in requires a password change. Bootstrap refuses to repeat an existing initial authority.
-
-For a host without an operator shell, the first `head_teacher` account can instead be provisioned once at startup using `HEAD_TEACHER_USERNAME`, `HEAD_TEACHER_NAME`, `HEAD_TEACHER_PASSWORD`, `HEAD_TEACHER_APPROVED=true`, and `HEAD_TEACHER_APPROVAL_REFERENCE`. Set these temporarily in the host's private environment settings, deploy, confirm the account was created, then remove all five values. This path refuses to create the account without explicit approval and will not update an existing head-teacher account. Do not put the password or approval reference in source control. Management can then create ordinary staff accounts and assign business roles through the portal.
-
-Management can then appoint HR, departmental approvers, CMS authors/editors/publishers and the privacy officer. HR records staff IDs, departments, supervisors and entitlements. ICT accounts **do not inherit HR/contract/financial access or business approvals**.
-
-## Checks
-
-```sh
-npm run check             # syntax, actual PWA assets, safe seed/artifact guard
-npm test                  # isolated synthetic SQLite/security/workflow/recovery tests
-npm audit --omit=dev
-# UI regressions also require OpenSSL (included on the Linux CI runner).
 npx playwright install --with-deps chromium
-npm run test:ui           # isolated browser workflow, mobile and accessibility checks
+npm run test:ui
 ```
 
-`CHROMIUM_EXECUTABLE` can point to an existing compatible Chromium. Tests do not read a production database. UI screenshots contain synthetic data and are written only to ignored `.runtime/ui-test/`. Test scripts never create accounts in the running preview.
+They launch an isolated PHP server and check public pages, responsive layouts, original interactions, forms, portal screens, accessibility, cross-site HTTPS iframe sign-in, partitioned cookies and bounded CSRF recovery. `PHP_BINARY` and `CHROMIUM_EXECUTABLE` can override the testing executables.
 
-## Production and staging
-
-Use separate databases, storage, keys, origins and alert recipients for each environment. Outside development, startup requires:
-
-- An explicitly configured, verified HTTPS `BASE_URL`.
-- A dedicated MySQL 8 schema on InnoDB (JSON documents, generated-column unique indexes, TLS outside development) and either persistent `DATA_DIR` storage or a private Supabase S3 bucket for files. `DATA_DIR` must remain persistent in both configurations because it holds application keys and, for local storage, uploaded files.
-- Two distinct 32-byte keys for private storage and audit HMAC. If not supplied as secrets or protected key files, production creates them once in `application-keys.json` under `DATA_DIR`; `DATA_DIR` must be a persistent, protected disk. Escrow this file separately and never replace it after real use. Legacy encrypted MFA fields are ignored and left untouched.
-- A signed office-alert endpoint/secret or configured Gmail SMTP delivery with approved office and privacy recipients, and an explicitly approved retention schedule. The safeguarding contact is managed dynamically through the portal’s independently reviewed and published school-contact settings; until configured, the site directs people to the Head of School’s office.
-
-The public site at **https://alpha-adventist-pre-primary-school.onrender.com** was reachable during a read-only check on **30 September 2026**. The similarly spelled hostname without the hyphen between `alpha` and `adventist` returned “Not Found.” The reachable URL is the development fallback only; production still requires an explicit `BASE_URL`, and the school must confirm its long-term official domain. No live deployment was performed in this implementation session.
-
-For a **free, read-only public preview**, create a separate Render service and set `NODE_ENV=staging`, `PUBLIC_PREVIEW=true`, `BASE_URL` to that service's HTTPS origin, and `DATA_DIR=/tmp/alpha-school-preview`. Do not copy `MYSQL_*` environment variables into this service; preview uses temporary SQLite and generated local keys. It displays a preview notice, rejects all `/api` and `/portal` requests, removes public submission forms and staff links, and returns `noindex`. Its database and temporary files can disappear on restart. This mode is not for real submissions, staff work or school records. Keep the live service in strict production mode with its approved MySQL schema, persistent storage and alert configuration.
-
-`render.yaml` is a **single-instance deployment template**, with a persistent disk, readiness probe and automatic deployment disabled. To use external files, create a private Supabase Storage bucket, enable S3 access in Supabase Storage settings, and configure all `SUPABASE_S3_*` and `SUPABASE_STORAGE_BUCKET` values from `.env.example`. Supabase S3 keys are server-only and have broad project storage access; use a dedicated Supabase project and never expose them to browsers. Files are streamed through the app's authorization and consent checks; do not make the bucket public. PDF and image uploads are not malware-scanned; only upload files from trusted sources. The template does not configure a messaging provider, database, backups, DNS, analytics or Search Console on your behalf.
-
-## Notifications
-
-Public forms are saved transactionally with an in-app notice and durable outbox entry. Alerts can go to a configured HTTPS integration, signed with HMAC-SHA256, or directly through Gmail SMTP. Emails contain only the request type, reference, received time and secure portal link; submitted form details are not emailed. Safeguarding and privacy alerts use the separately configured privacy recipient.
-
-Unconfigured jobs remain **PENDING**; non-success responses retry with backoff, then become **FAILED**. SMTP acceptance confirms that Gmail accepted the message, not that a person read it. Provider delivery callbacks, parent-channel messaging and bulk campaigns need further integration.
-
-## Backups and legacy migration
-
-- `npm run backup:mysql` creates an encrypted, bounded database-and-private-file archive during a confirmed maintenance window. Every table is read inside one `REPEATABLE READ` consistent-snapshot transaction. With Supabase Storage configured it captures referenced encrypted objects from the private bucket.
-- `npm run restore:mysql -- /protected/path/archive.json.enc` restores only to an explicitly approved, empty isolated schema ending in `_restore_test`; Supabase archives also require `SUPABASE_RESTORE_BUCKET` to name a separate empty bucket, never the source or live bucket.
-- `npm run import:mongodb -- /protected/path/archive.ejson.enc` is the one-time cutover path from an archive written by the retired MongoDB backup tool: it maps the old `adsp_*` collections into MySQL tables, never imports sessions or download grants, and can be rehearsed with `MYSQL_IMPORT_DRY_RUN=true`.
-- `npm run migrate:mysql` imports supported legacy text and form fields from a fresh encrypted backup, without importing old passwords, accounts or unverified photographs. Public imports become reviewable drafts; unrecognised schemas need a reviewed mapping.
-
-`npm test` skips the live MySQL suite unless `MYSQL_URL` is set; `npm run test:mysql` runs it directly, and the CI workflow starts a throwaway MySQL 8 service for it. See the operations template before using these commands. Tests cover isolated local file recovery, mocked Supabase object capture/restore, mocked SMTP message routing and the MySQL store against a temporary schema; live Supabase credentials, bucket permissions, real Gmail SMTP delivery and production recovery have not been verified in this workspace.
-
-## Repository and child-data safety
-
-Tracked runtime records, uploads, internal artifacts and unverified photographs were removed from the current checkout. **They may still exist in Git history, forks, clones, deployment caches and the previously deployed site. `.gitignore` does not remove them.** Coordinate repository visibility/history cleanup with the owner, rotate previously exposed secrets, and confirm photo-consent/removal obligations before publication. An earlier GitHub access check returned an authentication error. If it recurs, reconnect GitHub in Arena before retrying remote work.
-
-Keep real credentials, private operations records, guardian evidence, exports, backups and child images out of Git. The public operations document is a sanitised template; completed procedures and approval records belong in the school’s restricted operations system.
-
-## Later phases
-
-Fees/payments, admissions document collection, native apps, formal e-signatures, teacher-managed quiz authoring, provider-specific messaging, advanced HR casework and additional CMS/menu/profile tooling remain later or separate work. The family portal code has not been deployed or accepted against real school records. Guardian verification is an audited staff attestation, not automated identity proof; school-approved verification policy and real-data acceptance are required before production use. No native app was built ahead of the portals.
+CI runs PHP checks, SQLite/disposable MySQL tests, synthetic SMTP/storage tests and the optional browser checks. Live MySQL/TLS, SMTP inbox delivery, persistent-disk durability and the deployment container must still be rehearsed with the actual hosting configuration before release.
