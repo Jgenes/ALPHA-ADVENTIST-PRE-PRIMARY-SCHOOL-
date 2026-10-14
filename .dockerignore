@@ -13,3 +13,7 @@ data/*
 *.sqlite*
 *.json.enc
 *.log
+.arena
+vendor
+test
+.github

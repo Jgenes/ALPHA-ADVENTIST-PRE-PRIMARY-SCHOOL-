@@ -1,0 +1,27 @@
+{
+  "name": "alpha-adventist/digital-school-platform",
+  "description": "PHP school website and governed staff/family portal",
+  "type": "project",
+  "require": {
+    "php": "^8.2",
+    "ext-pdo": "*",
+    "ext-openssl": "*",
+    "ext-mbstring": "*",
+    "ext-curl": "*",
+    "ext-gd": "*",
+    "ext-sodium": "*"
+  },
+  "suggest": {
+    "ext-pdo_sqlite": "Development and automated tests",
+    "ext-pdo_mysql": "Production MySQL store",
+    "ext-exif": "Orientation-aware, metadata-free media processing"
+  },
+  "scripts": {
+    "start": "php -S 0.0.0.0:3000 -t public router.php",
+    "check": "php scripts/check.php",
+    "test": "php test/run.php && php test/integrations.php",
+    "maintenance": "php scripts/maintenance.php",
+    "verify:integrations": "php scripts/verify-integrations.php",
+    "init:production": "php scripts/init-production.php"
+  }
+}
