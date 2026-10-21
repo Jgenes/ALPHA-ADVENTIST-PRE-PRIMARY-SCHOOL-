@@ -6,7 +6,7 @@ try {
     $config = configuration();
     if (!$config["mysql"]) {
         throw new RuntimeException(
-            "Verification requires MySQL settings in .env.",
+            "Verification requires MySQL settings in alpha-school/config.php.",
         );
     }
     if ($config["storageDriver"] !== "local") {

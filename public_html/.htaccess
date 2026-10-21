@@ -1,0 +1,11 @@
+Options -Indexes
+DirectoryIndex index.php
+RewriteEngine On
+# Allow only the host's certificate-validation tokens for AutoSSL renewal.
+RewriteRule ^\.well-known/(?:acme-challenge|pki-validation)/[A-Za-z0-9_-]+(?:\.txt)?$ - [L]
+# Never serve configuration files, dotfiles, source folders or backup archives.
+RewriteRule (^|/)(?:\.|alpha-school(?:/|$)|src(?:/|$)|private(?:/|$)|backups(?:/|$)|config(?:\.|/|$)) - [F,L,NC]
+RewriteRule \.(?:env|ini|log|sql|bak|zip|enc)$ - [F,L,NC]
+RewriteRule ^(?:img|css|js|fonts)/ - [L]
+RewriteRule ^(?:index|setup)\.php$ - [L]
+RewriteRule ^ index.php [QSA,L]

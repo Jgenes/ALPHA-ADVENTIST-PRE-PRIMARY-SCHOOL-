@@ -11,6 +11,7 @@ jobs:
     env:
       TEST_MYSQL_URL: mysql://alpha_test:synthetic-ci-only@127.0.0.1/alpha_school_test
       TEST_MYSQL_RESTORE_URL: mysql://alpha_test:synthetic-ci-only@127.0.0.1/alpha_restore_test
+      TEST_MYSQL_SETUP_URL: mysql://alpha_test:synthetic-ci-only@127.0.0.1/alpha_setup_test
       TEST_MYSQL_INTEGRATIONS_URL: mysql://alpha_test:synthetic-ci-only@127.0.0.1/alpha_integrations_test
     steps:
       - uses: actions/checkout@v4
@@ -26,12 +27,17 @@ jobs:
           mysql --protocol=TCP -h127.0.0.1 -uroot -proot <<'SQL'
           CREATE DATABASE alpha_school_test CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
           CREATE DATABASE alpha_restore_test CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
+          CREATE DATABASE alpha_setup_test CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
           CREATE DATABASE alpha_integrations_test CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
           CREATE USER 'alpha_test'@'127.0.0.1' IDENTIFIED BY 'synthetic-ci-only';
           GRANT ALL PRIVILEGES ON alpha_school_test.* TO 'alpha_test'@'127.0.0.1';
           GRANT ALL PRIVILEGES ON alpha_restore_test.* TO 'alpha_test'@'127.0.0.1';
+          GRANT ALL PRIVILEGES ON alpha_setup_test.* TO 'alpha_test'@'127.0.0.1';
           GRANT ALL PRIVILEGES ON alpha_integrations_test.* TO 'alpha_test'@'127.0.0.1';
           SQL
-      - run: php scripts/check.php
-      - run: php test/run.php
-      - run: php test/integrations.php
+      - run: php alpha-school/scripts/check.php
+      - run: php alpha-school/test/cpanel.php
+      - run: php alpha-school/test/integrations.php --configuration-only
+      - run: php alpha-school/test/run.php
+      - run: php alpha-school/test/integrations.php
+      - run: php alpha-school/test/setup-mysql.php

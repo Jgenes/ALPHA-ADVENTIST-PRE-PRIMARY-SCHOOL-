@@ -1,115 +1,111 @@
 # Alpha Adventist Pre & Primary School
 
-A standard **HTML, PHP, CSS and MySQL** school website and staff/family portal.
-PHP renders the HTML and handles forms, authentication and database access using PDO. Stylesheets, fonts and photographs are served directly. Small browser JavaScript files power menus, galleries, forms and portal interactions; they do not need a build step.
+A normal **PHP, HTML, CSS, plain JavaScript and MySQL** school website and staff/family portal. No Docker, Node.js, npm, Composer or asset build is required.
 
-**No Docker, Node.js/npm, Composer, frontend framework, cloud-storage service or deployment platform is required.** Upload the files to PHP hosting and configure MySQL. No dependency-install or compilation command is needed.
+## cPanel: upload two folders, edit one file
+
+**No domain document-root changes or manual PHP path edits are needed.**
+
+```text
+/home/YOUR_CPANEL_USERNAME/
+├── public_html/                 Website files only
+│   ├── index.php                Already wired to the private application
+│   ├── setup.php                Protected one-time browser installer
+│   ├── .htaccess
+│   ├── css/, js/, img/, fonts/
+│   ├── offline.html
+│   └── service-worker.js
+└── alpha-school/                Private application — NOT inside public_html
+    ├── config.example.php       Copy to config.php and edit
+    ├── src/, data/, scripts/
+    ├── database/, test/
+    └── private/                 Created automatically; never overwrite on updates
+```
+
+1. Back up any existing website. Upload the **contents** of this repository's `public_html` folder into cPanel's existing `public_html`. Upload the `alpha-school` folder alongside it in your account's home directory. Include hidden `.htaccess` files. Do not upload the whole repository into `public_html`.
+2. Create an empty MySQL database and user using cPanel's Database Wizard. Assign the user privileges including tables, indexes and triggers. Prefixed names such as `account_alpha_school` work.
+3. Copy `alpha-school/config.example.php` to **`alpha-school/config.php`**. Enter the domain, database credentials, SMTP settings, school-approved retention periods and a random setup token. This is the only settings file needed. The private storage path is automatic—no username/path edits.
+4. Enable HTTPS, open **`https://yourdomain.com/setup.php`**, enter the setup token and provision the approved system administrator and head teacher. Tables, seed workflows and encrypted file storage are initialized automatically. No Terminal is needed for first installation.
+5. Delete `public_html/setup.php`, clear `SETUP_TOKEN` in the private configuration, and add the maintenance cron job from the guide. Test sign-in, forms, email and backups before using live school records.
+
+**Full click-by-click instructions: [cPanel installation](docs/cpanel.md).**
+
+The installer uses HTTPS, a private random token, CSRF checks, same-origin checks, a disk-backed attempt limit and private sessions. It refuses existing accounts, creates both accounts in one serialized transaction, and writes a completion lock. It cannot reset passwords or overwrite existing users. Initial users must change passwords at first sign-in; technical administrators do not automatically receive access to children's records.
 
 ## Requirements
 
-- PHP **8.2+**, with `pdo_mysql`, `openssl`, `mbstring`, `gd`, `sodium`, and standard JSON/fileinfo/session support. `exif` is recommended for image orientation.
-- **MySQL 8**, InnoDB, and a dedicated database user. Schema setup requires table/index/trigger privileges. MariaDB compatibility has not been verified.
-- Apache with `mod_rewrite` and `.htaccess` support for production (typical cPanel hosting).
-- HTTPS, private writable storage outside the document root, standard authenticated SMTP for production email, and one cron job for maintenance.
+- PHP **8.2+** with `pdo_mysql`, `openssl`, `mbstring`, `gd`, `sodium`, `fileinfo`, `session` and normal JSON support. `exif` is recommended for image orientation.
+- **MySQL 8** with InnoDB, JSON, generated-column indexes and triggers. MariaDB compatibility has not been verified.
+- Standard cPanel Apache rewrite/`.htaccess` support, HTTPS, private writable disk and authenticated SMTP for production alerts.
+- One maintenance cron job per minute. No persistent background application process.
 
-## Deploy on cPanel
+DNS must point your registered domain to the hosting server. `NXDOMAIN` is a DNS/registration/delegation problem, not a PHP problem; changing the website files cannot fix it.
 
-Follow **[the cPanel installation guide](docs/cpanel.md)**. In brief:
+## One configuration location
 
-1. Upload the project outside `public_html` and set the domain's document root to the project's `public/` directory.
-2. Create an empty database and user through cPanel's Database Wizard. Full cPanel-prefixed names such as `account_alpha_school` are supported.
-3. Copy `.env.production.example` to `.env` and replace all placeholders. Keep `.env` private with permissions `600`.
-4. Run these commands from the project directory, using the hosting account's PHP 8.2+ executable:
+**`alpha-school/config.php`** is a plain PHP file returning a settings array. It holds database/email settings and the temporary setup token, never public assets. The template is `alpha-school/config.example.php`. Keep the real file private (`600`) and never commit/share it.
 
-   ```sh
-   php scripts/check.php
-   php scripts/init-production.php
-   php scripts/verify-integrations.php
-   ```
+Environment variables remain available for operators/tests, and an existing private `.env` is accepted only when `config.php` is absent. New installations do not need `.env`. Do not maintain two competing configuration files.
 
-5. Create the approved initial staff accounts and schedule `php scripts/maintenance.php` once a minute.
-
-Use `MYSQL_HOST=localhost` for a same-host cPanel MySQL service. TLS can be disabled only for local loopback production database connections; remote production connections must use verified TLS. Never expose `.env`, `src/`, `data/`, scripts, backups or private storage on the web.
+**Existing installation:** do not use the first-install wizard. Preserve the current database, original `DATA_DIR`, encrypted uploads and encryption/audit keys. Keep your existing private configuration or copy its exact settings into `config.php` before switching. The new default private path is only for fresh installs. Read the [upgrade instructions](docs/cpanel.md#updating-an-existing-installation) before uploading.
 
 ## Local development
 
-Install PHP and MySQL (for example through a local PHP hosting stack). Create a dedicated empty `alpha_school` database with phpMyAdmin, or use `database/create-alpha-school.sql` under a database-owner account.
+Install PHP and MySQL, and create an empty database (with phpMyAdmin or `alpha-school/database/create-alpha-school.sql`). Copy the PHP configuration template and edit:
+
+- `APP_ENV` → `development`
+- `BASE_URL` → `http://localhost:3000`
+- Your local MySQL credentials.
+- Leave **all** SMTP fields empty if testing without email.
+- Set a random `SETUP_TOKEN` if using the browser installer.
+
+From the repository root:
 
 ```sh
-cp .env.example .env
+php -S 127.0.0.1:3000 -t public_html router.php
 ```
 
-Edit `.env` with your MySQL user/password, then:
+Visit `http://localhost:3000/setup.php`. HTTP setup is allowed only for loopback development, never remote production. The PHP development server is not a production server.
+
+## Optional PHP command-line tools
+
+These run from the repository/account home, not from `public_html`:
 
 ```sh
-php scripts/check.php
-php scripts/init-production.php
-php -S 0.0.0.0:3000 -t public router.php
+php alpha-school/scripts/check.php
+php alpha-school/scripts/init-production.php
+php alpha-school/scripts/verify-integrations.php
+php alpha-school/scripts/maintenance.php
 ```
 
-Open `http://localhost:3000`. The PHP built-in server is for development only. The application uses MySQL in both development and production; there is no alternate database fallback.
-
-## Initial accounts
-
-There are **no default login passwords or public registration endpoints**. Use an approved appointment and a protected password file outside the public directory:
-
-```sh
-chmod 600 /home/USERNAME/initial-password.txt
-export BOOTSTRAP_APPROVED=true
-export BOOTSTRAP_APPROVAL_REFERENCE='your-approved-appointment-reference'
-export BOOTSTRAP_PASSWORD_FILE=/home/USERNAME/initial-password.txt
-php scripts/bootstrap.php --username=system-admin --name='System Administrator' --role=system_admin
-```
-
-Create the password file privately with a strong, unique password, not a command-line password argument. Repeat with the separately approved `head_teacher` appointment and password file. Delete the temporary password files after secure handover. Users must change their passwords at first sign-in. Management grants business roles through the portal; a technical administrator does not automatically receive access to children's records.
-
-## Project structure
-
-```text
-public/             Only web-accessible directory
-  index.php         PHP entry point
-  .htaccess         Apache routing
-  css/              Stylesheets
-  js/               Browser interactions (no build tools)
-  img/, fonts/      Website assets
-src/php/            PHP templates, authentication and school business logic
-src/content/        Homepage slide content
-data/seed.json      Initial website/workflow content (not live records)
-database/           Optional local database-creation SQL
-scripts/            PHP setup, maintenance, verification and backup tools
-test/               PHP tests
-.env                Private database/email configuration (not committed)
-router.php          Local PHP development router
-```
-
-The existing website design, bilingual pages, school forms, staff/family portal, role checks, consent workflows, audit chain and encrypted private uploads are retained. Application records use the existing `adsp_*` MySQL tables. Setup does not drop, rename or migrate an existing database.
-
-## Maintenance and recovery
-
-- Cron: run `php scripts/maintenance.php` every minute under the hosting account. No continuously running worker is needed.
-- [Email, encrypted files and production checks](docs/production-integrations.md).
-- [Database backup and isolated restore](docs/mysql-migration.md).
-- [Operational safety checklist](docs/operations-template.md).
-- [API and access governance](docs/api-and-governance.md).
-
-**Existing installation:** preserve your MySQL data, private files and original encryption/audit keys. Do not generate new keys for existing encrypted records. Deploy a rehearsed backup first. Storage adapters and legacy archive import tools from previous deployments are no longer included; move any externally stored files through a separately reviewed migration before using this release.
+For approved CLI account provisioning instead of the browser installer, use `alpha-school/scripts/bootstrap.php` with a protected password file and `BOOTSTRAP_APPROVED`, `BOOTSTRAP_APPROVAL_REFERENCE`, and `BOOTSTRAP_PASSWORD_FILE` in the private operator environment. There are no default passwords. Do not put passwords in command arguments. See [cPanel installation](docs/cpanel.md#optional-terminal-based-setup).
 
 ## Tests
 
-No browser-testing packages or package manager are required. Run:
-
 ```sh
-php scripts/check.php
-php test/integrations.php --configuration-only
+php alpha-school/test/cpanel.php
+php alpha-school/test/integrations.php --configuration-only
+php alpha-school/scripts/check.php
 ```
 
-The second command checks configuration, encrypted disk storage and simulated SMTP without connecting to a database or sending email.
-
-Full business/outbox/recovery tests require **three separate, empty disposable MySQL databases** whose names end in `_test`. Set `TEST_MYSQL_URL`, `TEST_MYSQL_RESTORE_URL`, and `TEST_MYSQL_INTEGRATIONS_URL` in your private test environment, then run:
+The first two commands use no live database or email provider. The checker also verifies production PHP extensions. For full business/outbox/recovery tests, provide **three separate empty disposable MySQL schemas** ending in `_test` through `TEST_MYSQL_URL`, `TEST_MYSQL_RESTORE_URL`, and `TEST_MYSQL_INTEGRATIONS_URL`, then:
 
 ```sh
-php test/run.php
-php test/integrations.php
+php alpha-school/test/run.php
+php alpha-school/test/integrations.php
 ```
 
-Never point tests at live school data. Tests refuse existing tables and do not automatically clear databases. Use fresh disposable schemas for each run. The PHP/MySQL CI workflow uses the runner's normal MySQL service, not container services. Live hosting, email inbox delivery, backups and manual browser/accessibility checks must still be verified before launch.
+For the first-install MySQL regression, provide an additional empty schema through `TEST_MYSQL_SETUP_URL` and run `php alpha-school/test/setup-mysql.php`.
+
+Tests refuse existing tables and do not clear databases automatically. Never use live school data. Real cPanel/Apache, MySQL, email inbox delivery, backups and manual browser/accessibility checks still require hosting verification.
+
+## Features retained and operations
+
+The bilingual website, existing design, forms, staff/family portal, role permissions, consent workflows, append-only audit chain, encrypted private uploads and standard SMTP outbox remain in native PHP/MySQL. Browser scripts preserve menus, galleries, forms and portal interactions without frameworks or builds. Application records retain the `adsp_*` tables.
+
+- [Email and production verification](docs/production-integrations.md)
+- [Backup and isolated restore](docs/mysql-migration.md)
+- [Operational safety checklist](docs/operations-template.md)
+- [API and access governance](docs/api-and-governance.md)
+
+Production still needs approved school appointments, retention values, recipients and recovery procedures. Easier deployment is not permission to publish personal data or weaken security.

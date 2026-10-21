@@ -4,20 +4,20 @@ Start with [cPanel installation](cpanel.md). All integrations here are implement
 
 ## MySQL
 
-Create a dedicated MySQL 8 database/user with cPanel and set its full name in `.env`. Prefixed names are supported. `MYSQL_URL` is an optional alternative to individual connection fields; URL-encode special characters in URL credentials, and keep its database consistent with `MYSQL_DB_NAME`.
+Create a dedicated MySQL 8 database/user with cPanel and set its full name in `alpha-school/config.php`. Prefixed names are supported. `MYSQL_URL` is an optional alternative to individual connection fields; URL-encode special characters in URL credentials, and keep its database consistent with `MYSQL_DB_NAME`.
 
 ```sh
-php scripts/init-production.php
-php scripts/verify-integrations.php --check=database
+php alpha-school/scripts/init-production.php
+php alpha-school/scripts/verify-integrations.php --check=database
 ```
 
-Initialization is idempotent and does not drop, rename or copy existing data. The user needs schema/table/index/trigger privileges as well as application read/write access. On local installations only, an approved database owner may use `MYSQL_SCHEMA_CREATE_APPROVED=true php scripts/init-production.php --create-database` to create the configured schema. This is not needed on cPanel. Remove elevated privileges/approval after setup where possible without preventing application schema checks.
+Initialization is idempotent and does not drop, rename or copy existing data. The user needs schema/table/index/trigger privileges as well as application read/write access. On local installations only, an approved database owner may use `MYSQL_SCHEMA_CREATE_APPROVED=true php alpha-school/scripts/init-production.php --create-database` to create the configured schema. This is not needed on cPanel. Remove elevated privileges/approval after setup where possible without preventing application schema checks.
 
 Same-host loopback MySQL (`localhost` or `127.0.0.1`) can disable database TLS. Remote production MySQL must use verified TLS, a matching hostname, and the system trust store or the provider CA specified in `MYSQL_TLS_CA_FILE` / `MYSQL_SSL_CA`. There is no unverified-certificate fallback.
 
 ## Standard SMTP
 
-Configure these in the private `.env`:
+Configure these in the private `alpha-school/config.php`:
 
 - `SMTP_HOST`, `SMTP_PORT` (normally `587`), `SMTP_SECURITY=starttls` or `tls` (normally port `465`).
 - `SMTP_USERNAME`, `SMTP_PASSWORD` or `SMTP_PASSWORD_FILE` (not both).
@@ -29,9 +29,9 @@ The provider must support password-based `AUTH LOGIN` or `AUTH PLAIN` over verif
 A secret file must be a regular non-symlink file, permissions `600` or stricter. Do not put passwords in commands, screenshots, Git or chat.
 
 ```sh
-php scripts/verify-integrations.php --check=email
-php scripts/verify-integrations.php --check=email --send-test=office
-php scripts/verify-integrations.php --check=email --send-test=privacy
+php alpha-school/scripts/verify-integrations.php --check=email
+php alpha-school/scripts/verify-integrations.php --check=email --send-test=office
+php alpha-school/scripts/verify-integrations.php --check=email --send-test=privacy
 ```
 
 Checking configuration alone does not send mail or connect to SMTP. The explicit send commands use synthetic reference-only messages, not child details. SMTP acceptance is not proof of inbox arrival: check both inboxes and spam/provider logs.
@@ -45,13 +45,13 @@ Use `STORAGE_DRIVER=local` and a persistent `DATA_DIR` outside every domain docu
 Private uploads use AES-256-GCM. Distinct `STORAGE_ENCRYPTION_KEY` and `AUDIT_HMAC_KEY` values are 64-hex secrets; if blank, they are generated once in `DATA_DIR/application-keys.json`. Escrow them separately. Lost keys make files unreadable. Preserve keys, database and private files together during updates and migrations.
 
 ```sh
-php scripts/verify-integrations.php --check=storage
+php alpha-school/scripts/verify-integrations.php --check=storage
 ```
 
 The synthetic storage probe tests an encrypted round trip and removes its test file. It does not verify off-site durability. The database probe may initialize missing schema objects; run it only with approved setup credentials.
 
 ## Maintenance and release
 
-Schedule `php scripts/maintenance.php` once a minute through Cron Jobs. There is no daemon or alternative scheduler to install. Keep cron output/failure notifications private.
+Schedule `php alpha-school/scripts/maintenance.php` once a minute through Cron Jobs. There is no daemon or alternative scheduler to install. Keep cron output/failure notifications private.
 
 Before launch, verify `/readyz`, approved staff sign-in/password changes, synthetic forms, both real mailboxes, private download authorization, encrypted bytes on disk and a complete [backup/restore rehearsal](mysql-migration.md). Production needs HTTPS and approved institutional retention values; passing automated tests is not permission to publish school records.

@@ -733,4 +733,14 @@ check(
     "No public copies resurrected",
 );
 
+require dirname(__DIR__) . "/src/php/installation.php";
+$beforeSetupUsers = count($store->list("users"));
+rejects(fn() => setup_install([
+    'approved' => 'yes', 'approval_reference' => 'SYNTHETIC-TEST-ONLY',
+    'admin_username' => 'new-admin', 'admin_name' => 'Synthetic Admin',
+    'admin_password' => 'Synthetic-Admin-123!', 'admin_confirm' => 'Synthetic-Admin-123!',
+    'head_username' => 'new-head', 'head_name' => 'Synthetic Head',
+    'head_password' => 'Synthetic-Head-123!', 'head_confirm' => 'Synthetic-Head-123!',
+]), 409, 'Browser installer cannot reset an existing school');
+check(count($store->list("users")) === $beforeSetupUsers, 'Existing accounts remain unchanged after refused setup');
 echo "PASS: $checks checks (" . $store->kind . ")\n";

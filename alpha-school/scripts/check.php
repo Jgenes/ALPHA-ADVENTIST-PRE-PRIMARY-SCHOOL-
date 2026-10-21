@@ -2,7 +2,7 @@
 require dirname(__DIR__) . "/src/php/bootstrap.php";
 $root = dirname(__DIR__);
 $count = 0;
-foreach (["src", "scripts", "test", "public"] as $dir) {
+foreach (["src", "scripts", "test", "../public_html"] as $dir) {
     $it = new RecursiveIteratorIterator(
         new RecursiveDirectoryIterator(
             $root . "/" . $dir,
@@ -30,13 +30,12 @@ if (!extension_loaded("sodium")) {
 }
 foreach (
     [
-        "public/css/main.css",
-        "public/css/portal.css",
-        "public/js/main.js",
-        "public/js/portal.js",
-        "public/fonts/fonts.css",
-        "router.php",
-        "public/index.php",
+        "../public_html/css/main.css",
+        "../public_html/css/portal.css",
+        "../public_html/js/main.js",
+        "../public_html/js/portal.js",
+        "../public_html/fonts/fonts.css",
+        "../public_html/index.php",
     ]
     as $f
 ) {

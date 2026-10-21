@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . "/smtp.php";
-/** Run from cron once a minute: php scripts/maintenance.php. */
+/** Run from cron once a minute: php alpha-school/scripts/maintenance.php. */
 function deliver_alerts(Platform $p, ?callable $smtpSender = null): void
 {
     $c = $p->config;

@@ -1,0 +1,2 @@
+# Defense in depth if this private folder is accidentally placed on a web root.
+Require all denied
