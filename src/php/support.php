@@ -154,7 +154,7 @@ function load_environment(): void
 function configuration(): array
 {
     load_environment();
-    $environment = env_value("APP_ENV", env_value("NODE_ENV", "development"));
+    $environment = env_value("APP_ENV", "development");
     $production = in_array($environment, ["production", "staging"], true);
     $preview =
         $environment === "staging" && env_value("PUBLIC_PREVIEW") === "true";
@@ -247,7 +247,7 @@ function configuration(): array
             env_value("MYSQL_DB_NAME") !== $urlDatabase
         ) {
             throw new RuntimeException(
-                "MYSQL_DB_NAME must match the database in MYSQL_URL. Use /alpha_school for the production deployment; moving existing data requires an approved migration.",
+                "MYSQL_DB_NAME must match the database in MYSQL_URL. Moving existing data requires an approved migration.",
             );
         }
         $mysql = [
@@ -297,18 +297,9 @@ function configuration(): array
             "Configure a dedicated MySQL schema, hostname and valid port.",
         );
     }
-    if (
-        $environment === "production" &&
-        $mysql &&
-        $mysql["database"] !== "alpha_school"
-    ) {
+    if (!$mysql) {
         throw new RuntimeException(
-            "Production database must be alpha_school. An existing database needs an approved migration, not an automatic rename.",
-        );
-    }
-    if ($preview && ($mysql || env_value("SUPABASE_S3_ENDPOINT"))) {
-        throw new RuntimeException(
-            "Public preview requires isolated local storage.",
+            "Configure MYSQL_HOST, MYSQL_USER and MYSQL_DB_NAME in .env. This application requires MySQL.",
         );
     }
     if (
@@ -323,26 +314,10 @@ function configuration(): array
             "Production requires MySQL and approved retention settings.",
         );
     }
-    $alert = env_value("OFFICE_ALERT_WEBHOOK_URL");
-    $alertSecret = env_value("OFFICE_ALERT_WEBHOOK_SECRET");
-    if (
-        ($alert || $alertSecret) &&
-        (!$alert ||
-            strlen($alertSecret) < 32 ||
-            parse_url($alert, PHP_URL_SCHEME) !== "https" ||
-            parse_url($alert, PHP_URL_USER) ||
-            parse_url($alert, PHP_URL_PASS))
-    ) {
-        throw new RuntimeException(
-            "Configure a trusted HTTPS webhook and a separate secret.",
-        );
-    }
     $smtp = smtp_configuration();
     $storageDriver = storage_configuration();
-    if ($production && !$preview && !$alert && !$smtp) {
-        throw new RuntimeException(
-            "Production requires office-alert delivery.",
-        );
+    if ($production && !$preview && !$smtp) {
+        throw new RuntimeException("Production requires SMTP office-alert delivery.");
     }
     $hops = (int) env_value("TRUST_PROXY_HOPS", 0);
     if ($hops < 0 || $hops > 5) {
@@ -362,8 +337,6 @@ function configuration(): array
         "sessionAbsoluteMs" => 28800000,
         "maxUploadBytes" => 5242880,
         "policyVersion" => "privacy-2026-09-30-v2",
-        "alertUrl" => $alert,
-        "alertSecret" => $alertSecret,
         "smtp" => $smtp,
         "storageDriver" => $storageDriver,
     ];
@@ -374,7 +347,9 @@ function configuration(): array
         ]
         as $k => $v
     ) {
-        $n = env_value($v, $k === "formRetentionDays" ? 90 : 365);
+        $n = env_value($v) !== ""
+            ? env_value($v)
+            : ($k === "formRetentionDays" ? 90 : 365);
         if (!ctype_digit((string) $n) || (int) $n < 1 || (int) $n > 3650) {
             throw new RuntimeException("Invalid retention setting.");
         }

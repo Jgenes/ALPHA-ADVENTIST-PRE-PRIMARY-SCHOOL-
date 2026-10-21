@@ -4,7 +4,7 @@ require_once __DIR__ . "/smtp.php";
 function deliver_alerts(Platform $p, ?callable $smtpSender = null): void
 {
     $c = $p->config;
-    if (!$c["alertUrl"] && !$c["smtp"]) {
+    if (!$c["smtp"]) {
         return;
     }
     for ($i = 0; $i < 10; $i++) {
@@ -34,47 +34,12 @@ function deliver_alerts(Platform $p, ?callable $smtpSender = null): void
         $delivered = false;
         $status = 0;
         try {
-            if ($c["alertUrl"]) {
-                $timestamp = (string) js_date_now();
-                $payload = js_json_stringify([
-                    "id" => $alert["id"],
-                    "school" => "Alpha Adventist Pre & Primary School",
-                    "reference" => $alert["reference"],
-                    "type" => $alert["type"],
-                    "receivedAt" => $alert["createdAt"],
-                    "officeUrl" => $c["baseUrl"] . $alert["href"],
-                ]);
-                $signature = hash_hmac(
-                    "sha256",
-                    $timestamp . "." . $payload,
-                    $c["alertSecret"],
-                );
-                $ch = curl_init($c["alertUrl"]);
-                curl_setopt_array($ch, [
-                    CURLOPT_POST => true,
-                    CURLOPT_POSTFIELDS => $payload,
-                    CURLOPT_RETURNTRANSFER => true,
-                    CURLOPT_TIMEOUT => 5,
-                    CURLOPT_FOLLOWLOCATION => false,
-                    CURLOPT_HTTPHEADER => [
-                        "Content-Type: application/json",
-                        "Idempotency-Key: " . $alert["id"],
-                        "X-Alpha-Timestamp: " . $timestamp,
-                        "X-Alpha-Signature: sha256=" . $signature,
-                    ],
-                ]);
-                $r = curl_exec($ch);
-                $status = curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
-                curl_close($ch);
-                $delivered = $r !== false && $status >= 200 && $status < 300;
-            } else {
-                $delivered = ($smtpSender ?? "send_smtp_alert")(
-                    $c["smtp"],
-                    $alert,
-                    $c["baseUrl"],
-                );
-                $status = $delivered ? 250 : 550;
-            }
+            $delivered = ($smtpSender ?? "send_smtp_alert")(
+                $c["smtp"],
+                $alert,
+                $c["baseUrl"],
+            );
+            $status = $delivered ? 250 : 550;
         } catch (Throwable) {
             /* Do not log personal data or credentials. */
         }

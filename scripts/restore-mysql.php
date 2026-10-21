@@ -8,7 +8,7 @@ cli_main(function () use ($argv) {
     $dir = env_value("RESTORE_DATA_DIR");
     if (
         in_array(
-            env_value("APP_ENV", env_value("NODE_ENV")),
+            env_value("APP_ENV"),
             ["production", "staging"],
             true,
         ) ||
@@ -29,27 +29,10 @@ cli_main(function () use ($argv) {
     if (realpath($dir) && realpath($dir) === realpath(env_value("DATA_DIR"))) {
         throw new RuntimeException("Do not restore into active storage.");
     }
-    if (($snapshot["storage"]["provider"] ?? "local") === "supabase-s3") {
-        throw new RuntimeException(
-            "Restore object-storage archives into isolated local storage, then transfer verified private copies to a new bucket.",
-        );
-    }
     putenv("APP_ENV=development");
     putenv("MYSQL_URL=" . env_value("MYSQL_RESTORE_URL"));
     putenv("MYSQL_DB_NAME=" . $target);
     putenv("DATA_DIR=" . $dir);
-    foreach (
-        [
-            "SUPABASE_S3_ENDPOINT",
-            "SUPABASE_S3_REGION",
-            "SUPABASE_S3_ACCESS_KEY_ID",
-            "SUPABASE_S3_SECRET_ACCESS_KEY",
-            "SUPABASE_STORAGE_BUCKET",
-        ]
-        as $k
-    ) {
-        putenv($k . "=");
-    }
     $p = cli_application(false);
     $counts = restore_snapshot($p->store, $p->files, $snapshot);
     echo "Isolated restore complete: " .

@@ -1,4 +1,4 @@
-name: PHP platform checks
+name: PHP and MySQL checks
 on:
   push:
   pull_request:
@@ -6,50 +6,32 @@ permissions:
   contents: read
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-      - uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.3'
-          extensions: pdo_sqlite, pdo_mysql, openssl, mbstring, curl, gd, sodium, exif
-          coverage: none
-      - run: php scripts/check.php
-      - run: php test/run.php
-      - run: php test/integrations.php
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: npm
-      - run: npm ci
-      - run: npx playwright install --with-deps chromium
-      - run: npm run test:ui
-      # Screenshots, synthetic databases, password files and keys are never uploaded.
-  mysql:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    services:
-      mysql:
-        image: mysql:8.4
-        env:
-          MYSQL_ROOT_PASSWORD: ci-only-root-password
-          MYSQL_DATABASE: alpha_school_test
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pci-only-root-password"
-          --health-interval=5s
-          --health-timeout=5s
-          --health-retries=24
     env:
-      TEST_MYSQL_URL: mysql://root:ci-only-root-password@127.0.0.1:3306/alpha_school_test
+      TEST_MYSQL_URL: mysql://alpha_test:synthetic-ci-only@127.0.0.1/alpha_school_test
+      TEST_MYSQL_RESTORE_URL: mysql://alpha_test:synthetic-ci-only@127.0.0.1/alpha_restore_test
+      TEST_MYSQL_INTEGRATIONS_URL: mysql://alpha_test:synthetic-ci-only@127.0.0.1/alpha_integrations_test
     steps:
       - uses: actions/checkout@v4
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.3'
-          extensions: pdo_mysql, pdo_sqlite, openssl, mbstring, curl, gd, sodium, exif
+          extensions: pdo_mysql, openssl, mbstring, gd, sodium, exif
           coverage: none
+      # Use the runner's installed MySQL service, not a container.
+      - name: Prepare disposable MySQL databases
+        run: |
+          sudo systemctl start mysql
+          mysql --protocol=TCP -h127.0.0.1 -uroot -proot <<'SQL'
+          CREATE DATABASE alpha_school_test CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
+          CREATE DATABASE alpha_restore_test CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
+          CREATE DATABASE alpha_integrations_test CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
+          CREATE USER 'alpha_test'@'127.0.0.1' IDENTIFIED BY 'synthetic-ci-only';
+          GRANT ALL PRIVILEGES ON alpha_school_test.* TO 'alpha_test'@'127.0.0.1';
+          GRANT ALL PRIVILEGES ON alpha_restore_test.* TO 'alpha_test'@'127.0.0.1';
+          GRANT ALL PRIVILEGES ON alpha_integrations_test.* TO 'alpha_test'@'127.0.0.1';
+          SQL
+      - run: php scripts/check.php
       - run: php test/run.php
       - run: php test/integrations.php

@@ -1,13 +1,11 @@
-# Preserving the original UI in PHP
+# Website templates and assets
 
-The conversion is based on the existing repository layout; it is not a visual redesign.
+The website is server-rendered HTML from PHP templates, not a frontend framework or generated application.
 
-- All public stylesheets, portal stylesheets, fonts, photographs and browser scripts are unchanged.
-- Server-rendered public pages and portal shells now live in `src/php/pages_*.php` and `src/php/layout.php`.
-- Existing CSS classes, DOM structures, data attributes, URL paths and API response contracts are retained.
-- The original homepage slides remain in `src/content/home-slides.json`; published CMS banners can still override them.
-- The browser JavaScript continues to power carousel controls, filters/lightbox, modal dialogs, forms, Kids Zone games and the portal interface.
+- Public page templates are in `src/php/pages_*.php`; shared headers/navigation/footer are in `src/php/layout.php`.
+- CSS, fonts and photographs live in `public/css`, `public/fonts` and `public/img`.
+- The browser scripts in `public/js` power menus, carousel controls, gallery filters/lightboxes, modal dialogs, forms, games and the staff/family portal. Edit them directly; no package manager or build step is needed.
+- Homepage slide content is in `src/content/home-slides.json`; approved published banners can override it.
+- Existing routes, template markup and interactions are retained. `test/run.php` compares public page body hashes with `test/render-hashes.json` to catch unintended markup changes.
 
-Before retiring the Node renderer, all 15 main public pages were compared using the same context: their complete HTML was byte-for-byte identical. Original body hashes are checked by `test/run.php` using `test/render-hashes.json`. Browser checks additionally cover bilingual pages, staff screens, mobile widths and HTTPS embedded authentication.
-
-See [PHP migration](php-migration.md) for test details and deployment caveats. Node is now used only by optional browser-test scripts, not by the application.
+Make visual edits directly in the PHP templates and CSS. Test the pages and authenticated portal manually at desktop/mobile sizes after changes, including keyboard navigation and form feedback.

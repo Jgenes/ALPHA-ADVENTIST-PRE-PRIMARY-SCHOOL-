@@ -4,9 +4,9 @@ require dirname(__DIR__) . "/src/php/jobs.php";
 $options = getopt("", ["send-test:", "check:"]);
 try {
     $config = configuration();
-    if (!$config["mysql"] || $config["mysql"]["database"] !== "alpha_school") {
+    if (!$config["mysql"]) {
         throw new RuntimeException(
-            "Verification requires the configured MySQL database alpha_school.",
+            "Verification requires MySQL settings in .env.",
         );
     }
     if ($config["storageDriver"] !== "local") {
@@ -36,7 +36,7 @@ try {
         if (!$store->health()) {
             throw new RuntimeException("Database health check failed.");
         }
-        echo "PASS: MySQL alpha_school connectivity and application schema.\n";
+        echo "PASS: MySQL " . $config["mysql"]["database"] . " connectivity and application schema.\n";
     }
     if (in_array($check, ["all", "storage"], true)) {
         $files = new Files($config);

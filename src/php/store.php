@@ -1,4 +1,19 @@
 <?php
+/** Local cPanel MySQL may use loopback; remote production MySQL always requires TLS. */
+function mysql_ssl_mode(array $c): string
+{
+    $local = in_array(strtolower($c["mysql"]["host"]), ["localhost", "127.0.0.1"], true);
+    $mode = env_value("MYSQL_SSL_MODE") !== ""
+        ? env_value("MYSQL_SSL_MODE")
+        : (($c["production"] && !$local) ? "verify-full" : "disabled");
+    if (!in_array($mode, ["disabled", "verify-full"], true)) {
+        throw new RuntimeException("MYSQL_SSL_MODE must be disabled or verify-full.");
+    }
+    if ($mode === "disabled" && $c["production"] && !$local) {
+        throw new RuntimeException("Remote production MySQL requires verified TLS. Only loopback MySQL may disable TLS.");
+    }
+    return $mode;
+}
 function mysql_connection(array $c, bool $selectDatabase = true): PDO
 {
     $options = [
@@ -6,19 +21,7 @@ function mysql_connection(array $c, bool $selectDatabase = true): PDO
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
     ];
     $m = $c["mysql"];
-    $mode =
-        env_value("MYSQL_SSL_MODE") ?:
-        ($c["production"]
-            ? "verify-full"
-            : "disabled");
-    if (!in_array($mode, ["disabled", "verify-full"], true)) {
-        throw new RuntimeException(
-            "MYSQL_SSL_MODE must be disabled or verify-full.",
-        );
-    }
-    if ($mode === "disabled" && $c["production"]) {
-        throw new RuntimeException("Production MySQL requires verified TLS.");
-    }
+    $mode = mysql_ssl_mode($c);
     if ($mode === "verify-full") {
         $ca = env_value("MYSQL_TLS_CA_FILE", env_value("MYSQL_SSL_CA_FILE"));
         if (!$ca && env_value("MYSQL_SSL_CA")) {
@@ -60,56 +63,25 @@ class Store
     private bool $running = false;
     public function __construct(array $c)
     {
-        $this->kind = $c["mysql"] ? "mysql" : "sqlite";
-        $options = [
-            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        ];
-        if ($c["mysql"]) {
-            $this->db = mysql_connection($c);
-        } else {
-            $f = $c["dataDir"] . "/adsp.sqlite";
-            $this->db = new PDO("sqlite:" . $f, null, null, $options);
-            chmod($f, 0600);
-            $this->db->exec(
-                "PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000; PRAGMA secure_delete=ON;",
-            );
+        if (!$c["mysql"]) {
+            throw new RuntimeException("MySQL configuration is required.");
         }
-        // PHP requests have independent lifetimes: inspect schema metadata once rather
-        // than issuing dozens of CREATE TABLE statements on every page request.
-        if ($this->kind === "sqlite") {
-            $meta = $this->db
-                ->query(
-                    "SELECT type,name FROM sqlite_master WHERE type IN ('table','trigger')",
-                )
-                ->fetchAll();
-            $tables = [];
-            $triggers = [];
-            foreach ($meta as $row) {
-                if ($row["type"] === "table") {
-                    $tables[] = $row["name"];
-                } else {
-                    $triggers[] = $row["name"];
-                }
-            }
-            $auditReady =
-                in_array("audit_no_update", $triggers, true) &&
-                in_array("audit_no_delete", $triggers, true);
-        } else {
-            $tables = $this->db
-                ->query(
-                    "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE()",
-                )
-                ->fetchAll(PDO::FETCH_COLUMN);
-            $triggers = $this->db
-                ->query(
-                    "SELECT TRIGGER_NAME FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA=DATABASE()",
-                )
-                ->fetchAll(PDO::FETCH_COLUMN);
-            $auditReady =
-                in_array("adsp_audit_no_update", $triggers, true) &&
-                in_array("adsp_audit_no_delete", $triggers, true);
-        }
+        $this->kind = "mysql";
+        $this->db = mysql_connection($c);
+        // Inspect existing schema metadata before issuing setup DDL.
+        $tables = $this->db
+            ->query(
+                "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE()",
+            )
+            ->fetchAll(PDO::FETCH_COLUMN);
+        $triggers = $this->db
+            ->query(
+                "SELECT TRIGGER_NAME FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA=DATABASE()",
+            )
+            ->fetchAll(PDO::FETCH_COLUMN);
+        $auditReady =
+            in_array("adsp_audit_no_update", $triggers, true) &&
+            in_array("adsp_audit_no_delete", $triggers, true);
         if (
             $auditReady &&
             !array_diff(
@@ -121,112 +93,65 @@ class Store
         }
         foreach (COLLECTIONS as $name) {
             $table = "adsp_" . $name;
-            if ($this->kind === "sqlite") {
-                $this->db->exec(
-                    "CREATE TABLE IF NOT EXISTS $table (id TEXT PRIMARY KEY, revision INTEGER NOT NULL, payload TEXT NOT NULL CHECK(json_valid(payload)))",
-                );
-                foreach (
-                    array_merge(
-                        array_map(
-                            fn($x) => [$x, true],
-                            UNIQUE_KEYS[$name] ?? [],
-                        ),
-                        array_map(
-                            fn($x) => [$x, false],
-                            SECONDARY_KEYS[$name] ?? [],
-                        ),
-                    )
-                    as [$fields, $unique]
-                ) {
-                    $idx =
-                        $table .
+            $fields = [];
+            $indexes = [];
+            foreach (
+                array_merge(
+                    array_map(
+                        fn($x) => [$x, true],
+                        UNIQUE_KEYS[$name] ?? [],
+                    ),
+                    array_map(
+                        fn($x) => [$x, false],
+                        SECONDARY_KEYS[$name] ?? [],
+                    ),
+                )
+                as [$group, $unique]
+            ) {
+                foreach ($group as $f) {
+                    $fields[$f] = "idx_" . strtolower($f);
+                }
+                $idx = substr(
+                    $table .
                         "_" .
-                        strtolower(implode("_", $fields)) .
-                        ($unique ? "_uq" : "");
-                    $expr = implode(
+                        strtolower(implode("_", $group)) .
+                        ($unique ? "_uq" : ""),
+                    0,
+                    64,
+                );
+                $indexes[] =
+                    ($unique ? "UNIQUE " : "") .
+                    "KEY `$idx` (" .
+                    implode(
                         ",",
                         array_map(
-                            fn($f) => "json_extract(payload, '$.$f')",
-                            $fields,
+                            fn($f) => "`" . $fields[$f] . "`",
+                            $group,
                         ),
-                    );
-                    $this->db->exec(
-                        "CREATE " .
-                            ($unique ? "UNIQUE " : "") .
-                            "INDEX IF NOT EXISTS $idx ON $table ($expr)",
-                    );
-                }
-            } else {
-                $fields = [];
-                $indexes = [];
-                foreach (
-                    array_merge(
-                        array_map(
-                            fn($x) => [$x, true],
-                            UNIQUE_KEYS[$name] ?? [],
-                        ),
-                        array_map(
-                            fn($x) => [$x, false],
-                            SECONDARY_KEYS[$name] ?? [],
-                        ),
-                    )
-                    as [$group, $unique]
-                ) {
-                    foreach ($group as $f) {
-                        $fields[$f] = "idx_" . strtolower($f);
-                    }
-                    $idx = substr(
-                        $table .
-                            "_" .
-                            strtolower(implode("_", $group)) .
-                            ($unique ? "_uq" : ""),
-                        0,
-                        64,
-                    );
-                    $indexes[] =
-                        ($unique ? "UNIQUE " : "") .
-                        "KEY `$idx` (" .
-                        implode(
-                            ",",
-                            array_map(
-                                fn($f) => "`" . $fields[$f] . "`",
-                                $group,
-                            ),
-                        ) .
-                        ")";
-                }
-                $columns = [];
-                foreach ($fields as $f => $col) {
-                    $columns[] = "`$col` VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin GENERATED ALWAYS AS ((CASE WHEN JSON_EXTRACT(payload, '$.$f') IS NULL OR JSON_TYPE(JSON_EXTRACT(payload, '$.$f')) = 'NULL' THEN NULL ELSE JSON_UNQUOTE(JSON_EXTRACT(payload, '$.$f')) END)) VIRTUAL";
-                }
-                $this->db->exec(
-                    "CREATE TABLE IF NOT EXISTS `$table` (seq BIGINT UNSIGNED NOT NULL AUTO_INCREMENT, id VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL, revision INT UNSIGNED NOT NULL, payload JSON NOT NULL, PRIMARY KEY(id), UNIQUE KEY seq_unique(seq)" .
-                        ($columns ? ", " . implode(", ", $columns) : "") .
-                        ($indexes ? ", " . implode(", ", $indexes) : "") .
-                        ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
-                );
+                    ) .
+                    ")";
             }
+            $columns = [];
+            foreach ($fields as $f => $col) {
+                $columns[] = "`$col` VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin GENERATED ALWAYS AS ((CASE WHEN JSON_EXTRACT(payload, '$.$f') IS NULL OR JSON_TYPE(JSON_EXTRACT(payload, '$.$f')) = 'NULL' THEN NULL ELSE JSON_UNQUOTE(JSON_EXTRACT(payload, '$.$f')) END)) VIRTUAL";
+            }
+            $this->db->exec(
+                "CREATE TABLE IF NOT EXISTS `$table` (seq BIGINT UNSIGNED NOT NULL AUTO_INCREMENT, id VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL, revision INT UNSIGNED NOT NULL, payload JSON NOT NULL, PRIMARY KEY(id), UNIQUE KEY seq_unique(seq)" .
+                    ($columns ? ", " . implode(", ", $columns) : "") .
+                    ($indexes ? ", " . implode(", ", $indexes) : "") .
+                    ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            );
         }
-        if ($this->kind === "sqlite") {
-            foreach (["UPDATE", "DELETE"] as $verb) {
+        foreach (["UPDATE", "DELETE"] as $verb) {
+            $name = "adsp_audit_no_" . strtolower($verb);
+            $q = $this->db->prepare(
+                "SELECT TRIGGER_NAME FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA=DATABASE() AND TRIGGER_NAME=?",
+            );
+            $q->execute([$name]);
+            if (!$q->fetch()) {
                 $this->db->exec(
-                    "CREATE TRIGGER IF NOT EXISTS audit_no_" .
-                        strtolower($verb) .
-                        " BEFORE $verb ON adsp_audit_logs BEGIN SELECT RAISE(ABORT, 'Audit records are append-only'); END;",
+                    "CREATE TRIGGER `$name` BEFORE $verb ON adsp_audit_logs FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Audit records are append-only'",
                 );
-            }
-        } else {
-            foreach (["UPDATE", "DELETE"] as $verb) {
-                $name = "adsp_audit_no_" . strtolower($verb);
-                $q = $this->db->prepare(
-                    "SELECT TRIGGER_NAME FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA=DATABASE() AND TRIGGER_NAME=?",
-                );
-                $q->execute([$name]);
-                if (!$q->fetch()) {
-                    $this->db->exec(
-                        "CREATE TRIGGER `$name` BEFORE $verb ON adsp_audit_logs FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Audit records are append-only'",
-                    );
-                }
             }
         }
     }
@@ -237,33 +162,25 @@ class Store
         }
         $lock = false;
         try {
-            if ($this->kind === "mysql") {
-                $q = $this->db->query(
-                    "SELECT GET_LOCK(SHA2(CONCAT(DATABASE(), ':adsp-transaction'), 256), 10)",
+            $q = $this->db->query(
+                "SELECT GET_LOCK(SHA2(CONCAT(DATABASE(), ':adsp-transaction'), 256), 10)",
+            );
+            if ((int) $q->fetchColumn() !== 1) {
+                throw new HttpError(
+                    409,
+                    "Database is busy. Refresh and try again.",
+                    "VERSION_CONFLICT",
                 );
-                if ((int) $q->fetchColumn() !== 1) {
-                    throw new HttpError(
-                        409,
-                        "Database is busy. Refresh and try again.",
-                        "VERSION_CONFLICT",
-                    );
-                }
-                $lock = true;
-                $this->db->beginTransaction();
-            } else {
-                $this->db->exec("BEGIN IMMEDIATE");
             }
+            $lock = true;
+            $this->db->beginTransaction();
             $this->running = true;
             $r = $fn($this);
-            $this->kind === "mysql"
-                ? $this->db->commit()
-                : $this->db->exec("COMMIT");
+            $this->db->commit();
             return $r;
         } catch (Throwable $e) {
             if ($this->running) {
-                $this->kind === "mysql"
-                    ? $this->db->rollBack()
-                    : $this->db->exec("ROLLBACK");
+                $this->db->rollBack();
             }
             if (
                 $e instanceof PDOException &&
@@ -312,8 +229,7 @@ class Store
         $q = $this->db->prepare(
             "SELECT payload FROM " .
                 $this->table($name) .
-                " WHERE id=?" .
-                ($this->kind === "mysql" ? " FOR UPDATE" : ""),
+                " WHERE id=? FOR UPDATE",
         );
         $q->execute([(string) $id]);
         $r = $q->fetchColumn();
@@ -334,8 +250,7 @@ class Store
                 ->query(
                     "SELECT payload FROM " .
                         $this->table($name) .
-                        " ORDER BY " .
-                        ($this->kind === "mysql" ? "seq" : "rowid"),
+                        " ORDER BY seq",
                 )
                 ->fetchAll(),
         );

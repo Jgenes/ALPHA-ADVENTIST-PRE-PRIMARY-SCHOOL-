@@ -4,9 +4,9 @@ require dirname(__DIR__) . "/src/php/operations.php";
 cli_main(function () {
     $options = getopt("", ["create-database"]);
     $config = configuration();
-    if (!$config["mysql"] || $config["mysql"]["database"] !== "alpha_school") {
+    if (!$config["mysql"]) {
         throw new RuntimeException(
-            "This setup command requires MySQL database alpha_school.",
+            "This setup command requires MySQL settings in .env.",
         );
     }
     if ($config["storageDriver"] !== "local") {
@@ -21,8 +21,10 @@ cli_main(function () {
             );
         }
         $admin = mysql_connection($config, false);
+        // configuration() restricts the schema to letters, digits and underscores.
+        $database = $config["mysql"]["database"];
         $admin->exec(
-            "CREATE DATABASE IF NOT EXISTS `alpha_school` CHARACTER SET utf8mb4 COLLATE utf8mb4_bin",
+            "CREATE DATABASE IF NOT EXISTS `$database` CHARACTER SET utf8mb4 COLLATE utf8mb4_bin",
         );
         unset($admin);
     }
@@ -33,6 +35,6 @@ cli_main(function () {
     if (!$store->health()) {
         throw new RuntimeException("MySQL health check failed.");
     }
-    echo "MySQL alpha_school schema initialized; persistent encrypted disk storage ready.\n";
+    echo "MySQL " . $config["mysql"]["database"] . " schema initialized; encrypted local file storage ready.\n";
     echo "No existing database was renamed, dropped or copied. Run verify-integrations.php to check delivery.\n";
 });
