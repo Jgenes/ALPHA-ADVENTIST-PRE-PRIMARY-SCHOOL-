@@ -1,6 +1,7 @@
 <?php
-// Synthetic tests only: no sockets, provider credentials, live schemas or emails.
+// Synthetic fixtures and a dedicated disposable MySQL schema; no real emails.
 require dirname(__DIR__) . "/src/php/bootstrap.php";
+require __DIR__ . "/database.php";
 require dirname(__DIR__) . "/src/php/jobs.php";
 set_error_handler(function ($severity, $message, $file, $line) {
     throw new ErrorException($message, 0, $severity, $file, $line);
@@ -44,13 +45,9 @@ foreach (
         "HEAD_TEACHER_APPROVED",
         "HEAD_TEACHER_APPROVAL_REFERENCE",
         "PUBLIC_PREVIEW",
-        "SUPABASE_S3_ENDPOINT",
-        "SUPABASE_S3_REGION",
-        "SUPABASE_S3_ACCESS_KEY_ID",
-        "SUPABASE_S3_SECRET_ACCESS_KEY",
-        "SUPABASE_STORAGE_BUCKET",
-        "OFFICE_ALERT_WEBHOOK_URL",
-        "OFFICE_ALERT_WEBHOOK_SECRET",
+        "FORM_RETENTION_DAYS",
+        "ADMISSION_RETENTION_DAYS",
+        "RETENTION_POLICY_APPROVED",
         "SMTP_HOST",
         "SMTP_PORT",
         "SMTP_SECURITY",
@@ -59,8 +56,6 @@ foreach (
         "SMTP_PASSWORD_FILE",
         "SMTP_FROM_EMAIL",
         "SMTP_FROM_NAME",
-        "GMAIL_SMTP_USER",
-        "GMAIL_SMTP_APP_PASSWORD",
         "OFFICE_ALERT_EMAIL",
         "PRIVACY_ALERT_EMAIL",
     ]
@@ -73,6 +68,9 @@ putenv("BASE_URL=https://school.example");
 putenv("DATA_DIR=" . $dir);
 putenv("STORAGE_DRIVER=local");
 putenv("MYSQL_SSL_MODE=disabled");
+putenv("MYSQL_HOST=localhost");
+putenv("MYSQL_USER=synthetic-user");
+putenv("MYSQL_DB_NAME=alpha_school");
 integration_check(
     smtp_configuration() === null,
     "Unconfigured development email sends nothing",
@@ -122,9 +120,6 @@ foreach (
     );
     putenv($key . "=" . $settings[$key]);
 }
-putenv("GMAIL_SMTP_USER=legacy@school.example");
-integration_reject(fn() => smtp_configuration(), "Reject mixed providers");
-putenv("GMAIL_SMTP_USER=");
 $secret = $dir . "/smtp-password";
 file_put_contents($secret, "synthetic-secret-with-spaces \n");
 chmod($secret, 0600);
@@ -151,12 +146,6 @@ integration_check(
     storage_configuration() === "local",
     "Storage provider is explicitly pinned to disk",
 );
-putenv("SUPABASE_S3_ENDPOINT=https://storage.example");
-integration_reject(
-    fn() => storage_configuration(),
-    "Cannot silently switch local storage to S3",
-);
-putenv("SUPABASE_S3_ENDPOINT=");
 putenv("STORAGE_DRIVER=unknown");
 integration_reject(
     fn() => storage_configuration(),
@@ -164,6 +153,7 @@ integration_reject(
 );
 putenv("STORAGE_DRIVER=local");
 $c = configuration();
+integration_check($c["formRetentionDays"] === 90 && $c["admissionRetentionDays"] === 365, "Blank development retention fields use documented defaults");
 $files = new Files($c);
 $files->init();
 integration_check(
@@ -233,12 +223,10 @@ integration_reject(
     "MYSQL_URL and explicit schema must agree",
 );
 putenv("MYSQL_DB_NAME=");
-putenv(
-    "MYSQL_URL=mysql://synthetic-user:synthetic-password@mysql.example.com/old_schema",
-);
-integration_reject(
-    fn() => configuration(),
-    "Production cannot silently select an old database",
+putenv("MYSQL_URL=mysql://synthetic-user:synthetic-password@mysql.example.com/account_alpha_school");
+integration_check(
+    configuration()["mysql"]["database"] === "account_alpha_school",
+    "Production accepts cPanel-prefixed MySQL schemas",
 );
 putenv("MYSQL_URL=");
 putenv("MYSQL_HOST=mysql.example.com;dbname=wrong_schema");
@@ -246,10 +234,31 @@ integration_reject(
     fn() => configuration(),
     "MySQL hostname cannot inject DSN options",
 );
-putenv("APP_ENV=development");
+putenv("MYSQL_HOST=localhost");
+putenv("MYSQL_DB_NAME=account_alpha_school");
+putenv("MYSQL_SSL_MODE=");
+integration_check(mysql_ssl_mode(configuration()) === "disabled", "cPanel local MySQL works without database TLS");
+putenv("MYSQL_HOST=127.0.0.1");
+integration_check(mysql_ssl_mode(configuration()) === "disabled", "Loopback IP MySQL is supported");
+putenv("MYSQL_HOST=db.example.com");
+integration_check(mysql_ssl_mode(configuration()) === "verify-full", "Remote production MySQL defaults to verified TLS");
+putenv("MYSQL_SSL_MODE=disabled");
+integration_reject(fn() => mysql_ssl_mode(configuration()), "Remote production MySQL cannot disable TLS");
+putenv("MYSQL_HOST=localhost");
+putenv("MYSQL_SSL_MODE=invalid");
+integration_reject(fn() => mysql_ssl_mode(configuration()), "Unknown MySQL TLS mode is rejected");
+putenv("MYSQL_SSL_MODE=disabled");
+foreach (["bad-name", "bad;DROP DATABASE alpha_school", "bad`name", str_repeat("a", 64)] as $invalid) {
+    putenv("MYSQL_DB_NAME=" . $invalid);
+    integration_reject(fn() => configuration(), "Invalid database names cannot reach schema setup SQL");
+}
 putenv("MYSQL_HOST=");
-putenv("MYSQL_USER=");
+integration_reject(fn() => configuration(), "Missing MySQL configuration never falls back to another database");
+putenv("APP_ENV=development");
+putenv("MYSQL_HOST=localhost");
+putenv("MYSQL_USER=synthetic-user");
 putenv("MYSQL_PASSWORD=");
+putenv("MYSQL_DB_NAME=alpha_school");
 putenv("MYSQL_SSL_MODE=disabled");
 final class FakeSmtpConnection implements SmtpConnection
 {
@@ -484,9 +493,15 @@ integration_check(
     "UTF-8 MIME headers are bounded and injection-safe",
 );
 
-// Prove persistent outbox transitions without using the network.
-$c = configuration();
-$store = new Store($c);
+// Everything above is configuration, disk or fake SMTP only.
+if (in_array("--configuration-only", $argv, true)) {
+    echo "PASS: $checks offline configuration, file storage and synthetic SMTP checks\n";
+    exit(0);
+}
+// Persistent outbox checks use only an explicitly selected empty test schema.
+$testMysql = test_mysql_settings("TEST_MYSQL_INTEGRATIONS_URL");
+$c = array_replace(configuration(), ["mysql" => $testMysql]);
+$store = test_empty_store($c);
 $p = new Platform($store, $c, new Files($c));
 $p->init();
 $queue = array_replace($alert, [

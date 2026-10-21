@@ -10,10 +10,7 @@ function backup_key(): string
 {
     $v = env_value("MYSQL_BACKUP_ENCRYPTION_KEY");
     if (!$v) {
-        $file = env_value(
-            "MYSQL_BACKUP_ENCRYPTION_KEY_FILE",
-            env_value("MONGO_BACKUP_ENCRYPTION_KEY_FILE"),
-        );
+        $file = env_value("MYSQL_BACKUP_ENCRYPTION_KEY_FILE");
         if (!protected_file($file)) {
             throw new RuntimeException(
                 "Provide a protected backup-key file (permissions 600 or stricter).",
@@ -50,7 +47,7 @@ function seal_backup($snapshot, $key): string
     }
     return "ALPHAMYS" . $iv . $tag . $data;
 }
-function open_backup($file, $key, $allowLegacy = false): array
+function open_backup($file, $key): array
 {
     if (
         !is_file($file) ||
@@ -63,12 +60,9 @@ function open_backup($file, $key, $allowLegacy = false): array
     }
     $data = file_get_contents($file);
     $magic = substr($data, 0, 8);
-    if (
-        !in_array($magic, ["ALPHAMYS", "ALPHAMDB"], true) ||
-        ($magic === "ALPHAMDB" && !$allowLegacy)
-    ) {
+    if ($magic !== "ALPHAMYS") {
         throw new RuntimeException(
-            "Unsupported archive. Legacy MongoDB archives require the approved import command.",
+            "Unsupported archive. Supply a MySQL backup created by scripts/backup-mysql.php.",
         );
     }
     $plain = openssl_decrypt(
@@ -159,16 +153,11 @@ function capture_snapshot(Store $store, Files $files, array $c): array
         return [
             "version" => 3,
             "dialect" => $store->kind,
-            "database" => $c["mysql"]["database"] ?? "sqlite",
+            "database" => $c["mysql"]["database"],
             "exportedAt" => (new JsDate())->toISOString(),
             "collections" => $collections,
             "files" => $stored,
-            "storage" => [
-                "provider" => env_value("SUPABASE_S3_ENDPOINT")
-                    ? "supabase-s3"
-                    : "local",
-                "bucket" => env_value("SUPABASE_STORAGE_BUCKET"),
-            ],
+            "storage" => ["provider" => "local"],
             "publicCopiesRequireReview" => true,
         ];
     });

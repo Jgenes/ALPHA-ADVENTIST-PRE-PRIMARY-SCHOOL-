@@ -43,45 +43,19 @@ function smtp_configuration(): ?array
             $generic = true;
         }
     }
-    $gmail =
-        env_value("GMAIL_SMTP_USER") !== "" ||
-        env_value("GMAIL_SMTP_APP_PASSWORD") !== "";
     $recipients =
         env_value("OFFICE_ALERT_EMAIL") !== "" ||
         env_value("PRIVACY_ALERT_EMAIL") !== "";
-    if (!$generic && !$gmail && !$recipients) {
+    if (!$generic && !$recipients) {
         return null;
     }
-    if ($generic && $gmail) {
-        throw new RuntimeException(
-            "Use SMTP_* settings or the legacy Gmail settings, not both.",
-        );
-    }
-    if ($generic) {
-        $host = env_value("SMTP_HOST");
-        $portText =
-            env_value("SMTP_PORT") !== "" ? env_value("SMTP_PORT") : "587";
-        $security =
-            env_value("SMTP_SECURITY") !== ""
-                ? env_value("SMTP_SECURITY")
-                : "starttls";
-        $user = env_value("SMTP_USERNAME");
-        $password = integration_secret("SMTP_PASSWORD");
-        $from = env_value("SMTP_FROM_EMAIL");
-        $fromName = env_value("SMTP_FROM_NAME") ?: "Alpha School";
-    } else {
-        $host = "smtp.gmail.com";
-        $portText = "465";
-        $security = "tls";
-        $user = env_value("GMAIL_SMTP_USER");
-        $password = preg_replace(
-            "/\s+/",
-            "",
-            env_value("GMAIL_SMTP_APP_PASSWORD"),
-        );
-        $from = $user;
-        $fromName = "Alpha School";
-    }
+    $host = env_value("SMTP_HOST");
+    $portText = env_value("SMTP_PORT") !== "" ? env_value("SMTP_PORT") : "587";
+    $security = env_value("SMTP_SECURITY") !== "" ? env_value("SMTP_SECURITY") : "starttls";
+    $user = env_value("SMTP_USERNAME");
+    $password = integration_secret("SMTP_PASSWORD");
+    $from = env_value("SMTP_FROM_EMAIL");
+    $fromName = env_value("SMTP_FROM_NAME") ?: "Alpha School";
     // Only a hostname/IP, never a URL, credentials, path or SMTP command.
     if (
         !preg_match(
@@ -149,40 +123,9 @@ function smtp_configuration(): ?array
 }
 function storage_configuration(): string
 {
-    $driver =
-        env_value("STORAGE_DRIVER") !== ""
-            ? env_value("STORAGE_DRIVER")
-            : "auto";
-    if (!in_array($driver, ["auto", "local", "supabase"], true)) {
-        throw new RuntimeException(
-            "STORAGE_DRIVER must be local, supabase or auto.",
-        );
+    // Do not silently open an existing installation with a removed storage backend.
+    if (!in_array(env_value("STORAGE_DRIVER"), ["", "local"], true)) {
+        throw new RuntimeException("Only local file storage is supported. Migrate existing files before changing storage settings.");
     }
-    $keys = [
-        "SUPABASE_S3_ENDPOINT",
-        "SUPABASE_S3_REGION",
-        "SUPABASE_S3_ACCESS_KEY_ID",
-        "SUPABASE_S3_SECRET_ACCESS_KEY",
-        "SUPABASE_STORAGE_BUCKET",
-    ];
-    $configured = 0;
-    foreach ($keys as $key) {
-        if (env_value($key) !== "") {
-            $configured++;
-        }
-    }
-    if ($driver === "local" && $configured) {
-        throw new RuntimeException(
-            "Local disk storage is selected; clear the Supabase settings to prevent an accidental provider switch.",
-        );
-    }
-    if (
-        ($driver === "supabase" || $configured) &&
-        $configured !== count($keys)
-    ) {
-        throw new RuntimeException(
-            "Complete all five private Supabase settings.",
-        );
-    }
-    return $driver === "auto" ? ($configured ? "supabase" : "local") : $driver;
+    return "local";
 }

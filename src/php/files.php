@@ -2,75 +2,37 @@
 class Files
 {
     private string $root;
-    private ?array $s3 = null;
     public function __construct(private array $config)
     {
+        storage_configuration();
         $this->root = $config["dataDir"] . "/storage";
-        $driver = $config["storageDriver"] ?? storage_configuration();
-        $names = [
-            "endpoint" => "SUPABASE_S3_ENDPOINT",
-            "region" => "SUPABASE_S3_REGION",
-            "access" => "SUPABASE_S3_ACCESS_KEY_ID",
-            "secret" => "SUPABASE_S3_SECRET_ACCESS_KEY",
-            "bucket" => "SUPABASE_STORAGE_BUCKET",
-        ];
-        $s = [];
-        foreach ($names as $k => $env) {
-            $s[$k] = env_value($env);
-        }
-        if ($driver === "local" && array_filter($s)) {
-            throw new RuntimeException(
-                "Local persistent storage cannot be mixed with S3 settings.",
-            );
-        }
-        if ($driver === "supabase" || array_filter($s)) {
-            if (count(array_filter($s)) !== 5) {
-                throw new RuntimeException(
-                    "Complete all private Supabase S3 settings.",
-                );
-            }
-            if (
-                parse_url($s["endpoint"], PHP_URL_SCHEME) !== "https" ||
-                parse_url($s["endpoint"], PHP_URL_USER) ||
-                parse_url($s["endpoint"], PHP_URL_PASS) ||
-                parse_url($s["endpoint"], PHP_URL_QUERY) ||
-                !preg_match('/^[a-z0-9][a-z0-9.-]+$/', $s["bucket"])
-            ) {
-                throw new RuntimeException("Invalid private S3 configuration.");
-            }
-            $this->s3 = $s;
-        }
     }
     public function init(): void
     {
-        if ($this->s3) {
-            $this->s3Request("HEAD", "");
-        } else {
-            foreach (
-                [$this->root, $this->root . "/private", $this->root . "/public"]
-                as $directory
-            ) {
-                if (is_link($directory)) {
-                    throw new RuntimeException(
-                        "Storage directories must not be symbolic links.",
-                    );
-                }
-                if (!is_dir($directory) && !mkdir($directory, 0700, true)) {
-                    throw new RuntimeException(
-                        "Cannot create persistent storage.",
-                    );
-                }
-                if (!is_writable($directory) || !chmod($directory, 0700)) {
-                    throw new RuntimeException(
-                        "Persistent storage must be private and writable by the application account.",
-                    );
-                }
+        foreach (
+            [$this->root, $this->root . "/private", $this->root . "/public"]
+            as $directory
+        ) {
+            if (is_link($directory)) {
+                throw new RuntimeException(
+                    "Storage directories must not be symbolic links.",
+                );
+            }
+            if (!is_dir($directory) && !mkdir($directory, 0700, true)) {
+                throw new RuntimeException(
+                    "Cannot create persistent storage.",
+                );
+            }
+            if (!is_writable($directory) || !chmod($directory, 0700)) {
+                throw new RuntimeException(
+                    "Persistent storage must be private and writable by the application account.",
+                );
             }
         }
     }
     public function provider(): string
     {
-        return $this->s3 ? "supabase-s3" : "local";
+        return "local";
     }
     private function keyPath($area, $key): string
     {
@@ -82,94 +44,19 @@ class Files
         }
         return $this->root . "/" . $area . "/" . $key;
     }
-    private function s3Request($method, $key, $bytes = ""): string
-    {
-        $s = $this->s3;
-        $u =
-            rtrim($s["endpoint"], "/") .
-            "/" .
-            $s["bucket"] .
-            ($key !== "" ? "/" . $key : "");
-        $p = parse_url($u);
-        $host = $p["host"] . (isset($p["port"]) ? ":" . $p["port"] : "");
-        $date = gmdate("Ymd\THis\Z");
-        $day = substr($date, 0, 8);
-        $hash = hash("sha256", $bytes);
-        $headers = "host:$host\nx-amz-content-sha256:$hash\nx-amz-date:$date\n";
-        $signed = "host;x-amz-content-sha256;x-amz-date";
-        $canonical =
-            $method .
-            "\n" .
-            $p["path"] .
-            "\n\n" .
-            $headers .
-            "\n" .
-            $signed .
-            "\n" .
-            $hash;
-        $scope = $day . "/" . $s["region"] . "/s3/aws4_request";
-        $toSign =
-            "AWS4-HMAC-SHA256\n$date\n$scope\n" . hash("sha256", $canonical);
-        $k = hash_hmac("sha256", $day, "AWS4" . $s["secret"], true);
-        foreach ([$s["region"], "s3", "aws4_request"] as $part) {
-            $k = hash_hmac("sha256", $part, $k, true);
-        }
-        $signature = hash_hmac("sha256", $toSign, $k);
-        $ch = curl_init($u);
-        curl_setopt_array($ch, [
-            CURLOPT_CUSTOMREQUEST => $method,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => 20,
-            CURLOPT_FOLLOWLOCATION => false,
-            CURLOPT_HTTPHEADER => [
-                "Host: " . $host,
-                "x-amz-content-sha256: " . $hash,
-                "x-amz-date: " . $date,
-                "Authorization: AWS4-HMAC-SHA256 Credential=" .
-                $s["access"] .
-                "/" .
-                $scope .
-                ", SignedHeaders=" .
-                $signed .
-                ", Signature=" .
-                $signature,
-            ],
-        ]);
-        if ($method === "HEAD") {
-            curl_setopt($ch, CURLOPT_NOBODY, true);
-        }
-        if ($method === "PUT") {
-            curl_setopt($ch, CURLOPT_POSTFIELDS, $bytes);
-        }
-        $r = curl_exec($ch);
-        $code = curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
-        curl_close($ch);
-        if ($r === false || $code < 200 || $code >= 300) {
-            throw new RuntimeException(
-                "Private object storage request failed (" . $code . ").",
-            );
-        }
-        return $r;
-    }
     public function readStored($area, $key): string
     {
         $p = $this->keyPath($area, $key);
-        if (!$this->s3 && (!is_file($p) || is_link($p))) {
+        if (!is_file($p) || is_link($p)) {
             throw new RuntimeException(
                 "Protected storage must be a regular file.",
             );
         }
-        return $this->s3
-            ? $this->s3Request("GET", $area . "/" . $key)
-            : file_get_contents($p);
+        return file_get_contents($p);
     }
     public function writeStored($area, $key, $bytes): void
     {
         $p = $this->keyPath($area, $key);
-        if ($this->s3) {
-            $this->s3Request("PUT", $area . "/" . $key, $bytes);
-            return;
-        }
         $fh = @fopen($p, "x");
         if (!$fh) {
             throw new RuntimeException("Cannot write private file.");
@@ -184,9 +71,7 @@ class Files
     public function removeStored($area, $key): void
     {
         $p = $this->keyPath($area, $key);
-        if ($this->s3) {
-            $this->s3Request("DELETE", $area . "/" . $key);
-        } elseif (is_file($p)) {
+        if (is_file($p)) {
             unlink($p);
         }
     }

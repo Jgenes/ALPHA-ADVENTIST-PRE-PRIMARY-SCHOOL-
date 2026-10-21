@@ -16,25 +16,17 @@ foreach (["src", "scripts", "test", "public"] as $dir) {
         }
     }
 }
-$required = ["PDO", "openssl", "mbstring", "curl", "gd"];
+$required = ["PDO", "openssl", "mbstring", "gd"];
 foreach ($required as $ext) {
     if (!extension_loaded($ext)) {
         throw new RuntimeException("Required extension missing: " . $ext);
     }
 }
-if (
-    !in_array("sqlite", PDO::getAvailableDrivers(), true) &&
-    !in_array("mysql", PDO::getAvailableDrivers(), true)
-) {
-    throw new RuntimeException(
-        "Install pdo_sqlite (development) or pdo_mysql (production).",
-    );
+if (!in_array("mysql", PDO::getAvailableDrivers(), true)) {
+    throw new RuntimeException("Install the pdo_mysql PHP extension.");
 }
 if (!extension_loaded("sodium")) {
-    fwrite(
-        STDERR,
-        "Note: sodium is required to preserve legacy Node scrypt passwords; install it for deployment.\n",
-    );
+    throw new RuntimeException("Install the sodium PHP extension for existing password compatibility.");
 }
 foreach (
     [

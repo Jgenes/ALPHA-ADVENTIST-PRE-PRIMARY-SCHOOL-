@@ -1,5 +1,11 @@
 <?php
 require dirname(__DIR__) . "/src/php/bootstrap.php";
+require __DIR__ . "/database.php";
+$testMysql = test_mysql_settings("TEST_MYSQL_URL");
+$restoreMysql = test_mysql_settings("TEST_MYSQL_RESTORE_URL");
+if ($testMysql["host"] === $restoreMysql["host"] && $testMysql["port"] === $restoreMysql["port"] && $testMysql["database"] === $restoreMysql["database"]) {
+    throw new RuntimeException("Recovery tests require a separate empty schema.");
+}
 set_error_handler(function ($severity, $message, $file, $line) {
     throw new ErrorException($message, 0, $severity, $file, $line);
 });
@@ -26,7 +32,7 @@ mkdir($dir, 0700, true);
 putenv("APP_ENV=development");
 putenv("DATA_DIR=" . $dir);
 putenv("BASE_URL=http://localhost:3000");
-putenv("MYSQL_URL=" . env_value("TEST_MYSQL_URL"));
+putenv("MYSQL_URL=" . getenv("TEST_MYSQL_URL"));
 putenv("MYSQL_HOST=");
 putenv("MYSQL_DB_NAME=");
 putenv("MYSQL_SSL_MODE=disabled");
@@ -44,13 +50,6 @@ foreach (
         "HEAD_TEACHER_NAME",
         "HEAD_TEACHER_APPROVED",
         "HEAD_TEACHER_APPROVAL_REFERENCE",
-        "SUPABASE_S3_ENDPOINT",
-        "SUPABASE_S3_REGION",
-        "SUPABASE_S3_ACCESS_KEY_ID",
-        "SUPABASE_S3_SECRET_ACCESS_KEY",
-        "SUPABASE_STORAGE_BUCKET",
-        "OFFICE_ALERT_WEBHOOK_URL",
-        "OFFICE_ALERT_WEBHOOK_SECRET",
         "STORAGE_DRIVER",
         "SMTP_HOST",
         "SMTP_PORT",
@@ -60,8 +59,6 @@ foreach (
         "SMTP_PASSWORD_FILE",
         "SMTP_FROM_EMAIL",
         "SMTP_FROM_NAME",
-        "GMAIL_SMTP_USER",
-        "GMAIL_SMTP_APP_PASSWORD",
         "OFFICE_ALERT_EMAIL",
         "PRIVACY_ALERT_EMAIL",
     ]
@@ -75,16 +72,7 @@ if ($c["mysql"] && !str_ends_with($c["mysql"]["database"], "_test")) {
         "Tests require a disposable schema ending in _test.",
     );
 }
-$store = new Store($c);
-if ($c["mysql"]) {
-    foreach (COLLECTIONS as $name) {
-        if ($store->list($name)) {
-            throw new RuntimeException(
-                "Tests require an empty disposable schema.",
-            );
-        }
-    }
-}
+$store = test_empty_store($c);
 $files = new Files($c);
 $p = new Platform($store, $c, $files);
 $p->init();
@@ -716,8 +704,8 @@ try {
 check($wrongKeyRejected, "Wrong backup key rejected");
 $restoreDir = $dir . "/isolated-restore";
 mkdir($restoreDir, 0700, true);
-$restoreConfig = array_replace($c, ["dataDir" => $restoreDir, "mysql" => null]);
-$restoreStore = new Store($restoreConfig);
+$restoreConfig = array_replace($c, ["dataDir" => $restoreDir, "mysql" => $restoreMysql]);
+$restoreStore = test_empty_store($restoreConfig);
 $restoreFiles = new Files($restoreConfig);
 $restoreFiles->init();
 $counts = restore_snapshot($restoreStore, $restoreFiles, $opened);
@@ -745,28 +733,4 @@ check(
     "No public copies resurrected",
 );
 
-require dirname(__DIR__) . "/src/php/legacy-migration.php";
-$legacy = legacy_legacyRecords(
-    [
-        "collections" => [
-            [
-                "name" => "news",
-                "documents" => [
-                    [
-                        "title" => "Synthetic legacy news",
-                        "content" => ["Imported synthetic text"],
-                        "sortDate" => "2026-01-01",
-                    ],
-                ],
-            ],
-        ],
-        "exportedAt" => "2026-01-01",
-        "database" => "retired",
-    ],
-    $c,
-);
-check(
-    $legacy["content"][0]["status"] === "DRAFT",
-    "Legacy content quarantined for independent review",
-);
 echo "PASS: $checks checks (" . $store->kind . ")\n";

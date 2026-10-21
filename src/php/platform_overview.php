@@ -824,7 +824,7 @@ trait a_platform_overview_Methods
                 );
                 $output["database"] = g(g($this, "store"), "kind");
                 $output["officeAlertsConfigured"] =
-                    (bool) ($this->config["alertUrl"] || $this->config["smtp"]);
+                    (bool) $this->config["smtp"];
             }
             return $output;
         });
@@ -1327,8 +1327,7 @@ trait a_platform_overview_Methods
                     ),
                     "database" => g(g($this, "store"), "kind"),
                     "externalAlertsConfigured" =>
-                        (bool) ($this->config["alertUrl"] ||
-                            $this->config["smtp"]),
+                        (bool) $this->config["smtp"],
                     "safeguardingContactConfigured" => $safeguardingContactConfigured,
                 ];
             }
@@ -1355,13 +1354,9 @@ trait a_platform_overview_Methods
                 "environment" => g(g($this, "config"), "environment"),
                 "databaseName" => $this->config["mysql"]["database"] ?? "",
                 "storage" => $this->files->provider(),
-                "emailTransport" => $this->config["alertUrl"]
-                    ? "webhook"
-                    : ($this->config["smtp"]
-                        ? "smtp"
-                        : "unconfigured"),
+                "emailTransport" => $this->config["smtp"] ? "smtp" : "unconfigured",
                 "officeAlertsConfigured" =>
-                    (bool) ($this->config["alertUrl"] || $this->config["smtp"]),
+                    (bool) $this->config["smtp"],
                 "outbox" => jm(jm($tx, "list", "outbox"), "map", function (
                     $arg0,
                 ) {

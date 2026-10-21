@@ -1,7 +1,7 @@
--- Run once with an approved database-owner account, using your provider's SQL console.
--- This creates the named schema only: it never drops or moves an existing database.
--- Use a dedicated application account with access to alpha_school, not a shared root account.
+-- Optional, for a local MySQL owner account (for example in phpMyAdmin).
+-- On cPanel use MySQL Database Wizard instead, and put the FULL prefixed name
+-- in MYSQL_DB_NAME in .env. Do not run this against an existing school's data.
 CREATE DATABASE IF NOT EXISTS `alpha_school`
   CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
--- Application tables/indexes/audit triggers are initialized by:
+-- Application tables, indexes and audit triggers are initialized by:
 -- php scripts/init-production.php
