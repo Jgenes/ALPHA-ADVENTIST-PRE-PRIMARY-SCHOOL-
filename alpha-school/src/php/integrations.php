@@ -12,6 +12,7 @@ function integration_secret(
         );
     }
     if ($file) {
+        clearstatcache(true, $file);
         if (
             !is_file($file) ||
             is_link($file) ||

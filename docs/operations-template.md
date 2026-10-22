@@ -13,7 +13,7 @@ This is a template, not a legal opinion, security certification, completed recov
 
 ## Hosting and configuration
 
-Follow [cPanel installation](cpanel.md). Use PHP 8.2+, MySQL 8, Apache HTTPS, private local disk and standard SMTP. Serve only `public/`. Keep `.env`, application source, backups, private records and keys outside the document root. Disable public error display; never use permissions `777`.
+Follow [cPanel installation](cpanel.md). Use PHP 8.2+, MySQL 8, Apache HTTPS, private local disk and standard SMTP. Serve only `public_html/`. Keep `config.php`, application source, backups, private records and keys outside the document root. Disable public error display; never use permissions `777`.
 
 Production requires an HTTPS `BASE_URL`, writable private `DATA_DIR`, dedicated MySQL database, approved retention settings and complete SMTP configuration. Use the full cPanel database name. Same-host loopback MySQL can use a local connection; remote production MySQL requires verified TLS. Use the actual hosting PHP path in both CLI commands and cron.
 
@@ -29,7 +29,7 @@ Keep storage/audit/backup keys independent. Back them up separately, never rotat
 
 ## Scheduled work and monitoring
 
-Run `php scripts/maintenance.php` every minute through the hosting account's cron. Monitor job recency, PHP errors, failed/pending outbox work, HTTPS availability, TLS expiry, disk space, database capacity and backup age. Keep operational logs private and exclude personal form contents/passwords/tokens.
+Run `php alpha-school/scripts/maintenance.php` every minute through the hosting account's cron. Monitor job recency, PHP errors, failed/pending outbox work, HTTPS availability, TLS expiry, disk space, database capacity and backup age. Keep operational logs private and exclude personal form contents/passwords/tokens.
 
 `/healthz` and `/readyz` check database availability. They do not certify mail delivery, storage durability, recovery readiness or institutional compliance. Verify both approved email inboxes, not just an SMTP success response. Privacy/safeguarding email contains a reference/link and goes to the restricted mailbox, never a general staff group.
 

@@ -1,5 +1,5 @@
 <?php
-/** Tests never use the site's .env database and never delete existing records. */
+/** Tests never use the site's configured database and never delete existing records. */
 function test_mysql_settings(string $name): array
 {
     $url = getenv($name) ?: "";

@@ -136,17 +136,45 @@ function env_value($key, $default = "")
     $v = getenv($key);
     return $v === false ? $default : $v;
 }
+function application_root(): string
+{
+    return dirname(__DIR__, 2);
+}
+function public_root(): string
+{
+    return dirname(application_root()) . "/public_html";
+}
+/** Preserve literal PHP strings, including spaces/quotes in passwords. */
+function apply_private_settings(array $values): void
+{
+    foreach ($values as $key => $value) {
+        if (!is_string($key) || !preg_match('/^[A-Z][A-Z0-9_]*$/D', $key) || !is_scalar($value)) {
+            throw new RuntimeException("Invalid setting in private config.php.");
+        }
+        if (getenv($key) === false) {
+            putenv($key . "=" . (is_bool($value) ? ($value ? "true" : "false") : (string) $value));
+        }
+    }
+}
+/** Environment overrides are for operators/tests; cPanel uses just config.php. */
 function load_environment(): void
 {
-    $f = dirname(__DIR__, 2) . "/.env";
+    $file = application_root() . "/config.php";
+    if (is_file($file)) {
+        $values = require $file;
+        if (!is_array($values)) {
+            throw new RuntimeException("Private config.php must return a settings array.");
+        }
+        apply_private_settings($values);
+        return;
+    }
+    // Backward-compatible upgrade path. New installations need only config.php.
+    $f = application_root() . "/.env";
     if (!is_file($f)) {
         return;
     }
     foreach (file($f, FILE_IGNORE_NEW_LINES) as $line) {
-        if (
-            preg_match('/^([A-Z][A-Z0-9_]*)\s*=\s*(.*)$/', $line, $m) &&
-            getenv($m[1]) === false
-        ) {
+        if (preg_match('/^([A-Z][A-Z0-9_]*)\s*=\s*(.*)$/', $line, $m) && getenv($m[1]) === false) {
             putenv($m[1] . "=" . trim(trim($m[2]), "\"'"));
         }
     }
@@ -186,7 +214,10 @@ function configuration(): array
         throw new RuntimeException("Cannot create DATA_DIR.");
     }
     $dir = realpath($dir);
-    $public = realpath(dirname(__DIR__, 2) . "/public");
+    $public = realpath(public_root());
+    if ($public === false) {
+        throw new RuntimeException("The public_html folder is missing beside alpha-school.");
+    }
     if ($dir === $public || str_starts_with($dir, $public . "/")) {
         throw new RuntimeException("DATA_DIR must be outside the web root.");
     }
@@ -299,7 +330,7 @@ function configuration(): array
     }
     if (!$mysql) {
         throw new RuntimeException(
-            "Configure MYSQL_HOST, MYSQL_USER and MYSQL_DB_NAME in .env. This application requires MySQL.",
+            "Configure MYSQL_HOST, MYSQL_USER and MYSQL_DB_NAME in alpha-school/config.php. This application requires MySQL.",
         );
     }
     if (

@@ -19,7 +19,7 @@ No client bearer token is saved in local/session storage. The opaque session coo
 
 ## Endpoint groups
 
-The exact dispatcher is `src/php/platform_router.php`; there are no wildcard model endpoints.
+The exact dispatcher is `alpha-school/src/php/platform_router.php`; there are no wildcard model endpoints.
 
 | Group | Main routes |
 | --- | --- |
@@ -57,7 +57,7 @@ Department-scoped reads require a matching recorded department. Contract reviewe
 
 ## Storage and audit
 
-`src/php/store.php` uses PHP PDO transactions with dedicated MySQL 8 InnoDB JSON tables. Configuration is in `src/php/support.php`; cPanel-prefixed schema names are supported. Same-host loopback database connections may disable TLS, but remote production connections require verified TLS. MySQL advisory locks serialize collection-wide validation and audit extension. The `adsp_` tables use `id`/`revision`/`payload` records with database-enforced uniqueness and revision checks. This is sized for a small school: many reports read/filter whole tables in memory. Larger deployments need pagination/query optimisation. Private files are encrypted on the hosting account's local disk; run one application installation with coordinated database/file backups.
+`alpha-school/src/php/store.php` uses PHP PDO transactions with dedicated MySQL 8 InnoDB JSON tables. Configuration is in `alpha-school/src/php/support.php`; cPanel-prefixed schema names are supported. Same-host loopback database connections may disable TLS, but remote production connections require verified TLS. MySQL advisory locks serialize collection-wide validation and audit extension. The `adsp_` tables use `id`/`revision`/`payload` records with database-enforced uniqueness and revision checks. This is sized for a small school: many reports read/filter whole tables in memory. Larger deployments need pagination/query optimisation. Private files are encrypted on the hosting account's local disk; run one application installation with coordinated database/file backups.
 
 Files and database commits are separate physical systems. Failed uploads are discarded; published-file routes always recheck committed authority/state. Operations must monitor missing/orphaned files and reconcile storage after failures/restoration. Do not claim database transactions make the filesystem transactional.
 
@@ -65,4 +65,4 @@ HMAC audit chaining and its sequence/head are updated in the business transactio
 
 ## Test boundaries
 
-`test/run.php`, `scripts/ui-smoke.js` and `scripts/auth-ui-smoke.js` are executable acceptance evidence using generated credentials/synthetic data. No production identity or child record is bundled. See `delivery-status.md` for exactly what was run and what remains unverified. A CI definition is included, but no GitHub workflow run has been claimed.
+`alpha-school/test/run.php`, `scripts/ui-smoke.js` and `scripts/auth-ui-smoke.js` are executable acceptance evidence using generated credentials/synthetic data. No production identity or child record is bundled. See `delivery-status.md` for exactly what was run and what remains unverified. A CI definition is included, but no GitHub workflow run has been claimed.

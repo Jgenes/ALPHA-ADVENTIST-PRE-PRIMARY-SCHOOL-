@@ -243,7 +243,7 @@ function public_context(Platform $p, NativeUrl $url, $nonce): array
 }
 function serve_asset($route): bool
 {
-    $root = realpath(dirname(__DIR__, 2) . "/public");
+    $root = realpath(public_root());
     $decoded = rawurldecode($route);
     if (
         str_contains($decoded, "..") ||
@@ -377,13 +377,13 @@ function handle_request(): void
             header("Cache-Control: no-cache");
             header("Service-Worker-Allowed: /");
             if ($verb !== "HEAD") {
-                readfile(dirname(__DIR__, 2) . "/public/service-worker.js");
+                readfile(public_root() . "/service-worker.js");
             }
             return;
         }
         if ($route === "/offline") {
             response_html(
-                file_get_contents(dirname(__DIR__, 2) . "/public/offline.html"),
+                file_get_contents(public_root() . "/offline.html"),
             );
             return;
         }

@@ -6,7 +6,7 @@ cli_main(function () {
     $config = configuration();
     if (!$config["mysql"]) {
         throw new RuntimeException(
-            "This setup command requires MySQL settings in .env.",
+            "This setup command requires MySQL settings in alpha-school/config.php.",
         );
     }
     if ($config["storageDriver"] !== "local") {

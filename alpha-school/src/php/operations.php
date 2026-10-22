@@ -1,6 +1,9 @@
 <?php
 function protected_file($file): bool
 {
+    if (is_string($file) && $file !== "") {
+        clearstatcache(true, $file);
+    }
     return is_string($file) &&
         is_file($file) &&
         !is_link($file) &&
