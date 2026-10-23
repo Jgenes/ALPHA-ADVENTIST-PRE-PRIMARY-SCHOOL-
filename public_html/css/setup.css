@@ -1,1 +1,20 @@
 :root{font-family:system-ui,sans-serif;color:#18332b;background:#f3f6f4;line-height:1.6}body{margin:0;padding:24px}main{max-width:680px;margin:32px auto;padding:32px;background:#fff;border:1px solid #d5e1d9;border-radius:12px}h1{line-height:1.2}label{display:block;margin:16px 0;font-weight:600}input{display:block;box-sizing:border-box;width:100%;padding:12px;margin-top:6px;border:1px solid #80998b;border-radius:5px;font:inherit}button{background:#145d43;color:white;border:0;padding:14px 20px;border-radius:6px;font:inherit;font-weight:600;cursor:pointer}fieldset{margin:24px 0;border:1px solid #ccd9d0;border-radius:6px;padding:16px}legend{font-weight:700}.check{font-weight:400}.check input{display:inline-block;width:auto;margin-right:8px}.error{padding:12px;background:#fff0ee;border-left:4px solid #a52818;color:#721d12}code{overflow-wrap:anywhere}a{color:#145d43}input:focus,button:focus,a:focus{outline:3px solid #d7a22a;outline-offset:3px}@media(max-width:500px){body{padding:12px}main{margin:8px auto;padding:18px}}
+
+/* Owner-only deployment diagnostics (diagnose.php). Reuses the setup palette. */
+.diag{margin:24px 0;border:0}
+.diag__row{display:block;margin:0 0 10px;padding:12px 14px;border:1px solid #d5e1d9;border-left-width:4px;border-radius:6px;background:#fbfdfb}
+.diag__row dt{font-weight:700;margin:0}
+.diag__row dd{margin:6px 0 0;overflow-wrap:anywhere;white-space:normal}
+.diag__badge{display:inline-block;min-width:52px;margin-right:8px;padding:1px 6px;border-radius:4px;font-size:.75rem;font-weight:700;letter-spacing:.04em;text-align:center;color:#fff;background:#5c7266}
+.diag__badge--fail{background:#a52818}
+.diag__badge--warn{background:#a8710f}
+.diag__badge--ok{background:#145d43}
+.diag__badge--info{background:#4a6076}
+.diag--fail{border-left-color:#a52818;background:#fff6f5}
+.diag--warn{border-left-color:#d7a22a;background:#fffbf0}
+.diag--ok{border-left-color:#145d43}
+.diag--info{border-left-color:#4a6076}
+.diag__fix{margin:8px 0 0;padding-top:8px;border-top:1px dashed #ccd9d0}
+.diag__summary{font-size:1.05rem}
+.diag__good{padding:12px;background:#eef7f1;border-left:4px solid #145d43}
+h2{margin-top:32px}

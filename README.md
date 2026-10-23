@@ -11,6 +11,7 @@ A normal **PHP, HTML, CSS, plain JavaScript and MySQL** school website and staff
 ├── public_html/                 Website files only
 │   ├── index.php                Already wired to the private application
 │   ├── setup.php                Protected one-time browser installer
+│   ├── diagnose.php             Protected read-only deployment diagnostics
 │   ├── .htaccess
 │   ├── css/, js/, img/, fonts/
 │   ├── offline.html
@@ -29,6 +30,8 @@ A normal **PHP, HTML, CSS, plain JavaScript and MySQL** school website and staff
 5. Delete `public_html/setup.php`, clear `SETUP_TOKEN` in the private configuration, and add the maintenance cron job from the guide. Test sign-in, forms, email and backups before using live school records.
 
 **Full click-by-click instructions: [cPanel installation](docs/cpanel.md).**
+
+If a page instead shows **"The service is temporarily unavailable"**, that generic page never names the cause. Set a random `DIAGNOSTIC_TOKEN` in `alpha-school/config.php` and open **`https://yourdomain.com/diagnose.php`**: the read-only diagnostics report lists the exact failing requirement and its fix, without printing any secret. Delete `diagnose.php` and clear the token once the site is healthy. See [troubleshooting](docs/cpanel.md#if-the-website-says-the-service-is-temporarily-unavailable).
 
 The installer uses HTTPS, a private random token, CSRF checks, same-origin checks, a disk-backed attempt limit and private sessions. It refuses existing accounts, creates both accounts in one serialized transaction, and writes a completion lock. It cannot reset passwords or overwrite existing users. Initial users must change passwords at first sign-in; technical administrators do not automatically receive access to children's records.
 
