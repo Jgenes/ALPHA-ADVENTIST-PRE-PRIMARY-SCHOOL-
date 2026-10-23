@@ -49,4 +49,11 @@ return [
     // Visit https://yourdomain/setup.php and enter it there. Clear it after
     // installation and delete public_html/setup.php. Blank disables setup.
     'SETUP_TOKEN' => '',
+
+    // Optional owner-only troubleshooting page for a "temporarily unavailable"
+    // website. Set a DIFFERENT unique random token of at least 32 characters,
+    // then open https://yourdomain/diagnose.php. It is read-only: it never
+    // changes a record and never sends email. Delete public_html/diagnose.php
+    // and clear this token once the website is healthy. Blank disables it.
+    'DIAGNOSTIC_TOKEN' => '',
 ];

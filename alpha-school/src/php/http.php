@@ -594,8 +594,23 @@ function handle_request(): void
                     " at " .
                     basename($e->getFile()) .
                     ":" .
-                    $e->getLine(),
+                    $e->getLine() .
+                    " — " .
+                    diagnostic_mask($e->getMessage()),
             );
+            // Private, masked trail so the owner can see why a page failed
+            // without exposing infrastructure details to visitors.
+            try {
+                diagnostic_record_failure(
+                    // A configuration failure happens before the URL is parsed.
+                    $url
+                        ? $url->pathname
+                        : (parse_url($_SERVER["REQUEST_URI"] ?? "/", PHP_URL_PATH) ?: "/"),
+                    $status,
+                    $e,
+                );
+            } catch (Throwable) {
+            }
         }
         if ($url && str_starts_with($url->pathname, "/api/")) {
             response_json(
@@ -610,10 +625,28 @@ function handle_request(): void
                 $status,
             );
         } else {
+            // Point the account owner at the protected diagnostics page; the
+            // link only appears when they have configured a token for it.
+            $ownerLink = "";
+            if ($status >= 500) {
+                try {
+                    load_environment();
+                    if (
+                        diagnostics_enabled() &&
+                        is_file(public_root() . "/diagnose.php")
+                    ) {
+                        $ownerLink =
+                            ' · <a href="/diagnose.php">Run protected diagnostics</a>';
+                    }
+                } catch (Throwable) {
+                }
+            }
             response_html(
                 '<!doctype html><html lang="en"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Alpha School</title><body style="font-family:system-ui;padding:40px;max-width:700px;margin:auto"><h1>Please try again</h1><p>' .
                     esc($message) .
-                    '</p><a href="/">Return to school home</a></body></html>',
+                    '</p><a href="/">Return to school home</a>' .
+                    $ownerLink .
+                    "</body></html>",
                 $status,
             );
         }

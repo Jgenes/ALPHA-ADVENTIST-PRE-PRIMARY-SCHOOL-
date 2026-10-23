@@ -3,7 +3,7 @@
 // stored offline. This allowlist is deliberately not a wildcard runtime cache.
 const CACHE = 'alpha-public-static-v3';
 const ASSETS = ['/offline', '/img/logo-96.png', '/img/icon-192.png', '/img/icon-512.png', '/fonts/fonts.css', '/fonts/Inter-400-normal.woff2', '/fonts/Inter-600-normal.woff2'];
-const PRIVATE = /^\/(setup\.php(?:[/?]|$)|api(?:\/|$)|portal(?:\/|$)|admin(?:\/|$)|media(?:\/|$)|downloads\/)/;
+const PRIVATE = /^\/(setup\.php(?:[/?]|$)|diagnose\.php(?:[/?]|$)|api(?:\/|$)|portal(?:\/|$)|admin(?:\/|$)|media(?:\/|$)|downloads\/)/;
 self.addEventListener('install', event => { event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', event => { event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => key.startsWith('alpha-') && key !== CACHE).map(key => caches.delete(key)))).then(() => self.clients.claim())); });
 self.addEventListener('fetch', event => {

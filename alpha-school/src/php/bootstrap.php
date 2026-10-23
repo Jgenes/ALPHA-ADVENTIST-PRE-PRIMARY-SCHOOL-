@@ -2,6 +2,7 @@
 require_once __DIR__ . "/runtime.php";
 require_once __DIR__ . "/support.php";
 require_once __DIR__ . "/integrations.php";
+require_once __DIR__ . "/diagnostics.php";
 define(
     "SEED",
     json_decode(
