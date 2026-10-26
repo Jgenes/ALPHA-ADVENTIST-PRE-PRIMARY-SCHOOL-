@@ -21,11 +21,19 @@ body{overflow-wrap:anywhere}
 .hero__media .media-pending img{object-position:80% 50%;opacity:.3;padding:80px 12%;max-height:none}
 .life-card .media-pending img,.news-feat__media .media-pending img{background:var(--navy-100)}
 .footer__social-note:empty{display:none}.footer__links{display:flex;flex-wrap:wrap;gap:8px}
-.topbar__end{display:flex;align-items:center;gap:14px}
-.topbar__social{display:flex;align-items:center;gap:6px}
-.topbar__social a{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:50%;border:1px solid rgba(234,178,57,.38);background:rgba(255,255,255,.06);color:#e3eaf8;text-decoration:none;transition:color .18s,background .18s,border-color .18s}
+.topbar .topbar__in{max-width:1760px;flex-wrap:nowrap;gap:14px}
+.topbar .topbar__list{flex-wrap:nowrap;gap:16px;min-width:0;overflow:hidden}
+.topbar .topbar__list li{white-space:nowrap;flex:none}
+.topbar .topbar__list li:first-child{flex:0 1 auto;min-width:0;overflow:hidden}
+.topbar .topbar__list li:first-child span{overflow:hidden;text-overflow:ellipsis}
+.topbar__end{display:flex;align-items:center;gap:12px;flex:none;white-space:nowrap}
+.topbar__social{display:flex;align-items:center;gap:5px;flex:none}
+.topbar__social li{display:flex}
+.topbar__social a{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;border:1px solid rgba(234,178,57,.38);background:rgba(255,255,255,.06);color:#e3eaf8;text-decoration:none;transition:color .18s,background .18s,border-color .18s}
 .topbar__social a:hover{color:#fff;border-color:var(--gold);background:rgba(234,178,57,.2)}
-.topbar__social .icon{width:.95rem;height:.95rem;color:var(--gold)}
+.topbar__social .icon{width:.9rem;height:.9rem;color:var(--gold)}
+@media (max-width:1260px){.topbar .topbar__motto{display:none}}
+@media (max-width:640px){.topbar .topbar__in{justify-content:space-between}}
 .social-links{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:18px}
 .social-links--center{justify-content:center}
 .social-links__label{font-size:.84rem;font-weight:700;color:var(--muted);margin-right:2px}
