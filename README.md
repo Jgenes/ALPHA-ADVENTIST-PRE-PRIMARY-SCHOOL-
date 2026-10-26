@@ -1,111 +1,104 @@
-# Alpha Adventist Pre & Primary School
+# Alpha Adventist Digital School Platform
 
-A normal **PHP, HTML, CSS, plain JavaScript and MySQL** school website and staff/family portal. No Docker, Node.js, npm, Composer or asset build is required.
+A governed public website and staff workspace for **Alpha Adventist Pre & Primary School, Kigoma**. This implementation follows the September 2026 blueprint’s order: secure the existing site, establish editorial governance, then add staff/HR workflows and an admissions review desk.
 
-## cPanel: upload two folders, edit one file
+**This is an implementation for staged acceptance—not a declaration of production readiness or completion of every later phase.** See [delivery status](docs/delivery-status.md) and the [operations template](docs/operations-template.md).
 
-**No domain document-root changes or manual PHP path edits are needed.**
+## What is included
 
-```text
-/home/YOUR_CPANEL_USERNAME/
-├── public_html/                 Website files only
-│   ├── index.php                Already wired to the private application
-│   ├── setup.php                Protected one-time browser installer
-│   ├── .htaccess
-│   ├── css/, js/, img/, fonts/
-│   ├── offline.html
-│   └── service-worker.js
-└── alpha-school/                Private application — NOT inside public_html
-    ├── config.example.php       Copy to config.php and edit
-    ├── src/, data/, scripts/
-    ├── database/, test/
-    └── private/                 Created automatically; never overwrite on updates
-```
+- Original GitHub homepage layout and navy/gold design system; English/Kiswahili Home, Admissions and Contact; Downloads and Portal navigation; mobile Call/WhatsApp/Apply; child-friendly, local-only Kids Zone.
+- Central `BASE_URL` for canonical, Open Graph, structured data and sitemap URLs. Unapproved photo slots use the existing school crest; only consented, approved media can replace it.
+- Private `/portal`: role-specific staff, parent, student and teacher views; school-provisioned student accounts; audited guardian verification; class/teacher assignment; scoped attendance, published results, learning materials, notices, events and parent-teacher messaging; plus the existing HR and governance workflows.
+- CMS drafts, independent editorial/authority review, separate publication, scheduling and historical published snapshots. School contacts, verified map and official social links use the same review process.
+- Configurable, versioned approval routes with per-stage authority, comments, return/reject/cancel states, escalation notifications and append-only audit events.
+- Admissions state transitions and private enquiry queues. All five original public forms produce references and durable office-alert jobs; safeguarding/privacy requests have separate restricted queues.
+- Guardian media consent by pupil reference and channel, annual expiry, withdrawal enforcement and external-removal follow-up. Published images are checked on every request.
+- Scrypt passwords, persistent account/IP login limits, session rotation/revocation, CSRF/origin checks, server-side resource authorisation, encrypted private files and one-use download grants.
+- Limited PWA/offline shell. **No private records, API responses, submissions or photographs are cached by the service worker.**
 
-1. Back up any existing website. Upload the **contents** of this repository's `public_html` folder into cPanel's existing `public_html`. Upload the `alpha-school` folder alongside it in your account's home directory. Include hidden `.htaccess` files. Do not upload the whole repository into `public_html`.
-2. Create an empty MySQL database and user using cPanel's Database Wizard. Assign the user privileges including tables, indexes and triggers. Prefixed names such as `account_alpha_school` work.
-3. Copy `alpha-school/config.example.php` to **`alpha-school/config.php`**. Enter the domain, database credentials, SMTP settings, school-approved retention periods and a random setup token. This is the only settings file needed. The private storage path is automatic—no username/path edits.
-4. Enable HTTPS, open **`https://yourdomain.com/setup.php`**, enter the setup token and provision the approved system administrator and head teacher. Tables, seed workflows and encrypted file storage are initialized automatically. No Terminal is needed for first installation.
-5. Delete `public_html/setup.php`, clear `SETUP_TOKEN` in the private configuration, and add the maintenance cron job from the guide. Test sign-in, forms, email and backups before using live school records.
+## UI source
 
-**Full click-by-click instructions: [cPanel installation](docs/cpanel.md).**
+The public homepage, navigation, typography and cards use the original repository UI from commit `82757d3`. The portal reuses its original centred CMS login and navy admin layout. New features extend those components rather than replacing them with another template. See [UI source and integration](docs/ui-source.md).
 
-The installer uses HTTPS, a private random token, CSRF checks, same-origin checks, a disk-backed attempt limit and private sessions. It refuses existing accounts, creates both accounts in one serialized transaction, and writes a completion lock. It cannot reset passwords or overwrite existing users. Initial users must change passwords at first sign-in; technical administrators do not automatically receive access to children's records.
+## Run locally
 
-## Requirements
-
-- PHP **8.2+** with `pdo_mysql`, `openssl`, `mbstring`, `gd`, `sodium`, `fileinfo`, `session` and normal JSON support. `exif` is recommended for image orientation.
-- **MySQL 8** with InnoDB, JSON, generated-column indexes and triggers. MariaDB compatibility has not been verified.
-- Standard cPanel Apache rewrite/`.htaccess` support, HTTPS, private writable disk and authenticated SMTP for production alerts.
-- One maintenance cron job per minute. No persistent background application process.
-
-DNS must point your registered domain to the hosting server. `NXDOMAIN` is a DNS/registration/delegation problem, not a PHP problem; changing the website files cannot fix it.
-
-## One configuration location
-
-**`alpha-school/config.php`** is a plain PHP file returning a settings array. It holds database/email settings and the temporary setup token, never public assets. The template is `alpha-school/config.example.php`. Keep the real file private (`600`) and never commit/share it.
-
-Environment variables remain available for operators/tests, and an existing private `.env` is accepted only when `config.php` is absent. New installations do not need `.env`. Do not maintain two competing configuration files.
-
-**Existing installation:** do not use the first-install wizard. Preserve the current database, original `DATA_DIR`, encrypted uploads and encryption/audit keys. Keep your existing private configuration or copy its exact settings into `config.php` before switching. The new default private path is only for fresh installs. Read the [upgrade instructions](docs/cpanel.md#updating-an-existing-installation) before uploading.
-
-## Local development
-
-Install PHP and MySQL, and create an empty database (with phpMyAdmin or `alpha-school/database/create-alpha-school.sql`). Copy the PHP configuration template and edit:
-
-- `APP_ENV` → `development`
-- `BASE_URL` → `http://localhost:3000`
-- Your local MySQL credentials.
-- Leave **all** SMTP fields empty if testing without email.
-- Set a random `SETUP_TOKEN` if using the browser installer.
-
-From the repository root:
+Use **Node.js 22.13+ within the 22.x line**; tested on 22.22.3.
 
 ```sh
-php -S 127.0.0.1:3000 -t public_html router.php
+npm ci
+cp .env.example .env
+npm start
 ```
 
-Visit `http://localhost:3000/setup.php`. HTTP setup is allowed only for loopback development, never remote production. The PHP development server is not a production server.
+Open `http://localhost:3000`; the staff workspace is `/portal`. The server binds to `0.0.0.0`. Browser-facing requests use relative URLs, so a proxied preview works without calling the visitor’s localhost.
 
-## Optional PHP command-line tools
+With no MySQL configured, development uses transactional SQLite in ignored `.runtime/`, not a JSON-file database. Set `MYSQL_URL` (or `MYSQL_HOST`, `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_DB_NAME`) to run the same application against MySQL instead — see [docs/mysql-migration.md](docs/mysql-migration.md). Development keys are generated locally with restrictive permissions. Do not reuse them outside development. There are **no default login credentials, demo users or invented employment balances**.
 
-These run from the repository/account home, not from `public_html`:
+### Initial access
+
+Appoint **separate people** for technical administration and school business authority. Provide a strong temporary password through a mode-600 file outside source control (or, on Windows, a file with a protected NTFS ACL), then use an approved operator terminal:
 
 ```sh
-php alpha-school/scripts/check.php
-php alpha-school/scripts/init-production.php
-php alpha-school/scripts/verify-integrations.php
-php alpha-school/scripts/maintenance.php
+npm run bootstrap -- --username YOUR_NAMED_USERNAME --name "Authorised person's name" --role system_admin
+# A separate, owner-approved first appointment:
+npm run bootstrap -- --username ANOTHER_NAMED_USERNAME --name "Authorised school leader" --role head_teacher
 ```
 
-For approved CLI account provisioning instead of the browser installer, use `alpha-school/scripts/bootstrap.php` with a protected password file and `BOOTSTRAP_APPROVED`, `BOOTSTRAP_APPROVAL_REFERENCE`, and `BOOTSTRAP_PASSWORD_FILE` in the private operator environment. There are no default passwords. Do not put passwords in command arguments. See [cPanel installation](docs/cpanel.md#optional-terminal-based-setup).
+Replace the uppercase command placeholders with chosen lowercase usernames; they are not credentials. Each invocation requires `BOOTSTRAP_APPROVED=true`, a private `BOOTSTRAP_APPROVAL_REFERENCE`, and `BOOTSTRAP_PASSWORD_FILE` in the operator environment. No password belongs in the command line or this README. The first sign-in requires a password change. Bootstrap refuses to repeat an existing initial authority.
 
-## Tests
+For a host without an operator shell, the first `head_teacher` account can instead be provisioned once at startup using `HEAD_TEACHER_USERNAME`, `HEAD_TEACHER_NAME`, `HEAD_TEACHER_PASSWORD`, `HEAD_TEACHER_APPROVED=true`, and `HEAD_TEACHER_APPROVAL_REFERENCE`. Set these temporarily in the host's private environment settings, deploy, confirm the account was created, then remove all five values. This path refuses to create the account without explicit approval and will not update an existing head-teacher account. Do not put the password or approval reference in source control. Management can then create ordinary staff accounts and assign business roles through the portal.
+
+Management can then appoint HR, departmental approvers, CMS authors/editors/publishers and the privacy officer. HR records staff IDs, departments, supervisors and entitlements. ICT accounts **do not inherit HR/contract/financial access or business approvals**.
+
+## Checks
 
 ```sh
-php alpha-school/test/cpanel.php
-php alpha-school/test/integrations.php --configuration-only
-php alpha-school/scripts/check.php
+npm run check             # syntax, actual PWA assets, safe seed/artifact guard
+npm test                  # isolated synthetic SQLite/security/workflow/recovery tests
+npm audit --omit=dev
+# UI regressions also require OpenSSL (included on the Linux CI runner).
+npx playwright install --with-deps chromium
+npm run test:ui           # isolated browser workflow, mobile and accessibility checks
 ```
 
-The first two commands use no live database or email provider. The checker also verifies production PHP extensions. For full business/outbox/recovery tests, provide **three separate empty disposable MySQL schemas** ending in `_test` through `TEST_MYSQL_URL`, `TEST_MYSQL_RESTORE_URL`, and `TEST_MYSQL_INTEGRATIONS_URL`, then:
+`CHROMIUM_EXECUTABLE` can point to an existing compatible Chromium. Tests do not read a production database. UI screenshots contain synthetic data and are written only to ignored `.runtime/ui-test/`. Test scripts never create accounts in the running preview.
 
-```sh
-php alpha-school/test/run.php
-php alpha-school/test/integrations.php
-```
+## Production and staging
 
-For the first-install MySQL regression, provide an additional empty schema through `TEST_MYSQL_SETUP_URL` and run `php alpha-school/test/setup-mysql.php`.
+Use separate databases, storage, keys, origins and alert recipients for each environment. Outside development, startup requires:
 
-Tests refuse existing tables and do not clear databases automatically. Never use live school data. Real cPanel/Apache, MySQL, email inbox delivery, backups and manual browser/accessibility checks still require hosting verification.
+- An explicitly configured, verified HTTPS `BASE_URL`.
+- A dedicated MySQL 8 schema on InnoDB (JSON documents, generated-column unique indexes, TLS outside development) and either persistent `DATA_DIR` storage or a private Supabase S3 bucket for files. `DATA_DIR` must remain persistent in both configurations because it holds application keys and, for local storage, uploaded files.
+- Two distinct 32-byte keys for private storage and audit HMAC. If not supplied as secrets or protected key files, production creates them once in `application-keys.json` under `DATA_DIR`; `DATA_DIR` must be a persistent, protected disk. Escrow this file separately and never replace it after real use. Legacy encrypted MFA fields are ignored and left untouched.
+- A signed office-alert endpoint/secret or configured Gmail SMTP delivery with approved office and privacy recipients, and an explicitly approved retention schedule. The safeguarding contact is managed dynamically through the portal’s independently reviewed and published school-contact settings; until configured, the site directs people to the Head of School’s office.
 
-## Features retained and operations
+The public site at **https://alpha-adventist-pre-primary-school.onrender.com** was reachable during a read-only check on **30 September 2026**. The similarly spelled hostname without the hyphen between `alpha` and `adventist` returned “Not Found.” The reachable URL is the development fallback only; production still requires an explicit `BASE_URL`, and the school must confirm its long-term official domain. No live deployment was performed in this implementation session.
 
-The bilingual website, existing design, forms, staff/family portal, role permissions, consent workflows, append-only audit chain, encrypted private uploads and standard SMTP outbox remain in native PHP/MySQL. Browser scripts preserve menus, galleries, forms and portal interactions without frameworks or builds. Application records retain the `adsp_*` tables.
+For a **free, read-only public preview**, create a separate Render service and set `NODE_ENV=staging`, `PUBLIC_PREVIEW=true`, `BASE_URL` to that service's HTTPS origin, and `DATA_DIR=/tmp/alpha-school-preview`. Do not copy `MYSQL_*` environment variables into this service; preview uses temporary SQLite and generated local keys. It displays a preview notice, rejects all `/api` and `/portal` requests, removes public submission forms and staff links, and returns `noindex`. Its database and temporary files can disappear on restart. This mode is not for real submissions, staff work or school records. Keep the live service in strict production mode with its approved MySQL schema, persistent storage and alert configuration.
 
-- [Email and production verification](docs/production-integrations.md)
-- [Backup and isolated restore](docs/mysql-migration.md)
-- [Operational safety checklist](docs/operations-template.md)
-- [API and access governance](docs/api-and-governance.md)
+`render.yaml` is a **single-instance deployment template**, with a persistent disk, readiness probe and automatic deployment disabled. To use external files, create a private Supabase Storage bucket, enable S3 access in Supabase Storage settings, and configure all `SUPABASE_S3_*` and `SUPABASE_STORAGE_BUCKET` values from `.env.example`. Supabase S3 keys are server-only and have broad project storage access; use a dedicated Supabase project and never expose them to browsers. Files are streamed through the app's authorization and consent checks; do not make the bucket public. PDF and image uploads are not malware-scanned; only upload files from trusted sources. The template does not configure a messaging provider, database, backups, DNS, analytics or Search Console on your behalf.
 
-Production still needs approved school appointments, retention values, recipients and recovery procedures. Easier deployment is not permission to publish personal data or weaken security.
+## Notifications
+
+Public forms are saved transactionally with an in-app notice and durable outbox entry. Alerts can go to a configured HTTPS integration, signed with HMAC-SHA256, or directly through Gmail SMTP. Emails contain only the request type, reference, received time and secure portal link; submitted form details are not emailed. Safeguarding and privacy alerts use the separately configured privacy recipient.
+
+Unconfigured jobs remain **PENDING**; non-success responses retry with backoff, then become **FAILED**. SMTP acceptance confirms that Gmail accepted the message, not that a person read it. Provider delivery callbacks, parent-channel messaging and bulk campaigns need further integration.
+
+## Backups and legacy migration
+
+- `npm run backup:mysql` creates an encrypted, bounded database-and-private-file archive during a confirmed maintenance window. Every table is read inside one `REPEATABLE READ` consistent-snapshot transaction. With Supabase Storage configured it captures referenced encrypted objects from the private bucket.
+- `npm run restore:mysql -- /protected/path/archive.json.enc` restores only to an explicitly approved, empty isolated schema ending in `_restore_test`; Supabase archives also require `SUPABASE_RESTORE_BUCKET` to name a separate empty bucket, never the source or live bucket.
+- `npm run import:mongodb -- /protected/path/archive.ejson.enc` is the one-time cutover path from an archive written by the retired MongoDB backup tool: it maps the old `adsp_*` collections into MySQL tables, never imports sessions or download grants, and can be rehearsed with `MYSQL_IMPORT_DRY_RUN=true`.
+- `npm run migrate:mysql` imports supported legacy text and form fields from a fresh encrypted backup, without importing old passwords, accounts or unverified photographs. Public imports become reviewable drafts; unrecognised schemas need a reviewed mapping.
+
+`npm test` skips the live MySQL suite unless `MYSQL_URL` is set; `npm run test:mysql` runs it directly, and the CI workflow starts a throwaway MySQL 8 service for it. See the operations template before using these commands. Tests cover isolated local file recovery, mocked Supabase object capture/restore, mocked SMTP message routing and the MySQL store against a temporary schema; live Supabase credentials, bucket permissions, real Gmail SMTP delivery and production recovery have not been verified in this workspace.
+
+## Repository and child-data safety
+
+Tracked runtime records, uploads, internal artifacts and unverified photographs were removed from the current checkout. **They may still exist in Git history, forks, clones, deployment caches and the previously deployed site. `.gitignore` does not remove them.** Coordinate repository visibility/history cleanup with the owner, rotate previously exposed secrets, and confirm photo-consent/removal obligations before publication. An earlier GitHub access check returned an authentication error. If it recurs, reconnect GitHub in Arena before retrying remote work.
+
+Keep real credentials, private operations records, guardian evidence, exports, backups and child images out of Git. The public operations document is a sanitised template; completed procedures and approval records belong in the school’s restricted operations system.
+
+## Later phases
+
+Fees/payments, admissions document collection, native apps, formal e-signatures, teacher-managed quiz authoring, provider-specific messaging, advanced HR casework and additional CMS/menu/profile tooling remain later or separate work. The family portal code has not been deployed or accepted against real school records. Guardian verification is an audited staff attestation, not automated identity proof; school-approved verification policy and real-data acceptance are required before production use. No native app was built ahead of the portals.

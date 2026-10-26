@@ -1,5 +1,3 @@
-> **PHP conversion update:** The application now runs on PHP. See [PHP migration](php-migration.md) and the root README for current runtime, deployment and operator commands. Institutional governance and release gates below still apply. Older database adapter/pooling and historical test-count descriptions are superseded by that migration record.
-
 # API and governance notes
 
 ## Request contract
@@ -19,7 +17,7 @@ No client bearer token is saved in local/session storage. The opaque session coo
 
 ## Endpoint groups
 
-The exact dispatcher is `alpha-school/src/php/platform_router.php`; there are no wildcard model endpoints.
+The exact dispatcher is `src/platform/router.js`; there are no wildcard model endpoints.
 
 | Group | Main routes |
 | --- | --- |
@@ -57,7 +55,7 @@ Department-scoped reads require a matching recorded department. Contract reviewe
 
 ## Storage and audit
 
-`alpha-school/src/php/store.php` uses PHP PDO transactions with dedicated MySQL 8 InnoDB JSON tables. Configuration is in `alpha-school/src/php/support.php`; cPanel-prefixed schema names are supported. Same-host loopback database connections may disable TLS, but remote production connections require verified TLS. MySQL advisory locks serialize collection-wide validation and audit extension. The `adsp_` tables use `id`/`revision`/`payload` records with database-enforced uniqueness and revision checks. This is sized for a small school: many reports read/filter whole tables in memory. Larger deployments need pagination/query optimisation. Private files are encrypted on the hosting account's local disk; run one application installation with coordinated database/file backups.
+`src/platform/store.js` selects the store: when `MYSQL_URL`/`MYSQL_*` is configured it delegates to `src/platform/mysql-store.js`, which runs each unit of work in one InnoDB transaction on a pooled connection; otherwise it uses the serialised SQLite `BEGIN IMMEDIATE` implementation for local development and tests. Connection settings come from `src/platform/mysql-config.js`, which refuses a half-configured setup and, outside development, an unencrypted one. Both stores use the `adsp_` namespace, keep records as JSON documents in `id`/`revision`/`payload` columns, and enforce revisions and uniqueness constraints. The implementation is sized for a small school; many reports currently read/filter whole tables in memory. Pagination/index/query optimisation and shared object storage are required before substantial scale-out (the shared MySQL store allows more than one application instance, but local file storage does not).
 
 Files and database commits are separate physical systems. Failed uploads are discarded; published-file routes always recheck committed authority/state. Operations must monitor missing/orphaned files and reconcile storage after failures/restoration. Do not claim database transactions make the filesystem transactional.
 
@@ -65,4 +63,4 @@ HMAC audit chaining and its sequence/head are updated in the business transactio
 
 ## Test boundaries
 
-`alpha-school/test/run.php`, `scripts/ui-smoke.js` and `scripts/auth-ui-smoke.js` are executable acceptance evidence using generated credentials/synthetic data. No production identity or child record is bundled. See `delivery-status.md` for exactly what was run and what remains unverified. A CI definition is included, but no GitHub workflow run has been claimed.
+`test/platform.test.js`, `test/operations.test.js` and `scripts/ui-smoke.js` are executable acceptance evidence using generated credentials/synthetic data. No production identity or child record is bundled. See `delivery-status.md` for exactly what was run and what remains unverified. A CI definition is included, but no GitHub workflow run has been claimed.

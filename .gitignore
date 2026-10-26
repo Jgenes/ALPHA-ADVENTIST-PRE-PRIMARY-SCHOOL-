@@ -1,15 +1,18 @@
-# Private settings, records and keys never belong in source control.
 .env
 .env.*
-config.php
+!.env.example
+node_modules/
 .runtime/
 private/
 backups/
 uploads/
 work/
+coverage/
+*.sqlite
+*.sqlite-*
 *.json.enc
 *.log
 .sudo_as_admin_successful
-alpha-school/data/*
-!alpha-school/data/seed.json
-.arena/
+# Runtime records and keys never belong in source control.
+data/*
+!data/seed.json
