@@ -21,17 +21,12 @@ test('ADSP security, persistence and institutional workflows', { timeout: 120000
   let leave, contract, content, privateDocument, publicDocument, consent, media;
   const start = nextMonday();
   await t.test('production configuration fails closed and has no default credentials', async () => {
-    assert.throws(() => createConfig({ NODE_ENV: 'production', DATA_DIR: f.dir, BASE_URL: 'https://school.example.test' }), /MySQL/);
-    assert.throws(() => createConfig({ NODE_ENV: 'production', DATA_DIR: f.dir, BASE_URL: 'https://school.example.test', MYSQL_HOST: 'database.example.test', MYSQL_USER: 'alpha' }), /missing: MYSQL_DB_NAME/);
-    assert.throws(() => createConfig({ NODE_ENV: 'production', DATA_DIR: f.dir, BASE_URL: 'https://school.example.test', MYSQL_URL: 'mysql://alpha:secret@database.example.test/alpha_db', MYSQL_DB_NAME: 'other_db' }), /disagrees/);
-    assert.throws(() => createConfig({ NODE_ENV: 'production', DATA_DIR: f.dir, BASE_URL: 'https://school.example.test', MYSQL_URL: 'mysql://alpha:secret@database.example.test/alpha_db', MYSQL_SSL_MODE: 'disabled' }), /encrypted/);
-    assert.throws(() => createConfig({ NODE_ENV: 'production', DATA_DIR: f.dir, BASE_URL: 'https://school.example.test', MYSQL_URL: 'postgres://alpha@database.example.test/alpha_db' }), /mysql:\/\/ scheme/);
-    assert.throws(() => createConfig({ NODE_ENV: 'production', DATA_DIR: f.dir, BASE_URL: 'https://school.example.test', MYSQL_URL: 'mysql://alpha@database.example.test/alpha_db?pool_size=9' }), /Unsupported MYSQL_URL parameter/);
+    assert.throws(() => createConfig({ NODE_ENV: 'production', DATA_DIR: f.dir, BASE_URL: 'https://school.example.test' }), /MongoDB/);
     assert.throws(() => createConfig({ NODE_ENV: 'production', DATA_DIR: f.dir, BASE_URL: 'http://school.example.test' }), /HTTPS/);
     const generatedKeyDir = path.join(f.dir, 'generated-key-runtime');
     const generatedEnv = {
       NODE_ENV: 'production', DATA_DIR: generatedKeyDir, BASE_URL: 'https://school.example.test',
-      MYSQL_URL: 'mysql://alpha:secret@database.example.test:3306/alpha_generated_keys', MYSQL_DB_NAME: 'alpha_generated_keys',
+      MONGODB_URI: 'mongodb://database.example.test', MONGODB_DB_NAME: 'alpha_generated_keys',
       FORM_RETENTION_DAYS: '90', ADMISSION_RETENTION_DAYS: '365', RETENTION_POLICY_APPROVED: 'true',
       OFFICE_ALERT_WEBHOOK_URL: 'https://alerts.example.test/receiver', OFFICE_ALERT_WEBHOOK_SECRET: 'synthetic-webhook-secret-at-least-32-characters'
     };
@@ -43,7 +38,7 @@ test('ADSP security, persistence and institutional workflows', { timeout: 120000
     assert.equal(restartedConfig.auditKey.toString('hex'), generatedConfig.auditKey.toString('hex'));
     const remoteConfig = createConfig({
       NODE_ENV: 'production', DATA_DIR: path.join(f.dir, 'remote-runtime'), BASE_URL: 'https://school.example.test',
-      MYSQL_URL: 'mysql://alpha:secret@database.example.test:3306/alpha_production', MYSQL_DB_NAME: 'alpha_production',
+      MONGODB_URI: 'mongodb://database.example.test', MONGODB_DB_NAME: 'alpha_production',
       SUPABASE_S3_ENDPOINT: 'https://project.storage.supabase.co/storage/v1/s3', SUPABASE_S3_REGION: 'us-east-1',
       SUPABASE_S3_ACCESS_KEY_ID: 'synthetic-access', SUPABASE_S3_SECRET_ACCESS_KEY: 'synthetic-secret', SUPABASE_STORAGE_BUCKET: 'alpha-private',
       STORAGE_ENCRYPTION_KEY: '2'.repeat(64), AUDIT_HMAC_KEY: '3'.repeat(64),
@@ -55,7 +50,7 @@ test('ADSP security, persistence and institutional workflows', { timeout: 120000
     assert.throws(() => createConfig({ NODE_ENV: 'development', DATA_DIR: f.dir, BASE_URL: 'https://school.example.test', OFFICE_ALERT_WEBHOOK_URL: 'https://alerts.example.test/receiver' }), /missing: OFFICE_ALERT_WEBHOOK_SECRET/);
     const gmailConfig = createConfig({
       NODE_ENV: 'production', DATA_DIR: path.join(f.dir, 'gmail-runtime'), BASE_URL: 'https://school.example.test',
-      MYSQL_URL: 'mysql://alpha:secret@database.example.test:3306/alpha_production', MYSQL_DB_NAME: 'alpha_production',
+      MONGODB_URI: 'mongodb://database.example.test', MONGODB_DB_NAME: 'alpha_production',
       STORAGE_ENCRYPTION_KEY: '5'.repeat(64), AUDIT_HMAC_KEY: '6'.repeat(64),
       FORM_RETENTION_DAYS: '90', ADMISSION_RETENTION_DAYS: '365', RETENTION_POLICY_APPROVED: 'true',
       GMAIL_SMTP_USER: 'sender@example.test', GMAIL_SMTP_APP_PASSWORD: 'abcd efgh ijkl mnop',
@@ -597,9 +592,7 @@ test('staging public preview is isolated and read-only', { timeout: 15000 }, asy
   assert.equal((await fetch(base + '/api/auth/session')).status, 404);
   assert.equal((await fetch(base + '/portal')).status, 404);
   assert.match(await (await fetch(base + '/robots.txt')).text(), /Disallow: \/\n/);
-  assert.throws(() => createConfig({ NODE_ENV: 'production', PUBLIC_PREVIEW: 'true', DATA_DIR: dir, BASE_URL: 'https://preview.example.test' }), /MySQL/);
-  // A preview must not be pointed at a shared database, even accidentally.
-  assert.throws(() => createConfig({ NODE_ENV: 'staging', PUBLIC_PREVIEW: 'true', DATA_DIR: dir, BASE_URL: 'https://preview.example.test', MYSQL_URL: 'mysql://alpha@database.example.test/alpha_db' }), /not MySQL/);
+  assert.throws(() => createConfig({ NODE_ENV: 'production', PUBLIC_PREVIEW: 'true', DATA_DIR: dir, BASE_URL: 'https://preview.example.test' }), /MongoDB/);
 });
 
 function prettyPosition(value) { return 'Synthetic ' + value; }
