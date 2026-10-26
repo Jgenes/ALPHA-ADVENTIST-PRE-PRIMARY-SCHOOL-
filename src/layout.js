@@ -295,7 +295,7 @@ ${alternateTags}
 <link rel="manifest" href="/site.webmanifest">
 
 <link rel="stylesheet" href="/fonts/fonts.css">
-<link rel="stylesheet" href="/css/main.css?v=5"><link rel="stylesheet" href="/css/platform-public.css?v=5">
+<link rel="stylesheet" href="/css/main.css?v=5"><link rel="stylesheet" href="/css/platform-public.css?v=6">
 ${jsonld}</head>
 <body class="${bodyClass}">
 ${ctx.path === '/students' ? `<header class="kids-safe-head"><a href="/students"><img src="/img/logo-96.png" alt="School crest" width="38" height="38"> Alpha Kids Zone</a><a href="/">School home</a></header>` : header(ctx)}
