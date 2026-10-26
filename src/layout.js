@@ -56,11 +56,29 @@ const P = {
   eye: '<path d="M2.5 12S6 5.8 12 5.8 21.5 12 21.5 12 18 18.2 12 18.2 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>',
   send: '<path d="M21 3 3 10.5l7 3 3 7z"/><path d="M21 3 10 13.5"/>',
   quote: '<path d="M9 7c-3 1-4.5 3.4-4.5 6.5V17H10v-6H7.2C7.6 9.4 8.4 8.4 10 7.6zM19 7c-3 1-4.5 3.4-4.5 6.5V17H20v-6h-2.8c.4-1.6 1.2-2.6 2.8-3.4z"/>',
-  chevron: '<path d="m8 10 4 4 4-4"/>'
+  chevron: '<path d="m8 10 4 4 4-4"/>',
+  facebook: '<path d="M15 3h-2.5A4.5 4.5 0 0 0 8 7.5V10H5.5v4H8v7h4v-7h3l.8-4H12V7.5a.5.5 0 0 1 .5-.5H15z"/>',
+  instagram: '<rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r=".8" fill="currentColor"/>',
+  youtube: '<rect x="2.5" y="5.5" width="19" height="13" rx="4"/><path d="m10 9.2 5.2 2.8L10 14.8z"/>'
 };
 function icon(name, cls = '') {
   const d = P[name] || P.star;
   return `<svg class="icon ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${d}</svg>`;
+}
+function socialIcon(name) {
+  const key = String(name || '').toLowerCase();
+  if (key.includes('facebook')) return 'facebook';
+  if (key.includes('instagram')) return 'instagram';
+  if (key.includes('youtube')) return 'youtube';
+  return 'globe';
+}
+function socialLinks(settings, opts = {}) {
+  const items = (settings && settings.social) || [];
+  if (!items.length) return '';
+  const align = opts.align === 'center' ? ' social-links--center' : '';
+  const tone = opts.tone ? ` social-links--${opts.tone}` : '';
+  const label = opts.label ? `<span class="social-links__label">${esc(opts.label)}</span>` : '';
+  return `<div class="social-links${align}${tone}">${label}${items.map(channel => `<a class="social-links__item" href="${esc(channel.url)}" target="_blank" rel="noopener noreferrer">${icon(socialIcon(channel.name))}<span>${esc(channel.name)}</span></a>`).join('')}</div>`;
 }
 
 /* ============ image helper ============ */
@@ -150,7 +168,10 @@ function header(ctx) {
       <li><a href="tel:${esc(s.phones[0].href)}">${icon('phone')}<span>${esc(s.phones[0].number)}</span></a></li>
       ${s.emailPublished ? `<li class="topbar__hide-sm"><a href="mailto:${esc(s.email)}">${icon('mail')}<span>${esc(s.email)}</span></a></li>` : ''}
     </ul>
-    <p class="topbar__motto">${esc(s.motto)} <span>•</span> ${esc(s.conference)}</p>
+    <div class="topbar__end">
+      <p class="topbar__motto">${esc(s.motto)} <span>•</span> ${esc(s.conference)}</p>
+      ${(s.social || []).length ? `<ul class="topbar__social">${s.social.map(channel => `<li><a href="${esc(channel.url)}" target="_blank" rel="noopener noreferrer" aria-label="${esc(channel.name)}" title="${esc(channel.name)}">${icon(socialIcon(channel.name))}</a></li>`).join('')}</ul>` : ''}
+    </div>
   </div>
 </div>
 <header class="site-head" id="top">
@@ -178,6 +199,7 @@ function header(ctx) {
       <div class="mobilenav__ctas">
         ${ctx.config?.publicPreview ? '' : `<a class="btn btn--primary" href="${localPath(ctx, '/admissions')}#apply">${sw ? 'Omba Nafasi' : 'Apply for Admission'}</a><a class="btn btn--gold" href="/computer-learning#join">Join Computer Class</a>`}
         <a class="btn btn--ghost" href="/contact">Contact Us</a>
+        ${socialLinks(s, { align: 'center' })}
       </div>
     </nav>
   </div>
@@ -222,7 +244,7 @@ function footer(ctx) {
         <li>${icon('whatsapp')}<span><a href="${esc(wa)}" target="_blank" rel="noopener">WhatsApp: ${esc(s.whatsapp.number)}</a></span></li>
         ${s.emailPublished ? `<li>${icon('mail')}<span><a href="mailto:${esc(s.email)}">${esc(s.email)}</a></span></li>` : ''}
       </ul>
-      ${(s.social || []).length ? `<p class="footer__links">${s.social.map(channel => `<a href="${esc(channel.url)}" target="_blank" rel="noopener noreferrer">${esc(channel.name)}</a>`).join(' · ')}</p>` : ''}
+      ${(s.social || []).length ? `<p class="footer__social-heading">Follow Us</p>${socialLinks(s, { tone: 'dark' })}` : ''}
       <p class="footer__social-note">${esc(s.socialNote)}</p>
     </div>
   </div>
@@ -273,7 +295,7 @@ ${alternateTags}
 <link rel="manifest" href="/site.webmanifest">
 
 <link rel="stylesheet" href="/fonts/fonts.css">
-<link rel="stylesheet" href="/css/main.css?v=5"><link rel="stylesheet" href="/css/platform-public.css?v=3">
+<link rel="stylesheet" href="/css/main.css?v=5"><link rel="stylesheet" href="/css/platform-public.css?v=5">
 ${jsonld}</head>
 <body class="${bodyClass}">
 ${ctx.path === '/students' ? `<header class="kids-safe-head"><a href="/students"><img src="/img/logo-96.png" alt="School crest" width="38" height="38"> Alpha Kids Zone</a><a href="/">School home</a></header>` : header(ctx)}
@@ -306,10 +328,11 @@ function schoolJsonLd(ctx) {
       streetAddress: s.locationText
     },
     parentOrganization: { '@type': 'Organization', name: 'Western Tanzania Conference of Seventh-day Adventists' },
+    sameAs: (s.social || []).length ? s.social.map(channel => channel.url) : undefined,
     motto: s.motto,
     logo: `${BASE_URL}/img/logo-256.png`,
     image: `${BASE_URL}/img/og-image.png`
   };
 }
 
-module.exports = { icon, pic, photoSrc, btn, sectionHead, header, footer, page, NAV, schoolJsonLd, localPath, baseOf, ICONS: P };
+module.exports = { icon, socialIcon, socialLinks, pic, photoSrc, btn, sectionHead, header, footer, page, NAV, schoolJsonLd, localPath, baseOf, ICONS: P };

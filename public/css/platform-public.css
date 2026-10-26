@@ -21,6 +21,22 @@ body{overflow-wrap:anywhere}
 .hero__media .media-pending img{object-position:80% 50%;opacity:.3;padding:80px 12%;max-height:none}
 .life-card .media-pending img,.news-feat__media .media-pending img{background:var(--navy-100)}
 .footer__social-note:empty{display:none}.footer__links{display:flex;flex-wrap:wrap;gap:8px}
+.topbar__end{display:flex;align-items:center;gap:14px}
+.topbar__social{display:flex;align-items:center;gap:6px}
+.topbar__social a{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:50%;border:1px solid rgba(234,178,57,.38);background:rgba(255,255,255,.06);color:#e3eaf8;text-decoration:none;transition:color .18s,background .18s,border-color .18s}
+.topbar__social a:hover{color:#fff;border-color:var(--gold);background:rgba(234,178,57,.2)}
+.topbar__social .icon{width:.95rem;height:.95rem;color:var(--gold)}
+.social-links{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:18px}
+.social-links--center{justify-content:center}
+.social-links__label{font-size:.84rem;font-weight:700;color:var(--muted);margin-right:2px}
+.social-links__item,.mobilenav .social-links__item{display:inline-flex;align-items:center;gap:7px;min-height:0;padding:8px 14px;border-radius:999px;border:1.5px solid var(--navy-100);background:#fff;color:var(--navy-900);font-size:.86rem;font-weight:700;text-decoration:none;transition:transform .18s,border-color .18s,background .18s,color .18s}
+.social-links__item .icon{width:1.05rem;height:1.05rem;color:var(--navy)}
+.social-links__item:hover,.mobilenav .social-links__item:hover{border-color:var(--navy);background:var(--navy-050);color:var(--navy);transform:translateY(-2px);text-decoration:none}
+.footer__social-heading{font-size:.76rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);margin:18px 0 8px}
+.social-links--dark{margin-top:0;gap:8px}
+.social-links--dark .social-links__item{padding:6px 12px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:#e3eaf8;font-size:.82rem;font-weight:600}
+.social-links--dark .social-links__item .icon{width:1rem;height:1rem;color:var(--gold)}
+.social-links--dark .social-links__item:hover{border-color:var(--gold);background:rgba(234,178,57,.16);color:#fff;transform:none;text-decoration:none}
 /* New forms/downloads use the repository's established cards and brand tokens. */
 .adsp-consent{display:flex!important;align-items:flex-start!important;gap:10px;font-size:.86rem;line-height:1.7;margin:12px 0 18px}
 .adsp-consent input{width:16px!important;min-height:16px!important;flex:none;margin-top:5px;accent-color:var(--navy)}

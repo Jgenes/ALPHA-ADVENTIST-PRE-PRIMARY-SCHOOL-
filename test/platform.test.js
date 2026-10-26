@@ -81,7 +81,12 @@ test('ADSP security, persistence and institutional workflows', { timeout: 120000
       assert.ok(res.text.includes('https://school.example.test' + route), 'Canonical uses configured origin');
       assert.ok(!res.text.includes('alphaadventist.ac.tz'));
       if (route.startsWith('/sw')) assert.match(res.text, /<html lang="sw">/);
+      for (const socialUrl of ['https://www.youtube.com/@alphaadventispschool', 'https://www.instagram.com/alpha_adventist_primary_school/?__pwa=1#', 'https://www.facebook.com/profile.php?id=61585635475293']) {
+        assert.ok(res.text.includes(socialUrl), `${route} includes ${socialUrl}`);
+      }
     }
+    const contactJsonLd = JSON.parse((await anonymous.request('GET', '/contact')).text.match(/<script type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/)[1]);
+    assert.deepEqual(contactJsonLd.sameAs, ['https://www.youtube.com/@alphaadventispschool', 'https://www.instagram.com/alpha_adventist_primary_school/?__pwa=1#', 'https://www.facebook.com/profile.php?id=61585635475293']);
     const robots = (await anonymous.request('GET', '/robots.txt')).text;
     assert.match(robots, /Allow: \//); assert.ok(!robots.includes('Disallow: /\n'));
     const map = (await anonymous.request('GET', '/sitemap.xml')).text;
