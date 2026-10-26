@@ -372,6 +372,7 @@ ${db.gallery.length ? `<!-- 16 · Gallery strip -->
       <a class="contact-card rv" href="mailto:${esc(s.email)}">${icon('mail')}<strong>Email</strong><span>${esc(s.email)}</span></a>
       <a class="contact-card rv" href="${esc(s.mapUrl || 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(s.mapQuery))}" target="_blank" rel="noopener">${icon('pin')}<strong>Get Directions</strong><span>${esc(s.locationText)}</span></a>
     </div>
+    ${X.socialLinks(s, { align: 'center', label: 'Follow Alpha:' })}
     <p class="text-center" style="margin-top:26px">${btn('/contact', 'Send an Enquiry', 'primary', 'send')}</p>
   </div>
 </section>`;

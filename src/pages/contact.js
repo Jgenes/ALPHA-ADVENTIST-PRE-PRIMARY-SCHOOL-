@@ -35,6 +35,7 @@ ${phero(ctx, 'Contact', 'Contact Alpha', 'We would love to hear from you — cal
           <a class="btn btn--ghost" href="${esc(wa)}" target="_blank" rel="noopener">${icon('whatsapp')} WhatsApp</a>
           <a class="btn btn--ghost" href="mailto:${esc(s.email)}">${icon('mail')} Email</a>
         </div>
+        ${X.socialLinks(s, { label: 'Official social media:' })}
         <div class="note-strip" style="margin-top:22px">${icon('pin')}<span>${esc(s.mapNote)}</span></div>
         <div class="card" style="margin-top:22px;padding:0;overflow:hidden">
           <div class="media-stack__main" style="border-radius:0">${pic('staff-group', 'Alpha Adventist Pre & Primary School building in Kigoma, with staff group photograph', { widths: [800, 1200], ratio: '16/8' })}</div>
@@ -67,7 +68,8 @@ ${phero(ctx, 'Contact', 'Contact Alpha', 'We would love to hear from you — cal
       <div class="card rv" style="text-align:center"><div class="card__ico" style="margin-inline:auto">${icon('laptop')}</div><h3>Computer Learning</h3><p>Join a computer class or register interest for community training.</p>${btn('/computer-learning', 'Computer Learning', 'ghost')}</div>
       <div class="card rv" style="text-align:center"><div class="card__ico" style="margin-inline:auto">${icon('users')}</div><h3>Parent Corner</h3><p>Calendars, announcements and boarding information for families.</p>${btn('/parents', 'Parent Corner', 'ghost')}</div>
     </div>
-    <p class="text-center muted" style="margin-top:26px;font-size:.88rem">${esc(s.socialNote)}</p>
+    ${(s.social || []).length ? `<div style="margin-top:44px">${sectionHead('Social Media', 'Follow Alpha Online', 'Stay connected with official school updates, videos and campus moments.', { align: 'center' })}<div class="grid grid--3">${s.social.map(channel => `<a class="contact-card rv" href="${esc(channel.url)}" target="_blank" rel="noopener noreferrer">${icon(X.socialIcon(channel.name))}<strong>${esc(channel.name)}</strong><span>Visit official ${esc(channel.name)}</span></a>`).join('')}</div></div>` : ''}
+    ${s.socialNote ? `<p class="text-center muted" style="margin-top:26px;font-size:.88rem">${esc(s.socialNote)}</p>` : ''}
   </div>
 </section>`;
     return {

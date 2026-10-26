@@ -32,7 +32,20 @@
     "emailPublished": true,
     "officeHours": "The school office responds during working hours on school days. For current office hours, please call or send a WhatsApp message to the school office.",
     "centreCode": "PS0603108",
-    "social": [],
+    "social": [
+      {
+        "name": "YouTube",
+        "url": "https://www.youtube.com/@alphaadventispschool"
+      },
+      {
+        "name": "Instagram",
+        "url": "https://www.instagram.com/alpha_adventist_primary_school/?__pwa=1#"
+      },
+      {
+        "name": "Facebook",
+        "url": "https://www.facebook.com/profile.php?id=61585635475293"
+      }
+    ],
     "socialNote": "",
     "mapNote": "Approximate area shown: Msimba, Kigoma. The verified campus map pin will be published once confirmed by school management.",
     "mapQuery": "Alpha Adventist Pre & Primary School, Kigoma, Tanzania"
