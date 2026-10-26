@@ -1,4 +1,4 @@
-name: PHP and MySQL checks
+name: Platform checks
 on:
   push:
   pull_request:
@@ -6,38 +6,48 @@ permissions:
   contents: read
 jobs:
   verify:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 15
-    env:
-      TEST_MYSQL_URL: mysql://alpha_test:synthetic-ci-only@127.0.0.1/alpha_school_test
-      TEST_MYSQL_RESTORE_URL: mysql://alpha_test:synthetic-ci-only@127.0.0.1/alpha_restore_test
-      TEST_MYSQL_SETUP_URL: mysql://alpha_test:synthetic-ci-only@127.0.0.1/alpha_setup_test
-      TEST_MYSQL_INTEGRATIONS_URL: mysql://alpha_test:synthetic-ci-only@127.0.0.1/alpha_integrations_test
     steps:
       - uses: actions/checkout@v4
-      - uses: shivammathur/setup-php@v2
+      - uses: actions/setup-node@v4
         with:
-          php-version: '8.3'
-          extensions: pdo_mysql, openssl, mbstring, gd, sodium, exif
-          coverage: none
-      # Use the runner's installed MySQL service, not a container.
-      - name: Prepare disposable MySQL databases
-        run: |
-          sudo systemctl start mysql
-          mysql --protocol=TCP -h127.0.0.1 -uroot -proot <<'SQL'
-          CREATE DATABASE alpha_school_test CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
-          CREATE DATABASE alpha_restore_test CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
-          CREATE DATABASE alpha_setup_test CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
-          CREATE DATABASE alpha_integrations_test CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
-          CREATE USER 'alpha_test'@'127.0.0.1' IDENTIFIED BY 'synthetic-ci-only';
-          GRANT ALL PRIVILEGES ON alpha_school_test.* TO 'alpha_test'@'127.0.0.1';
-          GRANT ALL PRIVILEGES ON alpha_restore_test.* TO 'alpha_test'@'127.0.0.1';
-          GRANT ALL PRIVILEGES ON alpha_setup_test.* TO 'alpha_test'@'127.0.0.1';
-          GRANT ALL PRIVILEGES ON alpha_integrations_test.* TO 'alpha_test'@'127.0.0.1';
-          SQL
-      - run: php alpha-school/scripts/check.php
-      - run: php alpha-school/test/cpanel.php
-      - run: php alpha-school/test/integrations.php --configuration-only
-      - run: php alpha-school/test/run.php
-      - run: php alpha-school/test/integrations.php
-      - run: php alpha-school/test/setup-mysql.php
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npm test
+      - run: npm audit --omit=dev
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:ui
+      # Screenshots, temporary databases and secrets deliberately are not uploaded.
+  mysql:
+    # The production store on a throwaway MySQL 8 server: schema and indexes, rollback,
+    # optimistic conflicts, audit triggers and chain, the retention job, sign-in and the
+    # portal API. See test/mysql-store.test.js; it skips locally without MYSQL_URL.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: ci-only-root-password
+          MYSQL_DATABASE: adsp_ci_placeholder
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pci-only-root-password"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=24
+    env:
+      MYSQL_URL: mysql://root:ci-only-root-password@127.0.0.1:3306/adsp_ci_placeholder
+      MYSQL_SSL_MODE: disabled
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run test:mysql

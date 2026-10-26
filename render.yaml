@@ -1,0 +1,76 @@
+# Deployment template, not proof of production readiness. Complete the release
+# gates in docs/operations-template.md and rehearse with isolated staging first.
+# Use MySQL plus this persistent disk (for application keys and local files)
+# or a private Supabase S3 bucket (for durable files).
+services:
+  - type: web
+    name: alpha-adventist-school
+    runtime: node
+    plan: starter
+    buildCommand: npm ci --omit=dev && node --check server.js
+    startCommand: npm start
+    healthCheckPath: /readyz
+    autoDeploy: false
+    envVars:
+      - key: NODE_VERSION
+        value: "22.22.3"
+      - key: NODE_ENV
+        value: production
+      - key: DATA_DIR
+        value: /var/data
+      - key: BASE_URL
+        sync: false
+      - key: TRUST_PROXY_HOPS
+        value: "1"
+      - key: MYSQL_URL
+        sync: false
+      - key: MYSQL_DB_NAME
+        sync: false
+      - key: MYSQL_SSL_MODE
+        value: verify-full
+      - key: SUPABASE_S3_ENDPOINT
+        sync: false
+      - key: SUPABASE_S3_REGION
+        sync: false
+      - key: SUPABASE_S3_ACCESS_KEY_ID
+        sync: false
+      - key: SUPABASE_S3_SECRET_ACCESS_KEY
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        sync: false
+      - key: STORAGE_ENCRYPTION_KEY
+        sync: false
+      - key: AUDIT_HMAC_KEY
+        sync: false
+      - key: OFFICE_ALERT_WEBHOOK_URL
+        sync: false
+      - key: OFFICE_ALERT_WEBHOOK_SECRET
+        sync: false
+      - key: GMAIL_SMTP_USER
+        sync: false
+      - key: GMAIL_SMTP_APP_PASSWORD
+        sync: false
+      - key: OFFICE_ALERT_EMAIL
+        sync: false
+      - key: PRIVACY_ALERT_EMAIL
+        sync: false
+      - key: FORM_RETENTION_DAYS
+        sync: false
+      - key: ADMISSION_RETENTION_DAYS
+        sync: false
+      - key: RETENTION_POLICY_APPROVED
+        sync: false
+      - key: HEAD_TEACHER_USERNAME
+        sync: false
+      - key: HEAD_TEACHER_NAME
+        sync: false
+      - key: HEAD_TEACHER_PASSWORD
+        sync: false
+      - key: HEAD_TEACHER_APPROVED
+        sync: false
+      - key: HEAD_TEACHER_APPROVAL_REFERENCE
+        sync: false
+    disk:
+      name: alpha-school-private-files
+      mountPath: /var/data
+      sizeGB: 5
