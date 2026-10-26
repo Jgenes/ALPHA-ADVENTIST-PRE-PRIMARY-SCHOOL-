@@ -6,19 +6,17 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "test": "node --test test/*.test.js",
-    "test:mysql": "node --test test/mysql-store.test.js",
     "check": "node scripts/check.js",
     "bootstrap": "node scripts/bootstrap.js",
-    "backup:mysql": "node scripts/backup-mysql.js",
-    "restore:mysql": "node scripts/restore-mysql.js",
-    "import:mongodb": "node scripts/import-mongodb.js",
-    "migrate:mysql": "node scripts/migrate-mysql.js",
+    "backup:mongodb": "node scripts/backup-mongodb.js",
+    "migrate:mongodb": "node scripts/migrate-mongodb.js",
+    "restore:mongodb": "node scripts/restore-mongodb.js",
     "test:ui": "node scripts/ui-smoke.js && node scripts/auth-ui-smoke.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1144.0",
     "dotenv": "^16.4.7",
-    "mysql2": "^3.24.5",
+    "mongodb": "^7.7.0",
     "nodemailer": "^10.0.13",
     "sharp": "^0.35.5"
   },

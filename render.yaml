@@ -1,7 +1,10 @@
 # Deployment template, not proof of production readiness. Complete the release
 # gates in docs/operations-template.md and rehearse with isolated staging first.
-# Use MySQL plus this persistent disk (for application keys and local files)
+# Use MongoDB plus this persistent disk (for application keys and local files)
 # or a private Supabase S3 bucket (for durable files).
+# MONGODB_URI must point at a replica set (MongoDB Atlas free/shared tiers work):
+# the platform writes inside multi-document transactions, so a standalone mongod
+# is refused at startup.
 services:
   - type: web
     name: alpha-adventist-school
@@ -22,12 +25,10 @@ services:
         sync: false
       - key: TRUST_PROXY_HOPS
         value: "1"
-      - key: MYSQL_URL
+      - key: MONGODB_URI
         sync: false
-      - key: MYSQL_DB_NAME
+      - key: MONGODB_DB_NAME
         sync: false
-      - key: MYSQL_SSL_MODE
-        value: verify-full
       - key: SUPABASE_S3_ENDPOINT
         sync: false
       - key: SUPABASE_S3_REGION

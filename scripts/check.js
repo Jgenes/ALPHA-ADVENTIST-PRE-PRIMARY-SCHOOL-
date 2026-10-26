@@ -24,7 +24,7 @@ const files = execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--
 for (const file of files) {
   if (file === '.env.example') continue;
   assert.ok(!/^(?:\.env(?:\.|$)|\.runtime\/|private\/|work\/|uploads\/|backups\/|data\/(?!seed\.json$))/.test(file), 'Sensitive/runtime path must not be tracked: ' + file);
-  assert.ok(!/\.(?:sqlite(?:-\w+)?|json\.enc|pdf)$/i.test(file), 'Review and remove internal binary artifact: ' + file);
+  assert.ok(!/\.(?:sqlite(?:-\w+)?|ejson\.enc|pdf)$/i.test(file), 'Review and remove internal binary artifact: ' + file);
 }
 const YAML = require('yaml');
 for (const name of ['render.yaml', '.github/workflows/ci.yml']) {

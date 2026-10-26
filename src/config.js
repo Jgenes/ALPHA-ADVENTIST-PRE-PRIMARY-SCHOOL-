@@ -3,7 +3,6 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { supabaseStorageConfig } = require('./platform/supabase-storage');
-const { mysqlConfig, isConfigured: isMySQLConfigured } = require('./platform/mysql-config');
 
 const LIVE_URL = 'https://alpha-adventist-pre-primary-school.onrender.com';
 function positive(value, fallback, max = 3650) {
@@ -65,9 +64,10 @@ function createConfig(env = process.env) {
     if (!/^[a-f0-9]{64}$/i.test(value || '')) throw new Error(`${name} is missing or invalid. Set ${name} (or ${name}_FILE) to exactly 64 hexadecimal characters representing 32 random bytes; do not use a placeholder.`);
     return Buffer.from(value, 'hex');
   }
-  const mysql = mysqlConfig(env, { production });
-  if (publicPreview && (mysql || isMySQLConfigured(env))) throw new Error('Public preview must use isolated temporary storage, not MySQL.');
-  if (production && !publicPreview && !mysql) throw new Error('An isolated MySQL database is required outside development. Set MYSQL_URL, or MYSQL_HOST, MYSQL_USER and MYSQL_DB_NAME, for a dedicated schema.');
+  const mongoUri = env.MONGODB_URI || env.MONGO_URI;
+  const mongoDb = env.MONGODB_DB_NAME || env.MONGO_DB_NAME;
+  if (publicPreview && (mongoUri || mongoDb)) throw new Error('Public preview must use isolated temporary storage, not MongoDB.');
+  if (production && !publicPreview && (!mongoUri || !mongoDb)) throw new Error('An isolated MongoDB replica-set database is required outside development.');
   if (production && !publicPreview && (!env.FORM_RETENTION_DAYS || !env.ADMISSION_RETENTION_DAYS || env.RETENTION_POLICY_APPROVED !== 'true')) throw new Error('Configure and approve the retention schedule before production/staging startup.');
   const webhookConfigured = Boolean(env.OFFICE_ALERT_WEBHOOK_URL || env.OFFICE_ALERT_WEBHOOK_SECRET);
   const missingWebhookSettings = ['OFFICE_ALERT_WEBHOOK_URL', 'OFFICE_ALERT_WEBHOOK_SECRET'].filter(name => !env[name]);
@@ -95,7 +95,7 @@ function createConfig(env = process.env) {
   if (!Number.isSafeInteger(proxyHops) || proxyHops < 0 || proxyHops > 5) throw new Error('TRUST_PROXY_HOPS must be an explicit proxy hop count (0–5).');
   return {
     production, publicPreview, environment: env.NODE_ENV || 'development', baseUrl: base.origin, dataDir,
-    port, mysql, mysqlDatabase: mysql ? mysql.database : '', supabaseStorage, ...keys,
+    port, mongoUri, mongoDb, supabaseStorage, ...keys,
     proxyHops, sessionIdleMs: 30 * 60 * 1000, sessionAbsoluteMs: 8 * 60 * 60 * 1000,
     formRetentionDays: positive(env.FORM_RETENTION_DAYS, 90), admissionRetentionDays: positive(env.ADMISSION_RETENTION_DAYS, 365),
     alertUrl: env.OFFICE_ALERT_WEBHOOK_URL || '', alertSecret: env.OFFICE_ALERT_WEBHOOK_SECRET || '', smtp,

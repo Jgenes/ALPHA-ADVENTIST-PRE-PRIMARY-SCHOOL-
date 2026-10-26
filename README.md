@@ -32,11 +32,11 @@ npm start
 
 Open `http://localhost:3000`; the staff workspace is `/portal`. The server binds to `0.0.0.0`. Browser-facing requests use relative URLs, so a proxied preview works without calling the visitor’s localhost.
 
-With no MySQL configured, development uses transactional SQLite in ignored `.runtime/`, not a JSON-file database. Set `MYSQL_URL` (or `MYSQL_HOST`, `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_DB_NAME`) to run the same application against MySQL instead — see [docs/mysql-migration.md](docs/mysql-migration.md). Development keys are generated locally with restrictive permissions. Do not reuse them outside development. There are **no default login credentials, demo users or invented employment balances**.
+With no Mongo URI, development uses transactional SQLite in ignored `.runtime/`, not a JSON-file database. Development keys are generated locally with restrictive permissions. Do not reuse them outside development. There are **no default login credentials, demo users or invented employment balances**.
 
 ### Initial access
 
-Appoint **separate people** for technical administration and school business authority. Provide a strong temporary password through a mode-600 file outside source control (or, on Windows, a file with a protected NTFS ACL), then use an approved operator terminal:
+Appoint **separate people** for technical administration and school business authority. Provide a strong temporary password through a mode-600 file outside source control, then use an approved operator terminal:
 
 ```sh
 npm run bootstrap -- --username YOUR_NAMED_USERNAME --name "Authorised person's name" --role system_admin
@@ -68,13 +68,13 @@ npm run test:ui           # isolated browser workflow, mobile and accessibility 
 Use separate databases, storage, keys, origins and alert recipients for each environment. Outside development, startup requires:
 
 - An explicitly configured, verified HTTPS `BASE_URL`.
-- A dedicated MySQL 8 schema on InnoDB (JSON documents, generated-column unique indexes, TLS outside development) and either persistent `DATA_DIR` storage or a private Supabase S3 bucket for files. `DATA_DIR` must remain persistent in both configurations because it holds application keys and, for local storage, uploaded files.
+- A transaction-capable MongoDB replica set/Atlas database and either persistent `DATA_DIR` storage or a private Supabase S3 bucket for files. `DATA_DIR` must remain persistent in both configurations because it holds application keys and, for local storage, uploaded files.
 - Two distinct 32-byte keys for private storage and audit HMAC. If not supplied as secrets or protected key files, production creates them once in `application-keys.json` under `DATA_DIR`; `DATA_DIR` must be a persistent, protected disk. Escrow this file separately and never replace it after real use. Legacy encrypted MFA fields are ignored and left untouched.
 - A signed office-alert endpoint/secret or configured Gmail SMTP delivery with approved office and privacy recipients, and an explicitly approved retention schedule. The safeguarding contact is managed dynamically through the portal’s independently reviewed and published school-contact settings; until configured, the site directs people to the Head of School’s office.
 
 The public site at **https://alpha-adventist-pre-primary-school.onrender.com** was reachable during a read-only check on **30 September 2026**. The similarly spelled hostname without the hyphen between `alpha` and `adventist` returned “Not Found.” The reachable URL is the development fallback only; production still requires an explicit `BASE_URL`, and the school must confirm its long-term official domain. No live deployment was performed in this implementation session.
 
-For a **free, read-only public preview**, create a separate Render service and set `NODE_ENV=staging`, `PUBLIC_PREVIEW=true`, `BASE_URL` to that service's HTTPS origin, and `DATA_DIR=/tmp/alpha-school-preview`. Do not copy `MYSQL_*` environment variables into this service; preview uses temporary SQLite and generated local keys. It displays a preview notice, rejects all `/api` and `/portal` requests, removes public submission forms and staff links, and returns `noindex`. Its database and temporary files can disappear on restart. This mode is not for real submissions, staff work or school records. Keep the live service in strict production mode with its approved MySQL schema, persistent storage and alert configuration.
+For a **free, read-only public preview**, create a separate Render service and set `NODE_ENV=staging`, `PUBLIC_PREVIEW=true`, `BASE_URL` to that service's HTTPS origin, and `DATA_DIR=/tmp/alpha-school-preview`. Do not copy MongoDB environment variables into this service; preview uses temporary SQLite and generated local keys. It displays a preview notice, rejects all `/api` and `/portal` requests, removes public submission forms and staff links, and returns `noindex`. Its database and temporary files can disappear on restart. This mode is not for real submissions, staff work or school records. Keep the live service in strict production mode with its approved MongoDB, persistent storage and alert configuration.
 
 `render.yaml` is a **single-instance deployment template**, with a persistent disk, readiness probe and automatic deployment disabled. To use external files, create a private Supabase Storage bucket, enable S3 access in Supabase Storage settings, and configure all `SUPABASE_S3_*` and `SUPABASE_STORAGE_BUCKET` values from `.env.example`. Supabase S3 keys are server-only and have broad project storage access; use a dedicated Supabase project and never expose them to browsers. Files are streamed through the app's authorization and consent checks; do not make the bucket public. PDF and image uploads are not malware-scanned; only upload files from trusted sources. The template does not configure a messaging provider, database, backups, DNS, analytics or Search Console on your behalf.
 
@@ -86,12 +86,11 @@ Unconfigured jobs remain **PENDING**; non-success responses retry with backoff, 
 
 ## Backups and legacy migration
 
-- `npm run backup:mysql` creates an encrypted, bounded database-and-private-file archive during a confirmed maintenance window. Every table is read inside one `REPEATABLE READ` consistent-snapshot transaction. With Supabase Storage configured it captures referenced encrypted objects from the private bucket.
-- `npm run restore:mysql -- /protected/path/archive.json.enc` restores only to an explicitly approved, empty isolated schema ending in `_restore_test`; Supabase archives also require `SUPABASE_RESTORE_BUCKET` to name a separate empty bucket, never the source or live bucket.
-- `npm run import:mongodb -- /protected/path/archive.ejson.enc` is the one-time cutover path from an archive written by the retired MongoDB backup tool: it maps the old `adsp_*` collections into MySQL tables, never imports sessions or download grants, and can be rehearsed with `MYSQL_IMPORT_DRY_RUN=true`.
-- `npm run migrate:mysql` imports supported legacy text and form fields from a fresh encrypted backup, without importing old passwords, accounts or unverified photographs. Public imports become reviewable drafts; unrecognised schemas need a reviewed mapping.
+- `npm run backup:mongodb` creates an encrypted, bounded database-and-private-file archive during a confirmed maintenance window. With Supabase Storage configured it captures referenced encrypted objects from the private bucket.
+- `npm run restore:mongodb -- /protected/path/archive.ejson.enc` restores only to an explicitly approved, empty isolated database ending in `_restore_test`; Supabase archives also require `SUPABASE_RESTORE_BUCKET` to name a separate empty bucket, never the source or live bucket.
+- `npm run migrate:mongodb` imports supported legacy text and form fields from a fresh encrypted backup, without importing old passwords, accounts or unverified photographs. Public imports become reviewable drafts; unrecognised schemas need a reviewed mapping.
 
-`npm test` skips the live MySQL suite unless `MYSQL_URL` is set; `npm run test:mysql` runs it directly, and the CI workflow starts a throwaway MySQL 8 service for it. See the operations template before using these commands. Tests cover isolated local file recovery, mocked Supabase object capture/restore, mocked SMTP message routing and the MySQL store against a temporary schema; live Supabase credentials, bucket permissions, real Gmail SMTP delivery and production recovery have not been verified in this workspace.
+See the operations template before using these commands. Tests cover isolated local file recovery, mocked Supabase object capture/restore, and mocked SMTP message routing; live Supabase credentials, bucket permissions, real Gmail SMTP delivery, Mongo restore/migration and production recovery have not been verified in this workspace.
 
 ## Repository and child-data safety
 
