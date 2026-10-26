@@ -50,6 +50,21 @@ For a host without an operator shell, the first `head_teacher` account can inste
 
 Management can then appoint HR, departmental approvers, CMS authors/editors/publishers and the privacy officer. HR records staff IDs, departments, supervisors and entitlements. ICT accounts **do not inherit HR/contract/financial access or business approvals**.
 
+### Sample accounts for a demonstration
+
+For development or a walkthrough only, the seeder creates one account per role plus enough classroom data that every dashboard shows something:
+
+```sh
+npm run seed:samples            # create the accounts and demonstration records
+node scripts/seed-sample-users.js --dry-run   # show the plan without writing anything
+```
+
+It creates `sample.sysadmin`, `sample.head`, `sample.admin`, `sample.teacher`, `sample.hr`, `sample.parent`, `sample.student` and one account for every other role, all under the `sample.*` namespace. Each receives a generated password written to **`sample-users.txt`** (mode `600`, git-ignored) — passwords are never printed to the console or logs. Every seeded account must change its password at first sign-in.
+
+It also inserts a sample classroom, teacher assignment, learner record, verified guardian link, attendance, a published result and learning material, a published staff notice, a CMS draft, and one submitted admission application. The run is idempotent: existing sample accounts and demonstration records are left untouched.
+
+Safeguards: it refuses to run when `PUBLIC_PREVIEW=true`, and refuses `NODE_ENV=production` unless `SEED_SAMPLE_USERS_APPROVED=true` and `SEED_SAMPLE_USERS_REFERENCE` are set. These accounts have known, written credentials, so never enable them on a public deployment. Delete the sample accounts before entering real school records.
+
 ## Checks
 
 ```sh

@@ -11,7 +11,8 @@
     "backup:mongodb": "node scripts/backup-mongodb.js",
     "migrate:mongodb": "node scripts/migrate-mongodb.js",
     "restore:mongodb": "node scripts/restore-mongodb.js",
-    "test:ui": "node scripts/ui-smoke.js && node scripts/auth-ui-smoke.js"
+    "test:ui": "node scripts/ui-smoke.js && node scripts/auth-ui-smoke.js",
+    "seed:samples": "node scripts/seed-sample-users.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1144.0",
