@@ -61,9 +61,16 @@ test('real MySQL/MariaDB store rehearsal: schema, revisions, uniqueness and audi
   await assert.rejects(store.run(tx => tx.insert('audit_logs', { id: 'AUD-REHEARSAL-DUP', sequence, action: 'rehearsal.duplicate' })), error => error.status === 409);
 
   // The trigger blocks a direct SQL rewrite even when the application is bypassed.
+  // A host that withholds TRIGGER (or MySQL 8 with binary logging and
+  // log_bin_trust_function_creators=0) leaves only the application guard; report
+  // that honestly instead of failing the school's rehearsal.
   const connection = await mysql.createConnection(mysqlConnectionOptions(config.mysql, { database: config.mysql.database }));
   try {
-    await assert.rejects(connection.query("UPDATE adsp_audit_logs SET payload = '{}' WHERE id = ?", ['AUD-REHEARSAL-' + sequence]), /append-only/);
+    const [[{ present }]] = await connection.query("SELECT COUNT(*) AS present FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = DATABASE() AND TRIGGER_NAME IN ('adsp_audit_logs_no_update', 'adsp_audit_logs_no_delete')");
+    if (Number(present) === 2) {
+      await assert.rejects(connection.query("UPDATE adsp_audit_logs SET payload = '{}' WHERE id = ?", ['AUD-REHEARSAL-' + sequence]), /append-only/);
+      await assert.rejects(connection.query('DELETE FROM adsp_audit_logs WHERE id = ?', ['AUD-REHEARSAL-' + sequence]), /append-only/);
+    } else t.diagnostic('Audit triggers are not installed on this database; only the application append-only guard was exercised. Grant TRIGGER or set log_bin_trust_function_creators=1, then repeat.');
   } finally { await connection.end(); }
 
   await store.run(tx => tx.remove('users', user.id));

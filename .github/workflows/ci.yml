@@ -25,7 +25,6 @@ jobs:
           --health-interval=10s
           --health-timeout=5s
           --health-retries=12
-          --log-bin-trust-function-creators=1
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -35,6 +34,11 @@ jobs:
       - run: npm ci
       - run: npm run check
       - run: npm test
+      - name: Allow append-only audit triggers in the disposable database
+        env:
+          MYSQL_ROOT_PASSWORD: synthetic-root-password
+        run: |
+          node -e "const mysql=require('mysql2/promise');(async()=>{const c=await mysql.createConnection({host:'127.0.0.1',user:'root',password:process.env.MYSQL_ROOT_PASSWORD});await c.query('SET GLOBAL log_bin_trust_function_creators = 1');await c.end();})().catch(error=>{console.error(error.message);process.exit(1)})"
       - name: Real MySQL/MariaDB store rehearsal
         env:
           TEST_DB_HOST: 127.0.0.1
