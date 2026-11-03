@@ -43,7 +43,7 @@
 - Synthetic family portal end-to-end: school creates learner/class/teacher links, staff verifies a guardian, teacher records attendance and draft results/materials, management publishes them, and parent/student/assigned-teacher views stay scoped. Unverified links, off-audience notices and unrelated-parent messages are denied.
 - Approved one-time bootstrap, AES-GCM archive integrity/wrong-key failures, restore target/path/checksum guards, **actual isolated SQLite + private-file restoration**, intact recovered audit chain and file decryption.
 - MySQL adapter behaviour against an in-memory statement double (revisions, unique business keys, duplicate rejection, audit append-only), generated schema consistency with `db/schema.mysql.sql`, and fail-closed MySQL configuration.
-- A real MySQL 8 rehearsal in CI against a disposable `alpha_school_test` database: 37 `adsp_*` tables created, revisions, duplicate-username rejection and both audit triggers blocking direct `UPDATE`/`DELETE`. `npm run test:mysql` repeats this against any disposable `*_test` database, including a cPanel MariaDB staging copy.
+- A real MySQL 8 rehearsal in CI against a disposable `alpha_school_test` database: 37 `adsp_*` tables created, optimistic revisions, duplicate-username rejection, both audit triggers blocking direct `UPDATE`/`DELETE`, and a full `createApplication` boot that initialises the platform, reads seeded public content and verifies the HMAC audit chain. `npm run test:mysql` repeats this against any disposable `*_test` database, including a cPanel MariaDB staging copy.
 
 `npm run check` verifies JavaScript syntax, all seven actual PWA precache resources, safe seed/current-tree artifact rules and diff whitespace. This does not scan or remove old Git history.
 
