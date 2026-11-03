@@ -64,10 +64,31 @@ function createConfig(env = process.env) {
     if (!/^[a-f0-9]{64}$/i.test(value || '')) throw new Error(`${name} is missing or invalid. Set ${name} (or ${name}_FILE) to exactly 64 hexadecimal characters representing 32 random bytes; do not use a placeholder.`);
     return Buffer.from(value, 'hex');
   }
-  const mongoUri = env.MONGODB_URI || env.MONGO_URI;
-  const mongoDb = env.MONGODB_DB_NAME || env.MONGO_DB_NAME;
-  if (publicPreview && (mongoUri || mongoDb)) throw new Error('Public preview must use isolated temporary storage, not MongoDB.');
-  if (production && !publicPreview && (!mongoUri || !mongoDb)) throw new Error('An isolated MongoDB replica-set database is required outside development.');
+  // MySQL/MariaDB in cPanel. The database created in cPanel is normally
+  // prefixed with the account name, for example alphadve_alpha_school.
+  const mysqlHost = env.DB_HOST || env.MYSQL_HOST || '';
+  const mysqlSocketPath = env.DB_SOCKET || env.MYSQL_SOCKET || '';
+  const mysqlUser = env.DB_USER || env.MYSQL_USER || '';
+  const mysqlPassword = env.DB_PASSWORD ?? env.MYSQL_PASSWORD ?? '';
+  const mysqlDatabase = env.DB_NAME || env.MYSQL_DATABASE || 'alphadve_alpha_school';
+  const mysqlPort = env.DB_PORT === undefined || env.DB_PORT === '' ? 3306 : Number(env.DB_PORT);
+  const mysqlConfigured = Boolean((mysqlHost || mysqlSocketPath) && mysqlUser);
+  if (!Number.isSafeInteger(mysqlPort) || mysqlPort < 1 || mysqlPort > 65535) throw new Error('DB_PORT must be a valid MySQL port (1–65535).');
+  if (!/^[A-Za-z0-9_]{1,64}$/.test(mysqlDatabase)) throw new Error('DB_NAME must be a MySQL database name (letters, digits and underscores only).');
+  let mysqlSsl = null;
+  if (['true', '1', 'yes'].includes(String(env.DB_SSL || '').toLowerCase())) {
+    const caFile = env.DB_SSL_CA_FILE;
+    if (caFile && !fs.existsSync(caFile)) throw new Error('DB_SSL_CA_FILE does not exist.');
+    mysqlSsl = { rejectUnauthorized: env.DB_SSL_REJECT_UNAUTHORIZED !== 'false', ...(caFile ? { ca: fs.readFileSync(caFile, 'utf8') } : {}) };
+  }
+  const mysql = mysqlConfigured ? {
+    host: mysqlHost, port: mysqlPort, user: mysqlUser, password: mysqlPassword,
+    database: mysqlDatabase, socketPath: mysqlSocketPath, ssl: mysqlSsl
+  } : null;
+  const mysqlAutoSchema = env.DB_AUTO_SCHEMA !== 'false';
+  if (publicPreview && mysql) throw new Error('Public preview must use isolated temporary storage, not the production MySQL database.');
+  if (production && !publicPreview && !mysql) throw new Error('A MySQL/MariaDB database is required outside development. Set DB_HOST, DB_NAME, DB_USER and DB_PASSWORD for the cPanel database (for example alphadve_alpha_school).');
+  if (production && !publicPreview && !mysqlPassword) throw new Error('Set DB_PASSWORD for the MySQL/MariaDB database user; do not rely on an empty password.');
   if (production && !publicPreview && (!env.FORM_RETENTION_DAYS || !env.ADMISSION_RETENTION_DAYS || env.RETENTION_POLICY_APPROVED !== 'true')) throw new Error('Configure and approve the retention schedule before production/staging startup.');
   const webhookConfigured = Boolean(env.OFFICE_ALERT_WEBHOOK_URL || env.OFFICE_ALERT_WEBHOOK_SECRET);
   const missingWebhookSettings = ['OFFICE_ALERT_WEBHOOK_URL', 'OFFICE_ALERT_WEBHOOK_SECRET'].filter(name => !env[name]);
@@ -95,7 +116,7 @@ function createConfig(env = process.env) {
   if (!Number.isSafeInteger(proxyHops) || proxyHops < 0 || proxyHops > 5) throw new Error('TRUST_PROXY_HOPS must be an explicit proxy hop count (0–5).');
   return {
     production, publicPreview, environment: env.NODE_ENV || 'development', baseUrl: base.origin, dataDir,
-    port, mongoUri, mongoDb, supabaseStorage, ...keys,
+    port, mysql, mysqlAutoSchema, supabaseStorage, ...keys,
     proxyHops, sessionIdleMs: 30 * 60 * 1000, sessionAbsoluteMs: 8 * 60 * 60 * 1000,
     formRetentionDays: positive(env.FORM_RETENTION_DAYS, 90), admissionRetentionDays: positive(env.ADMISSION_RETENTION_DAYS, 365),
     alertUrl: env.OFFICE_ALERT_WEBHOOK_URL || '', alertSecret: env.OFFICE_ALERT_WEBHOOK_SECRET || '', smtp,
