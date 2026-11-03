@@ -41,7 +41,18 @@ jobs:
           TEST_DB_NAME: alpha_school_test
           TEST_DB_USER: alpha_school
           TEST_DB_PASSWORD: synthetic-db-password
-        run: npm run test:mysql
+        run: |
+          set -o pipefail
+          if npm run test:mysql 2>&1 | tee /tmp/mysql-rehearsal.log; then exit 0; fi
+          # The runner log endpoint is not readable from this workspace, so surface
+          # the failing assertions as a check annotation when the rehearsal fails.
+          node - <<'SCRIPT'
+          const fs = require('node:fs');
+          const lines = fs.readFileSync('/tmp/mysql-rehearsal.log', 'utf8').split('\n').filter(Boolean).slice(-40);
+          const text = lines.join(' | ').replace(/%/g, '%25').replace(/\r/g, '').slice(0, 6000);
+          console.log('::error title=MySQL rehearsal output::' + text);
+          SCRIPT
+          exit 1
       - run: npm audit --omit=dev
       - run: npx playwright install --with-deps chromium
       - run: npm run test:ui
