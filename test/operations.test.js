@@ -12,7 +12,8 @@ const { Files } = require('../src/platform/files');
 const { supabaseStorageConfig, createSupabaseStorage } = require('../src/platform/supabase-storage');
 const { verifyAudit } = require('../src/platform/audit');
 const { bootstrapUser } = require('../scripts/bootstrap');
-const { validateRestore } = require('../scripts/restore-mysql');
+const { legacyRecords, importLegacy } = require('../scripts/migrate-mongodb');
+const { validateRestore } = require('../scripts/restore-mongodb');
 const B = require('../scripts/backup-lib');
 const { textFile } = require('./helpers');
 
@@ -162,16 +163,15 @@ test('operator safeguards and an actual isolated SQLite/file recovery rehearsal'
     assert.throws(() => B.keyBytes('not-a-key'));
   });
   await t.test('restore requires an approved empty isolated target, never the live database', () => {
-    const env = { NODE_ENV: 'test', RESTORE_APPROVED: 'true', DB_HOST: 'localhost', DB_NAME: 'alphadve_alpha_school', DB_USER: 'alphadve_school', DB_PASSWORD: 'synthetic-db-password', DB_RESTORE_NAME: 'alphadve_alpha_school_restore_test', RESTORE_DATA_DIR: path.join(root, 'restore') };
-    assert.equal(validateRestore(backup, env), 'alphadve_alpha_school_restore_test');
+    const env = { NODE_ENV: 'test', RESTORE_APPROVED: 'true', MONGODB_RESTORE_URI: 'mongodb://localhost:27017', MONGODB_RESTORE_DB_NAME: 'synthetic_restore_test', RESTORE_DATA_DIR: path.join(root, 'restore') };
+    assert.equal(validateRestore(backup, env), 'synthetic_restore_test');
     assert.throws(() => validateRestore(backup, { ...env, NODE_ENV: 'production' }));
     assert.throws(() => validateRestore(backup, { ...env, RESTORE_APPROVED: 'false' }));
-    assert.throws(() => validateRestore(backup, { ...env, DB_RESTORE_NAME: backup.database }));
-    assert.throws(() => validateRestore(backup, { ...env, DB_RESTORE_NAME: 'not_a_restore_database' }), /_restore_test/);
+    assert.throws(() => validateRestore(backup, { ...env, MONGODB_RESTORE_DB_NAME: backup.database }));
     assert.throws(() => validateRestore(backup, { ...env, DATA_DIR: env.RESTORE_DATA_DIR }));
     const remoteBackup = { ...backup, storage: { provider: 'supabase-s3', bucket: 'source-private' } };
     const remoteEnv = { ...env, SUPABASE_STORAGE_BUCKET: 'production-private', SUPABASE_RESTORE_BUCKET: 'restore-private' };
-    assert.equal(validateRestore(remoteBackup, remoteEnv), 'alphadve_alpha_school_restore_test');
+    assert.equal(validateRestore(remoteBackup, remoteEnv), 'synthetic_restore_test');
     assert.throws(() => validateRestore(remoteBackup, { ...remoteEnv, SUPABASE_RESTORE_BUCKET: 'source-private' }), /separate empty Supabase/);
     assert.throws(() => validateRestore(remoteBackup, { ...remoteEnv, SUPABASE_RESTORE_BUCKET: 'production-private' }), /separate empty Supabase/);
   });
@@ -188,5 +188,24 @@ test('operator safeguards and an actual isolated SQLite/file recovery rehearsal'
     assert.equal((await app.store.run(tx => tx.list('users'))).length, 1);
     await assert.rejects(B.restoreFiles(restoredDir, backup.files), /empty/);
     assert.equal((await fs.readdir(path.join(restoredDir, 'storage', 'public'))).length, 0);
+  });
+  await t.test('legacy import is explicit, text-only, review-first and idempotent', async () => {
+    const snapshot = { database: 'synthetic_legacy', exportedAt: new Date(), collections: [
+      { name: 'users', documents: [{ username: 'legacy-unsafe' }] },
+      { name: 'gallery', documents: [{ img: '/unverified.jpg' }] },
+      { name: 'news', documents: [{ id: 'old-story', title: 'Synthetic legacy story', slug: 'synthetic-legacy-story', content: ['Synthetic legacy text.'], image: '/unverified.jpg', sortDate: '2026-09-01' }] },
+      { name: 'submissions', documents: [{ id: 'old-enquiry', type: 'Contact enquiry', at: new Date().toISOString(), data: { name: 'Synthetic old parent', phone: '+255700000000', message: 'Synthetic legacy message', privateExtra: 'ignored' } }] }
+    ] };
+    const transformed = legacyRecords(snapshot, config);
+    assert.equal(transformed.content[0].status, 'DRAFT'); assert.equal(transformed.content[0].mediaId, '');
+    assert.equal(transformed.records[0].record.data.privateExtra, undefined);
+    assert.equal(transformed.records[0].record.consent.acceptedAt, null);
+    const first = await importLegacy(app.store, app.config, snapshot);
+    const second = await importLegacy(app.store, app.config, snapshot);
+    assert.deepEqual(first, second); assert.equal(first.drafts, 1); assert.equal(first.privateRecords, 1);
+    assert.equal((await app.store.run(tx => tx.list('users'))).length, 1);
+    assert.equal((await app.store.run(tx => tx.list('media'))).length, 0);
+    assert.equal((await app.platform.publicContent()).some(item => item.slug === 'synthetic-legacy-story'), false);
+    assert.equal((await app.store.run(tx => tx.list('submissions'))).length, 1);
   });
 });
