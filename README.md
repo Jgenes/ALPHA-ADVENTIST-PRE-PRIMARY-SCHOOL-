@@ -32,7 +32,7 @@ npm start
 
 Open `http://localhost:3000`; the staff workspace is `/portal`. The server binds to `0.0.0.0`. Browser-facing requests use relative URLs, so a proxied preview works without calling the visitor’s localhost.
 
-With no `DB_HOST`/`DB_USER`, development uses transactional SQLite in ignored `.runtime/`, not a JSON-file database. Set the MySQL/MariaDB variables (`.env.example` → `DB_*`) to run against MySQL instead; this is the same database engine used on cPanel. Development keys are generated locally with restrictive permissions. Do not reuse them outside development. There are **no default login credentials, demo users or invented employment balances**.
+With no Mongo URI, development uses transactional SQLite in ignored `.runtime/`, not a JSON-file database. Development keys are generated locally with restrictive permissions. Do not reuse them outside development. There are **no default login credentials, demo users or invented employment balances**.
 
 ### Initial access
 
@@ -69,8 +69,7 @@ Safeguards: it refuses to run when `PUBLIC_PREVIEW=true`, and refuses `NODE_ENV=
 
 ```sh
 npm run check             # syntax, actual PWA assets, safe seed/artifact guard
-npm test                  # isolated synthetic SQLite/MySQL-adapter/security/workflow/recovery tests
-npm run test:mysql        # optional real MySQL/MariaDB rehearsal against a scratch *_test database
+npm test                  # isolated synthetic SQLite/security/workflow/recovery tests
 npm audit --omit=dev
 # UI regressions also require OpenSSL (included on the Linux CI runner).
 npx playwright install --with-deps chromium
@@ -84,19 +83,15 @@ npm run test:ui           # isolated browser workflow, mobile and accessibility 
 Use separate databases, storage, keys, origins and alert recipients for each environment. Outside development, startup requires:
 
 - An explicitly configured, verified HTTPS `BASE_URL`.
-- A **MySQL/MariaDB** database (InnoDB, MySQL 5.7+/MariaDB 10.2+). The cPanel database name used for this school is **`alphadve_alpha_school`**; set `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER` and `DB_PASSWORD`. Import `db/schema.mysql.sql` once in phpMyAdmin (or leave `DB_AUTO_SCHEMA=true` for the first start). Also provide either persistent `DATA_DIR` storage or a private Supabase S3 bucket for files. `DATA_DIR` must remain persistent in both configurations because it holds application keys and, for local storage, uploaded files.
+- A transaction-capable MongoDB replica set/Atlas database and either persistent `DATA_DIR` storage or a private Supabase S3 bucket for files. `DATA_DIR` must remain persistent in both configurations because it holds application keys and, for local storage, uploaded files.
 - Two distinct 32-byte keys for private storage and audit HMAC. If not supplied as secrets or protected key files, production creates them once in `application-keys.json` under `DATA_DIR`; `DATA_DIR` must be a persistent, protected disk. Escrow this file separately and never replace it after real use. Legacy encrypted MFA fields are ignored and left untouched.
 - A signed office-alert endpoint/secret or configured Gmail SMTP delivery with approved office and privacy recipients, and an explicitly approved retention schedule. The safeguarding contact is managed dynamically through the portal’s independently reviewed and published school-contact settings; until configured, the site directs people to the Head of School’s office.
 
 The public site at **https://alpha-adventist-pre-primary-school.onrender.com** was reachable during a read-only check on **30 September 2026**. The similarly spelled hostname without the hyphen between `alpha` and `adventist` returned “Not Found.” The reachable URL is the development fallback only; production still requires an explicit `BASE_URL`, and the school must confirm its long-term official domain. No live deployment was performed in this implementation session.
 
-For a **free, read-only public preview**, create a separate Render service and set `NODE_ENV=staging`, `PUBLIC_PREVIEW=true`, `BASE_URL` to that service's HTTPS origin, and `DATA_DIR=/tmp/alpha-school-preview`. Do not copy the MySQL environment variables into this service; preview uses temporary SQLite and generated local keys. It displays a preview notice, rejects all `/api` and `/portal` requests, removes public submission forms and staff links, and returns `noindex`. Its database and temporary files can disappear on restart. This mode is not for real submissions, staff work or school records. Keep the live service in strict production mode with its approved MySQL database, persistent storage and alert configuration.
+For a **free, read-only public preview**, create a separate Render service and set `NODE_ENV=staging`, `PUBLIC_PREVIEW=true`, `BASE_URL` to that service's HTTPS origin, and `DATA_DIR=/tmp/alpha-school-preview`. Do not copy MongoDB environment variables into this service; preview uses temporary SQLite and generated local keys. It displays a preview notice, rejects all `/api` and `/portal` requests, removes public submission forms and staff links, and returns `noindex`. Its database and temporary files can disappear on restart. This mode is not for real submissions, staff work or school records. Keep the live service in strict production mode with its approved MongoDB, persistent storage and alert configuration.
 
-### cPanel deployment
-
-The production target for this school is **cPanel with a MySQL database named `alphadve_alpha_school`**. Step-by-step setup (database/user creation, schema import, Node.js app, environment variables, permissions, verification and backups) is in [docs/cpanel-deployment.md](docs/cpanel-deployment.md). The Node.js application keeps all persistent records in MySQL; only application keys, uploaded files and SQLite development data live in `DATA_DIR`.
-
-`render.yaml` is an alternative **single-instance deployment template**, with a persistent disk, readiness probe and automatic deployment disabled. To use external files, create a private Supabase Storage bucket, enable S3 access in Supabase Storage settings, and configure all `SUPABASE_S3_*` and `SUPABASE_STORAGE_BUCKET` values from `.env.example`. Supabase S3 keys are server-only and have broad project storage access; use a dedicated Supabase project and never expose them to browsers. Files are streamed through the app's authorization and consent checks; do not make the bucket public. PDF and image uploads are not malware-scanned; only upload files from trusted sources. The template does not configure a messaging provider, database, backups, DNS, analytics or Search Console on your behalf.
+`render.yaml` is a **single-instance deployment template**, with a persistent disk, readiness probe and automatic deployment disabled. To use external files, create a private Supabase Storage bucket, enable S3 access in Supabase Storage settings, and configure all `SUPABASE_S3_*` and `SUPABASE_STORAGE_BUCKET` values from `.env.example`. Supabase S3 keys are server-only and have broad project storage access; use a dedicated Supabase project and never expose them to browsers. Files are streamed through the app's authorization and consent checks; do not make the bucket public. PDF and image uploads are not malware-scanned; only upload files from trusted sources. The template does not configure a messaging provider, database, backups, DNS, analytics or Search Console on your behalf.
 
 ## Notifications
 
@@ -106,11 +101,11 @@ Unconfigured jobs remain **PENDING**; non-success responses retry with backoff, 
 
 ## Backups and legacy migration
 
-- `npm run db:schema` writes `db/schema.mysql.sql` from the code-owned schema; import it in phpMyAdmin (SQL tab) when preparing a cPanel database.
-- `npm run backup:mysql` creates an encrypted, bounded database-and-private-file archive during a confirmed maintenance window. It reads every `adsp_*` table in one repeatable-read transaction. With Supabase Storage configured it captures referenced encrypted objects from the private bucket. Also use cPanel → phpMyAdmin → Export for provider-level copies.
-- `npm run restore:mysql -- /protected/path/archive.json.enc` restores only to an explicitly approved, empty isolated cPanel database ending in `_restore_test` (for example `alphadve_alpha_school_restore_test`); Supabase archives also require `SUPABASE_RESTORE_BUCKET` to name a separate empty bucket, never the source or live bucket.
+- `npm run backup:mongodb` creates an encrypted, bounded database-and-private-file archive during a confirmed maintenance window. With Supabase Storage configured it captures referenced encrypted objects from the private bucket.
+- `npm run restore:mongodb -- /protected/path/archive.ejson.enc` restores only to an explicitly approved, empty isolated database ending in `_restore_test`; Supabase archives also require `SUPABASE_RESTORE_BUCKET` to name a separate empty bucket, never the source or live bucket.
+- `npm run migrate:mongodb` imports supported legacy text and form fields from a fresh encrypted backup, without importing old passwords, accounts or unverified photographs. Public imports become reviewable drafts; unrecognised schemas need a reviewed mapping.
 
-See the operations template before using these commands. Tests cover isolated local file recovery, mocked Supabase object capture/restore, the MySQL adapter against an in-memory statement double, and mocked SMTP message routing; live MySQL, Supabase credentials, bucket permissions, real Gmail SMTP delivery and production recovery have not been verified in this workspace. `npm run test:mysql` runs the real adapter rehearsal against a scratch database whose name ends in `_test`.
+See the operations template before using these commands. Tests cover isolated local file recovery, mocked Supabase object capture/restore, and mocked SMTP message routing; live Supabase credentials, bucket permissions, real Gmail SMTP delivery, Mongo restore/migration and production recovery have not been verified in this workspace.
 
 ## Repository and child-data safety
 

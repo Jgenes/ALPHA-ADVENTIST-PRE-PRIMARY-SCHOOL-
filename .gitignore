@@ -10,7 +10,7 @@ work/
 coverage/
 *.sqlite
 *.sqlite-*
-*.json.enc
+*.ejson.enc
 *.log
 .sudo_as_admin_successful
 # Runtime records and keys never belong in source control.
