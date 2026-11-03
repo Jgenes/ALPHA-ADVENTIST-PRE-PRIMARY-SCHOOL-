@@ -42,7 +42,8 @@
 - Guardian channels/evidence, immediate withdrawal, deterministic consent order, missing-child denial, annual expiry checked without waiting for jobs and no automatic republication.
 - Synthetic family portal end-to-end: school creates learner/class/teacher links, staff verifies a guardian, teacher records attendance and draft results/materials, management publishes them, and parent/student/assigned-teacher views stay scoped. Unverified links, off-audience notices and unrelated-parent messages are denied.
 - Approved one-time bootstrap, AES-GCM archive integrity/wrong-key failures, restore target/path/checksum guards, **actual isolated SQLite + private-file restoration**, intact recovered audit chain and file decryption.
-- MySQL adapter behaviour against an in-memory statement double (revisions, unique business keys, duplicate rejection, audit append-only), generated schema consistency with `db/schema.mysql.sql`, and fail-closed MySQL configuration; a real MySQL rehearsal exists as an opt-in test for a disposable `_test` database.
+- MySQL adapter behaviour against an in-memory statement double (revisions, unique business keys, duplicate rejection, audit append-only), generated schema consistency with `db/schema.mysql.sql`, and fail-closed MySQL configuration.
+- A real MySQL 8 rehearsal in CI against a disposable `alpha_school_test` database: 37 `adsp_*` tables created, revisions, duplicate-username rejection and both audit triggers blocking direct `UPDATE`/`DELETE`. `npm run test:mysql` repeats this against any disposable `*_test` database, including a cPanel MariaDB staging copy.
 
 `npm run check` verifies JavaScript syntax, all seven actual PWA precache resources, safe seed/current-tree artifact rules and diff whitespace. This does not scan or remove old Git history.
 
@@ -72,7 +73,7 @@ An earlier GitHub repository-access check returned HTTP 401. No visibility chang
 
 ## Explicitly unverified
 
-- A live cPanel MySQL deployment rehearsal (the `npm run test:mysql` opt-in test has not been run against a real server in this workspace), actual MySQL backup/restore, provider index/privilege configuration and multi-instance behavior.
+- A live **cPanel** deployment rehearsal. The same adapter did pass a real MySQL 8 rehearsal in CI on 3 November 2026 (schema creation, optimistic revisions, unique keys and both append-only audit triggers). MariaDB on the actual cPanel host, hosted backup/restore, provider privilege configuration and multi-instance behaviour remain unverified.
 - Malware scanning is not implemented; uploads rely on format checks, image re-encoding, encryption and review workflows, none of which detect all malicious content.
 - Real email/SMS/WhatsApp receipt, downstream delivery callbacks, production TLS/proxy/CDN settings, external uptime/backup monitors, scheduled off-site backups and disaster-recovery RPO/RTO.
 - School-approved HR/legal policies, guardian authority, real media consent, Maps pin, social identities, official-domain email, PDPC/legal compliance, independent penetration testing and production acceptance.

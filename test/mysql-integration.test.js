@@ -67,6 +67,7 @@ test('real MySQL/MariaDB store rehearsal: schema, revisions, uniqueness and audi
   const connection = await mysql.createConnection(mysqlConnectionOptions(config.mysql, { database: config.mysql.database }));
   try {
     const [[{ present }]] = await connection.query("SELECT COUNT(*) AS present FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = DATABASE() AND TRIGGER_NAME IN ('adsp_audit_logs_no_update', 'adsp_audit_logs_no_delete')");
+    if (env.TEST_DB_REQUIRE_TRIGGERS === 'true') assert.equal(Number(present), 2, 'This database was expected to allow the append-only audit triggers.');
     if (Number(present) === 2) {
       await assert.rejects(connection.query("UPDATE adsp_audit_logs SET payload = '{}' WHERE id = ?", ['AUD-REHEARSAL-' + sequence]), /append-only/);
       await assert.rejects(connection.query('DELETE FROM adsp_audit_logs WHERE id = ?', ['AUD-REHEARSAL-' + sequence]), /append-only/);

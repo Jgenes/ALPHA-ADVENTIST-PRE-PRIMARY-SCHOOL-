@@ -46,6 +46,7 @@ jobs:
           TEST_DB_NAME: alpha_school_test
           TEST_DB_USER: alpha_school
           TEST_DB_PASSWORD: synthetic-db-password
+          TEST_DB_REQUIRE_TRIGGERS: 'true'
         run: |
           set -o pipefail
           if npm run test:mysql 2>&1 | tee /tmp/mysql-rehearsal.log; then exit 0; fi
