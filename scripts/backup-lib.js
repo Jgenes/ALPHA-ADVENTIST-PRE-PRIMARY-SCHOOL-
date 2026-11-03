@@ -2,32 +2,32 @@
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const crypto = require('node:crypto');
-const { BSON } = require('mongodb');
-const EJSON = BSON.EJSON;
 const MAX_ARCHIVE_BYTES = 512 * 1024 * 1024;
 function keyBytes(hex) {
   if (!/^[a-f0-9]{64}$/i.test(hex || '')) throw new Error('Provide a separate 64-hex-character backup encryption key.');
   return Buffer.from(hex, 'hex');
 }
 async function backupKey(env = process.env) {
-  if (env.MONGO_BACKUP_ENCRYPTION_KEY) return keyBytes(env.MONGO_BACKUP_ENCRYPTION_KEY);
-  if (!env.MONGO_BACKUP_ENCRYPTION_KEY_FILE) throw new Error('The backup encryption key or protected key file is required.');
-  const stat = await fs.stat(env.MONGO_BACKUP_ENCRYPTION_KEY_FILE);
+  if (env.BACKUP_ENCRYPTION_KEY) return keyBytes(env.BACKUP_ENCRYPTION_KEY);
+  if (!env.BACKUP_ENCRYPTION_KEY_FILE) throw new Error('The backup encryption key or protected key file is required.');
+  const stat = await fs.stat(env.BACKUP_ENCRYPTION_KEY_FILE);
   if (!stat.isFile() || stat.mode & 0o077) throw new Error('Key-file permissions must be 600 or stricter.');
-  return keyBytes((await fs.readFile(env.MONGO_BACKUP_ENCRYPTION_KEY_FILE, 'utf8')).trim());
+  return keyBytes((await fs.readFile(env.BACKUP_ENCRYPTION_KEY_FILE, 'utf8')).trim());
 }
 function sealBackup(snapshot, key) {
-  const body = Buffer.from(EJSON.stringify(snapshot, { relaxed: false }));
+  // Plain JSON is enough: every database payload is already a JSON document, and
+  // archives are portable between the SQLite development store and MySQL.
+  const body = Buffer.from(JSON.stringify(snapshot));
   if (body.length > MAX_ARCHIVE_BYTES) throw new Error('Use managed database/storage snapshots for archives larger than 512 MB.');
   const iv = crypto.randomBytes(12), cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
   const encrypted = Buffer.concat([cipher.update(body), cipher.final()]);
-  return Buffer.concat([Buffer.from('ALPHAMDB'), iv, cipher.getAuthTag(), encrypted]);
+  return Buffer.concat([Buffer.from('ALPHADB1'), iv, cipher.getAuthTag(), encrypted]);
 }
 function openBackup(data, key) {
-  if (data.length < 36 || data.length > MAX_ARCHIVE_BYTES + 36 || data.subarray(0, 8).toString() !== 'ALPHAMDB') throw new Error('Unsupported, oversized or truncated backup.');
+  if (data.length < 36 || data.length > MAX_ARCHIVE_BYTES + 36 || data.subarray(0, 8).toString() !== 'ALPHADB1') throw new Error('Unsupported, oversized or truncated backup.');
   const decipher = crypto.createDecipheriv('aes-256-gcm', key, data.subarray(8, 20));
   decipher.setAuthTag(data.subarray(20, 36));
-  const snapshot = EJSON.parse(Buffer.concat([decipher.update(data.subarray(36)), decipher.final()]).toString('utf8'), { relaxed: true });
+  const snapshot = JSON.parse(Buffer.concat([decipher.update(data.subarray(36)), decipher.final()]).toString('utf8'));
   if (!snapshot.database || !Array.isArray(snapshot.collections)) throw new Error('Invalid backup manifest.');
   return snapshot;
 }

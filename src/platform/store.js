@@ -6,12 +6,67 @@ const { HttpError } = require('../lib');
 // Names are code-owned, never interpolated from a request. The prefix keeps the
 // audited platform separate from legacy collections until an explicit migration.
 const COLLECTIONS = ['users', 'sessions', 'login_limits', 'departments', 'staff_profiles', 'student_profiles', 'student_guardians', 'classes', 'class_teachers', 'attendance_records', 'student_results', 'learning_materials', 'family_messages', 'admission_documents', 'leave_types', 'leave_requests', 'leave_balances', 'contracts', 'documents', 'document_versions', 'workflow_definitions', 'workflow_instances', 'notices', 'notice_acknowledgements', 'cms_content', 'admissions', 'submissions', 'notifications', 'outbox', 'calendar', 'media', 'media_consents', 'privacy_requests', 'incidents', 'audit_logs', 'system_settings', 'download_grants'];
+
+// Unique business keys enforced by SQL as well as by application validation.
+// Each key field is mirrored into a real VARCHAR(191) column so the constraint
+// works on MySQL 5.7/MariaDB 10.x as well as newer servers without JSON indexes.
+const UNIQUE_KEYS = {
+  users: [['username']],
+  staff_profiles: [['staffId']],
+  student_profiles: [['studentRef'], ['userId']],
+  student_guardians: [['studentId', 'guardianUserId']],
+  class_teachers: [['classId', 'teacherUserId']],
+  attendance_records: [['studentId', 'date']],
+  cms_content: [['kind', 'slug']],
+  audit_logs: [['sequence']]
+};
+
 const clone = value => value == null ? null : structuredClone(value);
 const conflict = () => new HttpError(409, 'This record changed. Refresh and try again.', 'VERSION_CONFLICT');
+const isDuplicate = error => error && (error.code === 'ER_DUP_ENTRY' || error.errno === 1062);
 function table(name) {
   if (!COLLECTIONS.includes(name)) throw new Error('Unknown collection.');
   return 'adsp_' + name;
 }
+function uniqueFields(name) { return [...new Set((UNIQUE_KEYS[name] || []).flat())]; }
+function indexName(name, suffix) { return ('uk_' + table(name) + '_' + suffix).replace(/[^a-zA-Z0-9_]/g, '_').slice(0, 64); }
+function createTableSql(name) {
+  const columns = [
+    'id VARCHAR(191) NOT NULL',
+    'revision INT UNSIGNED NOT NULL',
+    'seq BIGINT UNSIGNED NOT NULL AUTO_INCREMENT',
+    "payload LONGTEXT NOT NULL CHECK (JSON_VALID(payload))",
+    ...uniqueFields(name).map(field => `\`${field}\` VARCHAR(191) NULL`)
+  ];
+  const keys = ['PRIMARY KEY (id)', `UNIQUE KEY ${indexName(name, 'seq')} (seq)`];
+  for (const index of UNIQUE_KEYS[name] || []) keys.push(`UNIQUE KEY ${indexName(name, index.join('_'))} (${index.map(field => `\`${field}\``).join(', ')})`);
+  return `CREATE TABLE IF NOT EXISTS ${table(name)} (\n  ${[...columns, ...keys].join(',\n  ')}\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`;
+}
+// Audit rows are append-only in the application, and MySQL/MariaDB repeats the
+// guarantee so an operator or a direct SQL session cannot quietly rewrite them.
+const AUDIT_TRIGGERS = [
+  ['adsp_audit_logs_no_update', "CREATE TRIGGER adsp_audit_logs_no_update BEFORE UPDATE ON adsp_audit_logs FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Audit records are append-only'"],
+  ['adsp_audit_logs_no_delete', "CREATE TRIGGER adsp_audit_logs_no_delete BEFORE DELETE ON adsp_audit_logs FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Audit records are append-only'"]
+];
+const MYSQL_SCHEMA = [
+  ...COLLECTIONS.map(name => ({ name: table(name), sql: createTableSql(name) })),
+  ...AUDIT_TRIGGERS.map(([name, sql]) => ({ name, sql, trigger: true }))
+];
+function mysqlSchemaStatements() { return MYSQL_SCHEMA.map(item => item.sql); }
+function mysqlSchemaFile() {
+  return [
+    '-- Alpha Adventist Digital School — MySQL/MariaDB schema for cPanel.',
+    '-- Import once in phpMyAdmin (SQL tab) or let the app create it on first start.',
+    '-- The cPanel database may be named alphadve_alpha_school; table names stay adsp_*.',
+    '-- Keep this file in sync with src/platform/store.js (npm run db:schema).',
+    'SET NAMES utf8mb4;',
+    'SET time_zone = "+00:00";',
+    '',
+    ...MYSQL_SCHEMA.map(item => item.sql + ';'),
+    ''
+  ].join('\n');
+}
+
 class SqliteUnit {
   constructor(db) { this.db = db; }
   async get(name, id) {
@@ -37,75 +92,142 @@ class SqliteUnit {
     this.db.prepare(`DELETE FROM ${table(name)} WHERE id = ?`).run(id);
   }
 }
-class MongoUnit {
-  constructor(db, session) { this.db = db; this.session = session; }
-  collection(name) { return this.db.collection(table(name)); }
+
+// Payload stays JSON so the richer workflow records keep their shape, while the
+// small set of business keys is mirrored into indexed columns for uniqueness.
+const keyValue = value => value === undefined || value === null || value === '' ? null : String(value).slice(0, 191);
+class MysqlUnit {
+  constructor(conn) { this.conn = conn; }
   async get(name, id) {
-    const value = await this.collection(name).findOne({ _id: String(id) }, { session: this.session });
-    if (value) delete value._id;
-    return value;
+    const [rows] = await this.conn.execute(`SELECT payload FROM ${table(name)} WHERE id = ?`, [String(id)]);
+    return rows.length ? JSON.parse(rows[0].payload) : null;
   }
   async list(name) {
-    const values = await this.collection(name).find({}, { session: this.session }).toArray();
-    return values.map(({ _id, ...value }) => value);
+    const [rows] = await this.conn.execute(`SELECT payload FROM ${table(name)} ORDER BY seq`);
+    return rows.map(row => JSON.parse(row.payload));
   }
   async insert(name, record) {
     const value = { ...clone(record), revision: 1 };
-    try { await this.collection(name).insertOne({ _id: value.id, ...value }, { session: this.session }); }
-    catch (error) { if (error.code === 11000) throw conflict(); throw error; }
+    const fields = uniqueFields(name);
+    const columns = ['id', 'revision', 'payload', ...fields];
+    const params = [value.id, 1, JSON.stringify(value), ...fields.map(field => keyValue(value[field]))];
+    try {
+      await this.conn.execute(`INSERT INTO ${table(name)} (${columns.join(', ')}) VALUES (${columns.map(() => '?').join(', ')})`, params);
+    } catch (error) { if (isDuplicate(error)) throw conflict(); throw error; }
     return value;
   }
   async update(name, record, expected = record.revision) {
     if (name === 'audit_logs') throw new Error('Audit records are append-only.');
     const value = { ...clone(record), revision: expected + 1 };
-    const result = await this.collection(name).replaceOne({ _id: value.id, revision: expected }, { _id: value.id, ...value }, { session: this.session });
-    if (!result.matchedCount) throw conflict();
+    const fields = uniqueFields(name);
+    const assignments = ['revision = ?', 'payload = ?', ...fields.map(field => `\`${field}\` = ?`)];
+    const params = [value.revision, JSON.stringify(value), ...fields.map(field => keyValue(value[field])), value.id, expected];
+    try {
+      const [result] = await this.conn.execute(`UPDATE ${table(name)} SET ${assignments.join(', ')} WHERE id = ? AND revision = ?`, params);
+      if (!result.affectedRows) throw conflict();
+    } catch (error) { if (isDuplicate(error)) throw conflict(); throw error; }
     return value;
   }
   async remove(name, id) {
     if (name === 'audit_logs') throw new Error('Audit records are append-only.');
-    await this.collection(name).deleteOne({ _id: id }, { session: this.session });
+    await this.conn.execute(`DELETE FROM ${table(name)} WHERE id = ?`, [String(id)]);
   }
 }
-async function openStore(config) {
-  if (config.mongoUri) {
-    const { MongoClient } = require('mongodb');
-    const client = new MongoClient(config.mongoUri, { serverSelectionTimeoutMS: 10000, maxPoolSize: 15, appName: 'AlphaDigitalSchoolPlatform', ...(config.production ? { tls: true } : {}) });
-    try {
-      await client.connect();
-      const db = client.db(config.mongoDb || 'alpha_adventist_development');
-      const topology = await db.command({ hello: 1 });
-      if (!topology.setName && topology.msg !== 'isdbgrid') throw new Error('MongoDB must support transactions (replica set or Atlas).');
-      const existing = new Set((await db.listCollections({}, { nameOnly: true }).toArray()).map(item => item.name));
-      for (const name of COLLECTIONS) {
-        if (!existing.has(table(name))) await db.createCollection(table(name), { validator: { $jsonSchema: { bsonType: 'object', required: ['id', 'revision'], properties: { id: { bsonType: 'string' }, revision: { bsonType: ['int', 'long', 'double'], minimum: 1 } } } } });
-      }
-      await db.collection(table('users')).createIndex({ username: 1 }, { unique: true });
-      await db.collection(table('audit_logs')).createIndex({ sequence: 1 }, { unique: true });
-      await db.collection(table('staff_profiles')).createIndex({ staffId: 1 }, { unique: true });
-      await db.collection(table('student_profiles')).createIndex({ studentRef: 1 }, { unique: true });
-      await db.collection(table('student_profiles')).createIndex({ userId: 1 }, { unique: true });
-      await db.collection(table('student_guardians')).createIndex({ studentId: 1, guardianUserId: 1 }, { unique: true });
-      await db.collection(table('class_teachers')).createIndex({ classId: 1, teacherUserId: 1 }, { unique: true });
-      await db.collection(table('attendance_records')).createIndex({ studentId: 1, date: 1 }, { unique: true });
-      await db.collection(table('family_messages')).createIndex({ studentId: 1, createdAt: 1 });
-      await db.collection(table('cms_content')).createIndex({ kind: 1, slug: 1 }, { unique: true });
-      for (const name of ['sessions', 'login_limits', 'download_grants']) await db.collection(table(name)).createIndex({ expiresAt: 1 });
-      return {
-        kind: 'mongodb',
-        async run(fn) {
-          const session = client.startSession();
-          try { return await session.withTransaction(() => fn(new MongoUnit(db, session)), { readConcern: { level: 'snapshot' }, writeConcern: { w: 'majority' } }); }
-          finally { await session.endSession(); }
-        },
-        async health() { await db.command({ ping: 1 }); return true; },
-        async close() { await client.close(); }
-      };
-    } catch (error) {
-      await client.close();
-      throw new Error(`MongoDB startup connection/check failed: ${error.message}`, { cause: error });
+
+const TRIGGER_PRIVILEGE_ERRORS = new Set(['ER_SPECIFIC_ACCESS_DENIED_ERROR', 'ER_BINLOG_CREATE_ROUTINE_NEED_SUPER', 'ER_TRG_NO_CREATION_CTX']);
+async function ensureMysqlSchema(conn, warnings = []) {
+  for (const item of MYSQL_SCHEMA) {
+    if (!item.trigger) { await conn.query(item.sql); continue; }
+    const [rows] = await conn.query('SELECT 1 AS present FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = DATABASE() AND TRIGGER_NAME = ?', [item.name]);
+    if (rows.length) continue;
+    try { await conn.query(item.sql); }
+    catch (error) {
+      if (error.code === 'ER_TRG_ALREADY_EXISTS') continue;
+      // Some shared hosts withhold TRIGGER (or run MySQL with binary logging and
+      // log_bin_trust_function_creators=0). The application still refuses every
+      // audit update/delete; the database guard is reported as degraded instead
+      // of blocking the whole school site.
+      if (TRIGGER_PRIVILEGE_ERRORS.has(error.code)) { warnings.push(item.name); continue; }
+      throw error;
     }
   }
+  return warnings;
+}
+
+// Shared by the application and the backup/restore scripts so no caller has to
+// pass null TLS or empty socket options to the driver.
+function mysqlConnectionOptions(mysqlConfig, overrides = {}) {
+  const options = {
+    user: mysqlConfig.user,
+    password: mysqlConfig.password,
+    charset: 'utf8mb4',
+    connectTimeout: 15000,
+    multipleStatements: false,
+    // Dates are never stored as SQL types, but UTC avoids server-timezone drift.
+    timezone: 'Z',
+    ...overrides
+  };
+  if (mysqlConfig.socketPath) options.socketPath = mysqlConfig.socketPath;
+  else { options.host = mysqlConfig.host; options.port = mysqlConfig.port || 3306; }
+  if (mysqlConfig.ssl) options.ssl = mysqlConfig.ssl;
+  return options;
+}
+
+async function openMysqlStore(mysqlConfig, options = {}) {
+  const mysql = require('mysql2/promise');
+  const pool = mysql.createPool(mysqlConnectionOptions(mysqlConfig, {
+    database: mysqlConfig.database,
+    waitForConnections: true,
+    connectionLimit: mysqlConfig.connectionLimit || 3,
+    queueLimit: 0,
+    enableKeepAlive: true
+  }));
+  try {
+    await pool.query('SELECT 1');
+    const warnings = [];
+    if (options.autoSchema !== false) {
+      try { await ensureMysqlSchema(pool, warnings); }
+      catch (error) {
+        throw new Error(`MySQL schema setup failed (${error.code || error.message}). The database user needs CREATE, ALTER, INDEX and TRIGGER privileges on ${mysqlConfig.database}, or import db/schema.mysql.sql in phpMyAdmin and restart with DB_AUTO_SCHEMA=false.`, { cause: error });
+      }
+    }
+    for (const name of warnings) console.warn(`[store] MySQL did not allow creating trigger ${name}; audit rows stay append-only in the application but the database-level guard is missing. Grant the database user the TRIGGER privilege (cPanel usually grants it automatically). On MySQL 8 with binary logging, the server also needs log_bin_trust_function_creators=1, or the triggers must be imported by an administrator.`);
+    // One connection at a time keeps the HMAC audit chain strictly ordered even
+    // if two requests try to append concurrently. The unique key on the audit
+    // sequence remains a second line of defence.
+    let queue = Promise.resolve();
+    function run(fn) {
+      const pending = queue.then(async () => {
+        const conn = await pool.getConnection();
+        try {
+          await conn.beginTransaction();
+          const result = await fn(new MysqlUnit(conn));
+          await conn.commit();
+          return result;
+        } catch (error) {
+          try { await conn.rollback(); } catch { /* the connection is released below */ }
+          throw error;
+        } finally { conn.release(); }
+      });
+      queue = pending.catch(() => {});
+      return pending;
+    }
+    return {
+      kind: 'mysql',
+      run,
+      async health() { await queue; const [rows] = await pool.query('SELECT 1 AS ok'); return rows[0].ok === 1; },
+      async close() { await queue; await pool.end(); }
+    };
+  } catch (error) {
+    try { await pool.end(); } catch { /* already closed */ }
+    if (/^MySQL schema setup failed/.test(error.message)) throw error;
+    if (error.code === 'ER_NO_SUCH_TABLE') throw new Error(`MySQL database ${mysqlConfig.database} is missing the adsp_ tables. Import db/schema.mysql.sql in phpMyAdmin or enable DB_AUTO_SCHEMA.`, { cause: error });
+    throw new Error(`MySQL startup connection/check failed: ${error.message}`, { cause: error });
+  }
+}
+
+async function openStore(config) {
+  if (config.mysql) return openMysqlStore(config.mysql, { autoSchema: config.mysqlAutoSchema !== false });
   const { DatabaseSync } = require('node:sqlite');
   const file = path.join(config.dataDir, 'adsp.sqlite');
   const db = new DatabaseSync(file);
@@ -140,4 +262,4 @@ async function openStore(config) {
     async close() { await queue; db.close(); }
   };
 }
-module.exports = { openStore, COLLECTIONS };
+module.exports = { openStore, COLLECTIONS, UNIQUE_KEYS, MysqlUnit, mysqlConnectionOptions, mysqlSchemaStatements, mysqlSchemaFile, MYSQL_SCHEMA };

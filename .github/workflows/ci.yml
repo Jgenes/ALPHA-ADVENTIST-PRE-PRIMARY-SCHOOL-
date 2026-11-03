@@ -7,7 +7,24 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
+    # A disposable MySQL 8 database exercises the cPanel storage engine. The
+    # database name ends in _test so the rehearsal can never point at school data.
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: synthetic-root-password
+          MYSQL_DATABASE: alpha_school_test
+          MYSQL_USER: alpha_school
+          MYSQL_PASSWORD: synthetic-db-password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -psynthetic-root-password"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -17,6 +34,31 @@ jobs:
       - run: npm ci
       - run: npm run check
       - run: npm test
+      - name: Allow append-only audit triggers in the disposable database
+        env:
+          MYSQL_ROOT_PASSWORD: synthetic-root-password
+        run: |
+          node -e "const mysql=require('mysql2/promise');(async()=>{const c=await mysql.createConnection({host:'127.0.0.1',user:'root',password:process.env.MYSQL_ROOT_PASSWORD});await c.query('SET GLOBAL log_bin_trust_function_creators = 1');await c.end();})().catch(error=>{console.error(error.message);process.exit(1)})"
+      - name: Real MySQL/MariaDB store rehearsal
+        env:
+          TEST_DB_HOST: 127.0.0.1
+          TEST_DB_PORT: '3306'
+          TEST_DB_NAME: alpha_school_test
+          TEST_DB_USER: alpha_school
+          TEST_DB_PASSWORD: synthetic-db-password
+          TEST_DB_REQUIRE_TRIGGERS: 'true'
+        run: |
+          set -o pipefail
+          if npm run test:mysql 2>&1 | tee /tmp/mysql-rehearsal.log; then exit 0; fi
+          # The runner log endpoint is not readable from this workspace, so surface
+          # the failing assertions as a check annotation when the rehearsal fails.
+          node - <<'SCRIPT'
+          const fs = require('node:fs');
+          const lines = fs.readFileSync('/tmp/mysql-rehearsal.log', 'utf8').split('\n').filter(Boolean).slice(-40);
+          const text = lines.join(' | ').replace(/%/g, '%25').replace(/\r/g, '').slice(0, 6000);
+          console.log('::error title=MySQL rehearsal output::' + text);
+          SCRIPT
+          exit 1
       - run: npm audit --omit=dev
       - run: npx playwright install --with-deps chromium
       - run: npm run test:ui
