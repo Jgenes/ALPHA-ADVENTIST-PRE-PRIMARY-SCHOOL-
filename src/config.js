@@ -81,9 +81,12 @@ function createConfig(env = process.env) {
     if (caFile && !fs.existsSync(caFile)) throw new Error('DB_SSL_CA_FILE does not exist.');
     mysqlSsl = { rejectUnauthorized: env.DB_SSL_REJECT_UNAUTHORIZED !== 'false', ...(caFile ? { ca: fs.readFileSync(caFile, 'utf8') } : {}) };
   }
+  // cPanel shared accounts often cap MySQL connections; transactions are queued
+  // through one pooled connection anyway, so a small pool is enough.
+  const mysqlPoolSize = positive(env.DB_POOL_SIZE, 3, 10);
   const mysql = mysqlConfigured ? {
     host: mysqlHost, port: mysqlPort, user: mysqlUser, password: mysqlPassword,
-    database: mysqlDatabase, socketPath: mysqlSocketPath, ssl: mysqlSsl
+    database: mysqlDatabase, socketPath: mysqlSocketPath, ssl: mysqlSsl, connectionLimit: mysqlPoolSize
   } : null;
   const mysqlAutoSchema = env.DB_AUTO_SCHEMA !== 'false';
   if (publicPreview && mysql) throw new Error('Public preview must use isolated temporary storage, not the production MySQL database.');

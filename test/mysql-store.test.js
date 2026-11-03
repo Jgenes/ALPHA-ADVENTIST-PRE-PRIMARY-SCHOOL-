@@ -162,6 +162,8 @@ test('MySQL configuration is explicit, defaults the cPanel database name and nev
     assert.equal(config.mysql.port, 3306);
     assert.equal(config.mysql.user, 'alphadve_alpha_school');
     assert.equal(config.mysql.ssl, null);
+    assert.equal(config.mysql.connectionLimit, 3);
+    assert.equal(createConfig({ ...productionBase, DB_HOST: 'localhost', DB_USER: 'alpha', DB_PASSWORD: 'synthetic-db-password', DB_POOL_SIZE: '7' }).mysql.connectionLimit, 7);
     assert.equal(config.mysqlAutoSchema, false);
     const tls = createConfig({ ...productionBase, DB_HOST: 'db.example.test', DB_USER: 'alpha', DB_PASSWORD: 'synthetic-db-password', DB_SSL: 'true' });
     assert.deepEqual(tls.mysql.ssl, { rejectUnauthorized: true });

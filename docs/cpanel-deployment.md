@@ -122,6 +122,7 @@ Configure **either**:
 ### Optional
 
 - `TRUST_PROXY_HOPS=1` when cPanel/Apache is the only trusted proxy in front of Node.
+- `DB_POOL_SIZE` (default `3`) when the host caps database connections per user.
 - `DB_SOCKET` when the host provides a MySQL Unix socket instead of TCP.
 - `DB_SSL`, `DB_SSL_CA_FILE` only for a remote MySQL server (not for cPanel localhost).
 - `SUPABASE_S3_*` + `SUPABASE_STORAGE_BUCKET` to keep uploaded files in a private Supabase bucket instead of `DATA_DIR`.

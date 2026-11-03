@@ -35,7 +35,7 @@ function createTableSql(name) {
     'id VARCHAR(191) NOT NULL',
     'revision INT UNSIGNED NOT NULL',
     'seq BIGINT UNSIGNED NOT NULL AUTO_INCREMENT',
-    'payload LONGTEXT NOT NULL',
+    "payload LONGTEXT NOT NULL CHECK (JSON_VALID(payload))",
     ...uniqueFields(name).map(field => `\`${field}\` VARCHAR(191) NULL`)
   ];
   const keys = ['PRIMARY KEY (id)', `UNIQUE KEY ${indexName(name, 'seq')} (seq)`];
@@ -178,7 +178,7 @@ async function openMysqlStore(mysqlConfig, options = {}) {
   const pool = mysql.createPool(mysqlConnectionOptions(mysqlConfig, {
     database: mysqlConfig.database,
     waitForConnections: true,
-    connectionLimit: mysqlConfig.connectionLimit || 5,
+    connectionLimit: mysqlConfig.connectionLimit || 3,
     queueLimit: 0,
     enableKeepAlive: true
   }));
