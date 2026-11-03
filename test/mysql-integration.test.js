@@ -6,6 +6,8 @@ const os = require('node:os');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { createConfig } = require('../src/config');
+const { createApplication } = require('../server');
+const { verifyAudit } = require('../src/platform/audit');
 const { openStore, COLLECTIONS, mysqlConnectionOptions } = require('../src/platform/store');
 
 // A real rehearsal against a throwaway MySQL/MariaDB database. CI has no MySQL
@@ -18,27 +20,34 @@ const skip = configured
   ? (scratch ? false : 'TEST_DB_NAME must end in _test so this rehearsal can never touch live school data.')
   : 'Set TEST_DB_HOST, TEST_DB_NAME (ending _test), TEST_DB_USER and TEST_DB_PASSWORD to run the real MySQL rehearsal.';
 
+const rehearsalEnv = {
+  NODE_ENV: 'test', BASE_URL: 'http://localhost:3000',
+  DB_HOST: env.TEST_DB_HOST, DB_PORT: env.TEST_DB_PORT || '3306', DB_NAME: env.TEST_DB_NAME,
+  DB_USER: env.TEST_DB_USER, DB_PASSWORD: env.TEST_DB_PASSWORD || '', DB_SOCKET: env.TEST_DB_SOCKET || ''
+};
+// Drop the audit triggers, empty every table and recreate the triggers so the
+// disposable database can be reused by the next rehearsal run.
+async function resetScratchDatabase(config) {
+  const mysql = require('mysql2/promise');
+  const connection = await mysql.createConnection(mysqlConnectionOptions(config.mysql, { database: config.mysql.database }));
+  try {
+    await connection.query('DROP TRIGGER IF EXISTS adsp_audit_logs_no_update');
+    await connection.query('DROP TRIGGER IF EXISTS adsp_audit_logs_no_delete');
+    for (const name of COLLECTIONS) await connection.query(`DELETE FROM adsp_${name}`);
+  } finally { await connection.end(); }
+  const reopened = await openStore(config);
+  await reopened.close();
+}
+
 test('real MySQL/MariaDB store rehearsal: schema, revisions, uniqueness and audit triggers', { skip, timeout: 120000 }, async t => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'alpha-mysql-it-'));
-  const config = createConfig({
-    NODE_ENV: 'test', DATA_DIR: dir, BASE_URL: 'http://localhost:3000',
-    DB_HOST: env.TEST_DB_HOST, DB_PORT: env.TEST_DB_PORT || '3306', DB_NAME: env.TEST_DB_NAME,
-    DB_USER: env.TEST_DB_USER, DB_PASSWORD: env.TEST_DB_PASSWORD || '', DB_SOCKET: env.TEST_DB_SOCKET || ''
-  });
+  const config = createConfig({ ...rehearsalEnv, DATA_DIR: dir });
   assert.equal(config.mysql.database, env.TEST_DB_NAME);
   const mysql = require('mysql2/promise');
   let store;
   t.after(async () => {
     if (store) await store.close().catch(() => {});
-    const connection = await mysql.createConnection(mysqlConnectionOptions(config.mysql, { database: config.mysql.database }));
-    try {
-      await connection.query('DROP TRIGGER IF EXISTS adsp_audit_logs_no_update');
-      await connection.query('DROP TRIGGER IF EXISTS adsp_audit_logs_no_delete');
-      for (const name of COLLECTIONS) await connection.query(`DELETE FROM adsp_${name}`);
-    } finally { await connection.end(); }
-    // Recreate the audit triggers so the scratch database is reusable.
-    const reopened = await openStore(config);
-    await reopened.close();
+    await resetScratchDatabase(config);
     await fs.rm(dir, { recursive: true, force: true });
   });
 
@@ -76,4 +85,20 @@ test('real MySQL/MariaDB store rehearsal: schema, revisions, uniqueness and audi
 
   await store.run(tx => tx.remove('users', user.id));
   assert.equal(await store.run(tx => tx.get('users', user.id)), null);
+});
+
+test('the full platform initialises on MySQL/MariaDB and keeps a verifiable audit chain', { skip, timeout: 120000 }, async t => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'alpha-mysql-app-'));
+  const config = createConfig({ ...rehearsalEnv, DATA_DIR: dir });
+  const app = await createApplication(config, { jobs: false });
+  t.after(async () => { await app.close(); await resetScratchDatabase(config); await fs.rm(dir, { recursive: true, force: true }); });
+  assert.equal(app.store.kind, 'mysql');
+  const initialised = await app.store.run(tx => tx.get('system_settings', 'initialised'));
+  assert.equal(initialised.schemaVersion, 1);
+  const content = await app.platform.publicContent();
+  assert.ok(content.some(item => item.kind === 'news'), 'seed news must be readable through MySQL');
+  const logs = await app.store.run(tx => tx.list('audit_logs'));
+  assert.ok(logs.length >= 1);
+  const head = await app.store.run(tx => tx.get('system_settings', 'audit-head'));
+  assert.equal(verifyAudit(logs, config.auditKey, head), true);
 });
