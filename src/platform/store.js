@@ -191,7 +191,7 @@ async function openMysqlStore(mysqlConfig, options = {}) {
         throw new Error(`MySQL schema setup failed (${error.code || error.message}). The database user needs CREATE, ALTER, INDEX and TRIGGER privileges on ${mysqlConfig.database}, or import db/schema.mysql.sql in phpMyAdmin and restart with DB_AUTO_SCHEMA=false.`, { cause: error });
       }
     }
-    for (const name of warnings) console.warn(`[store] MySQL did not allow creating trigger ${name}; audit rows stay append-only in the application but the database-level guard is missing. Grant the cPanel user the TRIGGER privilege, or import db/schema.mysql.sql as a privileged user.`);
+    for (const name of warnings) console.warn(`[store] MySQL did not allow creating trigger ${name}; audit rows stay append-only in the application but the database-level guard is missing. Grant the database user the TRIGGER privilege (cPanel usually grants it automatically). On MySQL 8 with binary logging, the server also needs log_bin_trust_function_creators=1, or the triggers must be imported by an administrator.`);
     // One connection at a time keeps the HMAC audit chain strictly ordered even
     // if two requests try to append concurrently. The unique key on the audit
     // sequence remains a second line of defence.
